@@ -1403,9 +1403,9 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const availableEditors = useServerAvailableEditors();
   const modelOptionsByProvider = useMemo(
     () => ({
-      codex: providerStatuses.find((provider) => provider.provider === "codex")?.models ?? [],
-      claudeAgent:
-        providerStatuses.find((provider) => provider.provider === "claudeAgent")?.models ?? [],
+      codex: getProviderModels(providerStatuses, "codex"),
+      claudeAgent: getProviderModels(providerStatuses, "claudeAgent"),
+      opencode: getProviderModels(providerStatuses, "opencode"),
     }),
     [providerStatuses],
   );

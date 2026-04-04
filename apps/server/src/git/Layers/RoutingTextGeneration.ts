@@ -3,13 +3,14 @@
  * Codex CLI or Claude CLI implementation based on the provider in each
  * request input.
  *
- * When `modelSelection.provider` is `"claudeAgent"` the request is forwarded to
- * the Claude layer; for any other value (including the default `undefined`) it
- * falls through to the Codex layer.
+ * `opencode` is wired into the shared model-selection contracts before its git
+ * text-generation layer exists, so requests for that provider fail explicitly
+ * instead of silently falling back to another harness.
  *
  * @module RoutingTextGeneration
  */
 import { Effect, Layer, ServiceMap } from "effect";
+import { TextGenerationError } from "@t3tools/contracts";
 
 import {
   TextGeneration,
@@ -38,16 +39,67 @@ class ClaudeTextGen extends ServiceMap.Service<ClaudeTextGen, TextGenerationShap
 const makeRoutingTextGeneration = Effect.gen(function* () {
   const codex = yield* CodexTextGen;
   const claude = yield* ClaudeTextGen;
-
-  const route = (provider?: TextGenerationProvider): TextGenerationShape =>
-    provider === "claudeAgent" ? claude : codex;
+  const unsupportedProvider = <T>(operation: string, provider: TextGenerationProvider) =>
+    Effect.fail(
+      new TextGenerationError({
+        operation,
+        detail: `Provider '${provider}' does not support git text generation yet.`,
+      }),
+    ) as Effect.Effect<T, TextGenerationError>;
 
   return {
-    generateCommitMessage: (input) =>
-      route(input.modelSelection.provider).generateCommitMessage(input),
-    generatePrContent: (input) => route(input.modelSelection.provider).generatePrContent(input),
-    generateBranchName: (input) => route(input.modelSelection.provider).generateBranchName(input),
-    generateThreadTitle: (input) => route(input.modelSelection.provider).generateThreadTitle(input),
+    generateCommitMessage: (input) => {
+      switch (input.modelSelection.provider) {
+        case "codex":
+          return codex.generateCommitMessage(input);
+        case "claudeAgent":
+          return claude.generateCommitMessage(input);
+        case "opencode":
+          return unsupportedProvider(
+            "RoutingTextGeneration.generateCommitMessage",
+            input.modelSelection.provider,
+          );
+      }
+    },
+    generatePrContent: (input) => {
+      switch (input.modelSelection.provider) {
+        case "codex":
+          return codex.generatePrContent(input);
+        case "claudeAgent":
+          return claude.generatePrContent(input);
+        case "opencode":
+          return unsupportedProvider(
+            "RoutingTextGeneration.generatePrContent",
+            input.modelSelection.provider,
+          );
+      }
+    },
+    generateBranchName: (input) => {
+      switch (input.modelSelection.provider) {
+        case "codex":
+          return codex.generateBranchName(input);
+        case "claudeAgent":
+          return claude.generateBranchName(input);
+        case "opencode":
+          return unsupportedProvider(
+            "RoutingTextGeneration.generateBranchName",
+            input.modelSelection.provider,
+          );
+      }
+    },
+    generateThreadTitle: (input) => {
+      switch (input.modelSelection.provider) {
+        case "codex":
+          return codex.generateThreadTitle(input);
+        case "claudeAgent":
+          return claude.generateThreadTitle(input);
+        case "opencode":
+          return unsupportedProvider(
+            "RoutingTextGeneration.generateThreadTitle",
+            input.modelSelection.provider,
+          );
+      }
+    },
   } satisfies TextGenerationShape;
 });
 

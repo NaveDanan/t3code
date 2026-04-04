@@ -30,6 +30,7 @@ import {
   readCodexConfigModelProvider,
 } from "./CodexProvider";
 import { checkClaudeProviderStatus, parseClaudeAuthStatusFromOutput } from "./ClaudeProvider";
+import { checkOpencodeProviderStatus } from "./OpencodeProvider";
 import { haveProvidersChanged, ProviderRegistryLive } from "./ProviderRegistry";
 import { ServerSettingsService, type ServerSettingsShape } from "../../serverSettings";
 import { ProviderRegistry } from "../Services/ProviderRegistry";
@@ -507,10 +508,107 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             version: "1.0.0",
             models: [],
           },
+          {
+            provider: "opencode",
+            status: "disabled",
+            enabled: false,
+            installed: false,
+            auth: { status: "unknown" },
+            checkedAt: "2026-03-25T00:00:00.000Z",
+            version: null,
+            models: [],
+          },
         ] as const satisfies ReadonlyArray<ServerProvider>;
 
         assert.strictEqual(haveProvidersChanged(providers, [...providers]), false);
       });
+
+      it.effect("reports OpenCode as disabled when the provider is disabled", () =>
+        Effect.gen(function* () {
+          const status = yield* checkOpencodeProviderStatus;
+          assert.strictEqual(status.provider, "opencode");
+          assert.strictEqual(status.enabled, false);
+          assert.strictEqual(status.status, "disabled");
+          assert.strictEqual(status.installed, false);
+          assert.strictEqual(status.message, "OpenCode is disabled in T3 Code settings.");
+        }).pipe(
+          Effect.provide(
+            ServerSettingsService.layerTest({
+              providers: {
+                opencode: {
+                  enabled: false,
+                },
+              },
+            }),
+          ),
+        ),
+      );
+
+      it.effect("reports OpenCode as unavailable until the sidecar bridge is implemented", () =>
+        Effect.gen(function* () {
+          const status = yield* checkOpencodeProviderStatus;
+          assert.strictEqual(status.provider, "opencode");
+          assert.strictEqual(status.enabled, true);
+          assert.strictEqual(status.status, "error");
+          assert.strictEqual(status.installed, true);
+          assert.strictEqual(status.version, "1.0.0");
+          assert.strictEqual(
+            status.message,
+            "OpenCode CLI is installed, but the T3 Code sidecar bridge is not implemented yet.",
+          );
+          assert.deepStrictEqual(
+            status.models.map((model) => model.slug),
+            ["openai/gpt-5", "openai/gpt-5-mini", "anthropic/claude-sonnet-4-5"],
+          );
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              ServerSettingsService.layerTest({
+                providers: {
+                  opencode: {
+                    enabled: true,
+                    customModels: ["anthropic/claude-sonnet-4-5"],
+                  },
+                },
+              }),
+              mockSpawnerLayer((args) => {
+                const joined = args.join(" ");
+                if (joined === "--version") {
+                  return { stdout: "opencode 1.0.0\n", stderr: "", code: 0 };
+                }
+                throw new Error(`Unexpected args: ${joined}`);
+              }),
+            ),
+          ),
+        ),
+      );
+
+      it.effect("reports OpenCode as missing when the CLI is not installed", () =>
+        Effect.gen(function* () {
+          const status = yield* checkOpencodeProviderStatus;
+          assert.strictEqual(status.provider, "opencode");
+          assert.strictEqual(status.enabled, true);
+          assert.strictEqual(status.status, "error");
+          assert.strictEqual(status.installed, false);
+          assert.strictEqual(
+            status.message,
+            "OpenCode CLI (`opencode`) is not installed or not on PATH.",
+          );
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              ServerSettingsService.layerTest({
+                providers: {
+                  opencode: {
+                    enabled: true,
+                  },
+                },
+              }),
+              failingSpawnerLayer("spawn opencode ENOENT"),
+            ),
+          ),
+        ),
+      );
 
       it.effect("reruns codex health when codex provider settings change", () =>
         Effect.gen(function* () {

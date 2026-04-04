@@ -72,7 +72,9 @@ function getProviderStateFromCapabilities(
   const normalizedOptions =
     provider === "codex"
       ? normalizeCodexModelOptionsWithCapabilities(caps, providerOptions)
-      : normalizeClaudeModelOptionsWithCapabilities(caps, providerOptions);
+      : provider === "claudeAgent"
+        ? normalizeClaudeModelOptionsWithCapabilities(caps, providerOptions)
+        : undefined;
 
   // Ultrathink styling (driven by capabilities data, not provider identity)
   const ultrathinkActive =
@@ -154,6 +156,11 @@ const composerProviderRegistry: Record<ProviderKind, ProviderRegistryEntry> = {
         onPromptChange={onPromptChange}
       />
     ),
+  },
+  opencode: {
+    getState: (input) => getProviderStateFromCapabilities(input),
+    renderTraitsMenuContent: () => null,
+    renderTraitsPicker: () => null,
   },
 };
 

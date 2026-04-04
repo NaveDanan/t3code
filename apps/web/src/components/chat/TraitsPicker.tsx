@@ -52,7 +52,10 @@ function getRawEffort(
   if (provider === "codex") {
     return trimOrNull((modelOptions as CodexModelOptions | undefined)?.reasoningEffort);
   }
-  return trimOrNull((modelOptions as ClaudeModelOptions | undefined)?.effort);
+  if (provider === "claudeAgent") {
+    return trimOrNull((modelOptions as ClaudeModelOptions | undefined)?.effort);
+  }
+  return null;
 }
 
 function getRawContextWindow(
@@ -73,7 +76,10 @@ function buildNextOptions(
   if (provider === "codex") {
     return { ...(modelOptions as CodexModelOptions | undefined), ...patch } as CodexModelOptions;
   }
-  return { ...(modelOptions as ClaudeModelOptions | undefined), ...patch } as ClaudeModelOptions;
+  if (provider === "claudeAgent") {
+    return { ...(modelOptions as ClaudeModelOptions | undefined), ...patch } as ClaudeModelOptions;
+  }
+  return (modelOptions ? { ...modelOptions, ...patch } : { ...patch }) as ProviderOptions;
 }
 
 function getSelectedTraits(
@@ -85,6 +91,20 @@ function getSelectedTraits(
   allowPromptInjectedEffort: boolean,
 ) {
   const caps = getProviderModelCapabilities(models, model, provider);
+  if (provider === "opencode") {
+    return {
+      caps,
+      effort: null,
+      effortLevels: [],
+      thinkingEnabled: null,
+      fastModeEnabled: false,
+      contextWindowOptions: [],
+      contextWindow: null,
+      defaultContextWindow: null,
+      ultrathinkPromptControlled: false,
+      ultrathinkInBodyText: false,
+    };
+  }
   const effortLevels = allowPromptInjectedEffort
     ? caps.reasoningEffortLevels
     : caps.reasoningEffortLevels.filter(
@@ -203,7 +223,11 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
         const stripped = prompt.replace(/^Ultrathink:\s*/i, "");
         onPromptChange(stripped);
       }
-      const effortKey = provider === "codex" ? "reasoningEffort" : "effort";
+      const effortKey =
+        provider === "codex" ? "reasoningEffort" : provider === "claudeAgent" ? "effort" : null;
+      if (!effortKey) {
+        return;
+      }
       updateModelOptions(
         buildNextOptions(provider, modelOptions, { [effortKey]: nextOption.value }),
       );
