@@ -33,11 +33,30 @@ import { checkClaudeProviderStatus, parseClaudeAuthStatusFromOutput } from "./Cl
 import { checkOpencodeProviderStatus } from "./OpencodeProvider";
 import { haveProvidersChanged, ProviderRegistryLive } from "./ProviderRegistry";
 import { ServerSettingsService, type ServerSettingsShape } from "../../serverSettings";
+import {
+  OpencodeServerManager,
+  OpencodeServerManagerError,
+  type OpencodeServerManagerShape,
+} from "../Services/OpencodeServerManager";
 import { ProviderRegistry } from "../Services/ProviderRegistry";
 
 // ── Test helpers ────────────────────────────────────────────────────
 
 const encoder = new TextEncoder();
+const opencodeProviderListModel = {
+  id: "gpt-5",
+  name: "GPT-5",
+  release_date: "2025-01-01",
+  attachment: true,
+  reasoning: true,
+  temperature: false,
+  tool_call: true,
+  limit: {
+    context: 200_000,
+    output: 8_000,
+  },
+  options: {},
+} as const;
 
 function mockHandle(result: { stdout: string; stderr: string; code: number }) {
   return ChildProcessSpawner.makeHandle({
@@ -95,6 +114,16 @@ function failingSpawnerLayer(description: string) {
       ),
     ),
   );
+}
+
+function fakeOpencodeServerManagerLayer(manager: Partial<OpencodeServerManagerShape> = {}) {
+  return Layer.succeed(OpencodeServerManager, {
+    ensureServer: () =>
+      Effect.die(new Error("fake OpencodeServerManager.ensureServer was not configured.")),
+    probe: () => Effect.die(new Error("fake OpencodeServerManager.probe was not configured.")),
+    stop: Effect.void,
+    ...manager,
+  } satisfies OpencodeServerManagerShape);
 }
 
 function makeMutableServerSettingsService(
@@ -533,32 +562,38 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
           assert.strictEqual(status.message, "OpenCode is disabled in T3 Code settings.");
         }).pipe(
           Effect.provide(
-            ServerSettingsService.layerTest({
-              providers: {
-                opencode: {
-                  enabled: false,
+            Layer.mergeAll(
+              ServerSettingsService.layerTest({
+                providers: {
+                  opencode: {
+                    enabled: false,
+                  },
                 },
-              },
-            }),
+              }),
+              fakeOpencodeServerManagerLayer(),
+            ),
           ),
         ),
       );
 
-      it.effect("reports OpenCode as unavailable until the sidecar bridge is implemented", () =>
+      it.effect("reports OpenCode bridge health while keeping runtime sessions gated", () =>
         Effect.gen(function* () {
           const status = yield* checkOpencodeProviderStatus;
           assert.strictEqual(status.provider, "opencode");
           assert.strictEqual(status.enabled, true);
-          assert.strictEqual(status.status, "error");
+          assert.strictEqual(status.status, "warning");
           assert.strictEqual(status.installed, true);
-          assert.strictEqual(status.version, "1.0.0");
+          assert.strictEqual(status.version, "1.3.15");
+          assert.strictEqual(status.auth.status, "authenticated");
+          assert.strictEqual(status.auth.type, "openai");
+          assert.strictEqual(status.auth.label, "OpenAI");
           assert.strictEqual(
             status.message,
-            "OpenCode CLI is installed, but the T3 Code sidecar bridge is not implemented yet.",
+            "OpenCode server bridge is healthy and OpenAI is connected. Chat sessions remain gated until the runtime adapter is wired.",
           );
           assert.deepStrictEqual(
             status.models.map((model) => model.slug),
-            ["openai/gpt-5", "openai/gpt-5-mini", "anthropic/claude-sonnet-4-5"],
+            ["openai/gpt-5", "anthropic/claude-sonnet-4-5"],
           );
         }).pipe(
           Effect.provide(
@@ -571,12 +606,89 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
                   },
                 },
               }),
-              mockSpawnerLayer((args) => {
-                const joined = args.join(" ");
-                if (joined === "--version") {
-                  return { stdout: "opencode 1.0.0\n", stderr: "", code: 0 };
-                }
-                throw new Error(`Unexpected args: ${joined}`);
+              fakeOpencodeServerManagerLayer({
+                probe: () =>
+                  Effect.succeed({
+                    server: {
+                      binaryPath: "opencode",
+                      url: "http://127.0.0.1:4196",
+                      client: {} as never,
+                      version: "1.3.15",
+                    },
+                    configuredProviders: [
+                      {
+                        id: "openai",
+                        name: "OpenAI",
+                        source: "api",
+                        env: [],
+                        options: {},
+                        models: {
+                          "gpt-5": {
+                            id: "gpt-5",
+                            providerID: "openai",
+                            api: {
+                              id: "openai",
+                              url: "https://api.openai.com/v1",
+                              npm: "openai",
+                            },
+                            name: "GPT-5",
+                            capabilities: {
+                              temperature: false,
+                              reasoning: true,
+                              attachment: true,
+                              toolcall: true,
+                              input: {
+                                text: true,
+                                audio: false,
+                                image: true,
+                                video: false,
+                                pdf: true,
+                              },
+                              output: {
+                                text: true,
+                                audio: false,
+                                image: false,
+                                video: false,
+                                pdf: false,
+                              },
+                              interleaved: false,
+                            },
+                            cost: {
+                              input: 1,
+                              output: 2,
+                              cache: {
+                                read: 0,
+                                write: 0,
+                              },
+                            },
+                            limit: {
+                              context: 200_000,
+                              output: 8_000,
+                            },
+                            status: "active",
+                            options: {},
+                            headers: {},
+                            release_date: "2025-01-01",
+                          },
+                        },
+                      },
+                    ],
+                    knownProviders: [
+                      {
+                        id: "openai",
+                        name: "OpenAI",
+                        env: [],
+                        models: {
+                          "gpt-5": opencodeProviderListModel,
+                        },
+                      },
+                    ],
+                    connectedProviderIds: ["openai"],
+                    authMethodsByProviderId: {
+                      openai: [{ type: "api", label: "API Key" }],
+                    },
+                    defaultModelByProviderId: { openai: "gpt-5" },
+                  }),
               }),
             ),
           ),
@@ -604,7 +716,15 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
                   },
                 },
               }),
-              failingSpawnerLayer("spawn opencode ENOENT"),
+              fakeOpencodeServerManagerLayer({
+                probe: () =>
+                  Effect.fail(
+                    new OpencodeServerManagerError({
+                      operation: "ensureServer",
+                      detail: "spawn opencode ENOENT",
+                    }),
+                  ),
+              }),
             ),
           ),
         ),

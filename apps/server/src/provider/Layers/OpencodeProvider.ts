@@ -1,18 +1,15 @@
 import type { OpencodeSettings, ServerProviderModel } from "@t3tools/contracts";
-import { Effect, Equal, Layer, Option, Result, Stream } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { Effect, Equal, Layer, Result, Stream } from "effect";
 
 import {
   buildServerProvider,
-  DEFAULT_TIMEOUT_MS,
-  detailFromResult,
   isCommandMissingCause,
-  parseGenericCliVersion,
   providerModelsFromSettings,
-  spawnAndCollect,
 } from "../providerSnapshot";
 import { makeManagedServerProvider } from "../makeManagedServerProvider";
 import { OpencodeProvider } from "../Services/OpencodeProvider";
+import { OpencodeServerManager } from "../Services/OpencodeServerManager";
+import { OpencodeServerManagerLive } from "./OpencodeServerManager";
 import { ServerSettingsService } from "../../serverSettings";
 
 const PROVIDER = "opencode" as const;
@@ -32,35 +29,88 @@ const BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [
   },
 ];
 
-const runOpencodeCommand = Effect.fn("runOpencodeCommand")(function* (args: ReadonlyArray<string>) {
-  const opencodeSettings = yield* Effect.service(ServerSettingsService).pipe(
-    Effect.flatMap((service) => service.getSettings),
-    Effect.map((settings) => settings.providers.opencode),
+function resolveOpencodeModels(input: {
+  readonly customModels: ReadonlyArray<string>;
+  readonly configuredProviders: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly models: Readonly<Record<string, { readonly id: string; readonly name: string }>>;
+  }>;
+}): ReadonlyArray<ServerProviderModel> {
+  const discoveredModels = input.configuredProviders
+    .flatMap((provider) =>
+      Object.values(provider.models).map((model) => ({
+        slug: `${provider.id}/${model.id}`,
+        name: `${provider.name} ${model.name}`,
+        isCustom: false,
+        capabilities: null,
+      })),
+    )
+    .toSorted((left, right) => left.slug.localeCompare(right.slug));
+
+  return providerModelsFromSettings(discoveredModels, PROVIDER, input.customModels);
+}
+
+function resolveOpenCodeAuth(input: {
+  readonly connectedProviderIds: ReadonlyArray<string>;
+  readonly knownProviders: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+  readonly authMethodCount: number;
+}) {
+  if (input.connectedProviderIds.length === 0) {
+    return input.authMethodCount > 0
+      ? {
+          auth: { status: "unauthenticated" as const },
+          message:
+            "OpenCode server bridge is healthy, but no upstream providers are authenticated. Connect a provider in OpenCode and try again.",
+        }
+      : {
+          auth: { status: "unknown" as const },
+          message:
+            "OpenCode server bridge is healthy, but provider authentication could not be verified.",
+        };
+  }
+
+  const knownProviders = new Map(
+    input.knownProviders.map((provider) => [provider.id, provider.name]),
   );
-  const command = ChildProcess.make(opencodeSettings.binaryPath, [...args], {
-    shell: process.platform === "win32",
-  });
-  return yield* spawnAndCollect(opencodeSettings.binaryPath, command);
-});
+  const labels = input.connectedProviderIds.map(
+    (providerId) => knownProviders.get(providerId) ?? providerId,
+  );
+  const label = labels.length === 1 ? labels[0] : `${labels.length} providers connected`;
+
+  return {
+    auth: {
+      status: "authenticated" as const,
+      label,
+      ...(labels.length === 1 ? { type: input.connectedProviderIds[0] } : {}),
+    },
+    message:
+      labels.length === 1
+        ? `OpenCode server bridge is healthy and ${label} is connected. Chat sessions remain gated until the runtime adapter is wired.`
+        : `OpenCode server bridge is healthy and ${label}. Chat sessions remain gated until the runtime adapter is wired.`,
+  };
+}
 
 export const checkOpencodeProviderStatus = Effect.gen(function* () {
   const opencodeSettings = yield* Effect.service(ServerSettingsService).pipe(
     Effect.flatMap((service) => service.getSettings),
     Effect.map((settings) => settings.providers.opencode),
   );
+  const opencodeServerManager = yield* OpencodeServerManager;
   const checkedAt = new Date().toISOString();
-  const models = providerModelsFromSettings(
+  const fallbackModels = providerModelsFromSettings(
     BUILT_IN_MODELS,
     PROVIDER,
     opencodeSettings.customModels,
   );
 
   if (!opencodeSettings.enabled) {
+    yield* opencodeServerManager.stop;
     return buildServerProvider({
       provider: PROVIDER,
       enabled: false,
       checkedAt,
-      models,
+      models: fallbackModels,
       probe: {
         installed: false,
         version: null,
@@ -71,18 +121,19 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
     });
   }
 
-  const versionProbe = yield* runOpencodeCommand(["--version"]).pipe(
-    Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
-    Effect.result,
-  );
+  const probeResult = yield* opencodeServerManager
+    .probe({
+      binaryPath: opencodeSettings.binaryPath,
+    })
+    .pipe(Effect.result);
 
-  if (Result.isFailure(versionProbe)) {
-    const error = versionProbe.failure;
+  if (Result.isFailure(probeResult)) {
+    const error = probeResult.failure;
     return buildServerProvider({
       provider: PROVIDER,
       enabled: true,
       checkedAt,
-      models,
+      models: fallbackModels,
       probe: {
         installed: !isCommandMissingCause(error),
         version: null,
@@ -95,42 +146,22 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
     });
   }
 
-  if (Option.isNone(versionProbe.success)) {
-    return buildServerProvider({
-      provider: PROVIDER,
-      enabled: true,
-      checkedAt,
-      models,
-      probe: {
-        installed: true,
-        version: null,
-        status: "error",
-        auth: { status: "unknown" },
-        message: "OpenCode CLI is installed but failed to run. Timed out while running command.",
-      },
-    });
-  }
-
-  const version = versionProbe.success.value;
-  const parsedVersion = parseGenericCliVersion(`${version.stdout}\n${version.stderr}`);
-  if (version.code !== 0) {
-    const detail = detailFromResult(version);
-    return buildServerProvider({
-      provider: PROVIDER,
-      enabled: true,
-      checkedAt,
-      models,
-      probe: {
-        installed: true,
-        version: parsedVersion,
-        status: "error",
-        auth: { status: "unknown" },
-        message: detail
-          ? `OpenCode CLI is installed but failed to run. ${detail}`
-          : "OpenCode CLI is installed but failed to run.",
-      },
-    });
-  }
+  const probe = probeResult.success;
+  const authResolution = resolveOpenCodeAuth({
+    connectedProviderIds: probe.connectedProviderIds,
+    knownProviders: probe.knownProviders,
+    authMethodCount: Object.values(probe.authMethodsByProviderId).reduce(
+      (count, methods) => count + methods.length,
+      0,
+    ),
+  });
+  const models =
+    probe.configuredProviders.length > 0
+      ? resolveOpencodeModels({
+          configuredProviders: probe.configuredProviders,
+          customModels: opencodeSettings.customModels,
+        })
+      : fallbackModels;
 
   return buildServerProvider({
     provider: PROVIDER,
@@ -139,10 +170,10 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
     models,
     probe: {
       installed: true,
-      version: parsedVersion,
-      status: "error",
-      auth: { status: "unknown" },
-      message: "OpenCode CLI is installed, but the T3 Code sidecar bridge is not implemented yet.",
+      version: probe.server.version,
+      status: "warning",
+      auth: authResolution.auth,
+      message: authResolution.message,
     },
   });
 });
@@ -151,11 +182,11 @@ export const OpencodeProviderLive = Layer.effect(
   OpencodeProvider,
   Effect.gen(function* () {
     const serverSettings = yield* ServerSettingsService;
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const opencodeServerManager = yield* OpencodeServerManager;
 
     const checkProvider = checkOpencodeProviderStatus.pipe(
       Effect.provideService(ServerSettingsService, serverSettings),
-      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+      Effect.provideService(OpencodeServerManager, opencodeServerManager),
     );
 
     return yield* makeManagedServerProvider<OpencodeSettings>({
@@ -170,4 +201,4 @@ export const OpencodeProviderLive = Layer.effect(
       checkProvider,
     });
   }),
-);
+).pipe(Layer.provideMerge(OpencodeServerManagerLive));

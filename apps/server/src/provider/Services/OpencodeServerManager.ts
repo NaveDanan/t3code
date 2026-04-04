@@ -1,0 +1,54 @@
+import type {
+  ConfigProvidersResponse,
+  OpencodeClient,
+  ProviderAuthMethod,
+  ProviderListResponse,
+} from "@opencode-ai/sdk/v2";
+import { Effect, Schema, ServiceMap } from "effect";
+
+export type OpencodeConfiguredProvider = ConfigProvidersResponse["providers"][number];
+export type OpencodeKnownProvider = ProviderListResponse["all"][number];
+
+export interface OpencodeServerHandle {
+  readonly binaryPath: string;
+  readonly url: string;
+  readonly client: OpencodeClient;
+  readonly version: string;
+}
+
+export interface OpencodeServerProbe {
+  readonly server: OpencodeServerHandle;
+  readonly configuredProviders: ReadonlyArray<OpencodeConfiguredProvider>;
+  readonly knownProviders: ReadonlyArray<OpencodeKnownProvider>;
+  readonly connectedProviderIds: ReadonlyArray<string>;
+  readonly authMethodsByProviderId: Readonly<Record<string, ReadonlyArray<ProviderAuthMethod>>>;
+  readonly defaultModelByProviderId: Readonly<Record<string, string>>;
+}
+
+export class OpencodeServerManagerError extends Schema.TaggedErrorClass<OpencodeServerManagerError>()(
+  "OpencodeServerManagerError",
+  {
+    operation: Schema.String,
+    detail: Schema.String,
+    cause: Schema.optional(Schema.Defect),
+  },
+) {
+  override get message(): string {
+    return `OpenCode server manager failed in ${this.operation}: ${this.detail}`;
+  }
+}
+
+export interface OpencodeServerManagerShape {
+  readonly ensureServer: (input: {
+    readonly binaryPath: string;
+  }) => Effect.Effect<OpencodeServerHandle, OpencodeServerManagerError>;
+  readonly probe: (input: {
+    readonly binaryPath: string;
+  }) => Effect.Effect<OpencodeServerProbe, OpencodeServerManagerError>;
+  readonly stop: Effect.Effect<void>;
+}
+
+export class OpencodeServerManager extends ServiceMap.Service<
+  OpencodeServerManager,
+  OpencodeServerManagerShape
+>()("t3/provider/Services/OpencodeServerManager") {}

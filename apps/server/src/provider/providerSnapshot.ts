@@ -32,9 +32,24 @@ export function nonEmptyTrimmed(value: string | undefined): string | undefined {
 }
 
 export function isCommandMissingCause(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const lower = error.message.toLowerCase();
-  return lower.includes("enoent") || lower.includes("notfound");
+  let current: unknown = error;
+  let depth = 0;
+
+  while (current instanceof Error && depth < 5) {
+    const lower = current.message.toLowerCase();
+    if (
+      lower.includes("enoent") ||
+      lower.includes("notfound") ||
+      lower.includes("command not found") ||
+      lower.includes("is not recognized as an internal or external command")
+    ) {
+      return true;
+    }
+    current = current.cause;
+    depth += 1;
+  }
+
+  return false;
 }
 
 export const spawnAndCollect = (binaryPath: string, command: ChildProcess.Command) =>

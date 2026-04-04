@@ -2,9 +2,11 @@
 
 ## Summary
 
-Implement OpenCode as a first-class provider by adding a T3-owned sidecar or session manager around the OpenCode CLI, replacing the current stub provider probe and adapter, enabling OpenCode in chat or orchestration and git text generation, and closing the remaining web, type, and test gaps.
+Implement OpenCode as a first-class provider by integrating with OpenCode's documented headless server and JS SDK, replacing the current stub provider probe and adapter, enabling OpenCode in chat or orchestration and git text generation, and closing the remaining web, type, and test gaps.
 
-This work must reuse the existing provider-neutral orchestration path and the Codex or Claude reference patterns instead of introducing a parallel transport or provider-specific shortcuts.
+The preferred runtime shape is now validated: T3 should manage an OpenCode server process or SDK-backed client session manager, not invent a raw, undocumented subprocess bridge when the product already exposes HTTP, SSE, and generated client types for external integrations.
+
+This work must still reuse the existing provider-neutral orchestration path and the Codex or Claude reference patterns instead of introducing a parallel transport or provider-specific shortcuts.
 
 ## Goals
 
@@ -33,42 +35,53 @@ The existing OpenCode integration is scaffolded but intentionally non-functional
 4. `apps/server/src/git/Layers/RoutingTextGeneration.ts` explicitly rejects OpenCode for commit messages, PR content, branch names, and thread titles.
 5. Most provider contracts already include OpenCode, but a few web and store seams still assume only Codex or Claude.
 
-## Phase 0: Runtime Contract Validation
+## Phase 0: Runtime Contract Findings
 
-Before implementation, validate the supported OpenCode runtime contract.
+The main go or no-go questions are now materially answered.
 
-Required confirmations:
+Validated surfaces:
 
-1. Long-lived session startup and shutdown.
-2. Machine-readable event streaming.
-3. Interrupt support.
-4. Approval requests and approval responses.
-5. Structured user-input prompts and responses.
-6. Resume or reconnect semantics.
-7. Auth or account inspection.
-8. Model override behavior.
-9. Thread history reads.
-10. Rollback or checkpoint semantics.
-11. One-shot structured-output support for git text generation.
+1. OpenCode exposes a documented headless HTTP server through `opencode serve`.
+2. OpenCode exposes a documented JS or TS SDK through `@opencode-ai/sdk`.
+3. OpenCode exposes a documented SSE event stream at `GET /event`.
+4. OpenCode exposes documented session lifecycle APIs under `/session`.
+5. OpenCode exposes provider and auth metadata under `/provider`, `/provider/auth`, and `/config/providers`.
+6. OpenCode exposes permission and question response APIs as first-class routes.
+7. OpenCode supports structured output with JSON Schema on prompt requests.
 
-This is a hard go or no-go checkpoint. The repo currently has no OpenCode SDK dependency or protocol notes, only a CLI version probe, so the rest of the plan depends on a verified machine-readable contract.
+Validated live observations from a local `opencode serve` instance:
 
-## Phase 1: Bridge Boundary and Dependency Strategy
+1. `GET /global/health` returns `{ healthy: true, version }`.
+2. `GET /event` emits SSE frames with payloads such as `server.connected`, `message.updated`, `message.part.delta`, `message.part.updated`, `session.status`, `session.diff`, and `session.idle`.
+3. `POST /session` creates a reusable session bound to a working directory.
+4. `POST /session/:id/prompt_async` accepts a prompt with an explicit model object shaped like `{ providerID, modelID }`.
+5. Structured output works via `format: { type: "json_schema", schema }` and returns validated data in `info.structured`, plus a `StructuredOutput` tool part.
+6. `GET /question` and `GET /permission` are available and return pending requests.
 
-Define how T3 Code will talk to OpenCode.
+Open questions that still need implementation-time validation:
 
-1. If OpenCode exposes a supported SDK or structured protocol client, add that dependency in `apps/server/package.json`.
-2. Otherwise, add a thin internal process-protocol client that owns raw subprocess communication.
-3. In either case, introduce a T3-owned OpenCode session manager layer that owns:
-   - process spawn
-   - handshake
-   - streaming I/O
-   - request correlation
+1. How reliably `POST /session/:id/abort` maps to T3's current turn interruption semantics under active load.
+2. How OpenCode's message-level revert model should map to T3's `rollbackThread(threadId, numTurns)` contract.
+3. Whether T3 should persist raw OpenCode session IDs directly as resume state or wrap them in an adapter-owned cursor shape.
+
+## Phase 1: Server or SDK Boundary and Dependency Strategy
+
+Define how T3 Code will talk to OpenCode using the documented external integration path.
+
+1. Prefer the official JS or TS SDK by adding `@opencode-ai/sdk` in `apps/server/package.json`, unless a direct HTTP client keeps the integration meaningfully smaller.
+2. Launch and manage `opencode serve` as the runtime boundary when T3 owns the OpenCode process lifecycle.
+3. If the user already runs an external OpenCode server, consider whether T3 should optionally attach instead of always spawning its own instance.
+4. Introduce a T3-owned OpenCode session manager layer that owns:
+   - process spawn for `opencode serve` when T3 manages the runtime
+   - server readiness and health checks
+   - SDK or HTTP client construction
+   - SSE subscription and event fan-out
    - shutdown and cleanup
-   - resume hooks
-4. Keep this manager separate from the adapter so `OpencodeAdapter` continues to implement `ProviderAdapterShape` rather than embedding raw child-process control.
+   - reconnect and resume hooks
+5. Keep this manager separate from the adapter so `OpencodeAdapter` continues to implement `ProviderAdapterShape` rather than embedding raw process or HTTP control.
+6. Treat ACP as a secondary integration path. It is documented and uses JSON-RPC over stdio, but it is primarily editor-facing. The headless server and SDK are a better fit for a Node server like T3.
 
-Reference implementations:
+Reference implementations and comparisons:
 
 1. `apps/server/src/codexAppServerManager.ts`
 2. `apps/server/src/provider/Layers/CodexAdapter.ts`
@@ -84,13 +97,14 @@ Expected behavior:
 2. Report not installed when the CLI is missing.
 3. Report run failure when the CLI exists but the probe fails.
 4. Report version, auth, capabilities, and available models when the provider is actually usable.
-5. Only report a ready or healthy status when T3 can initialize the OpenCode bridge, not merely when `opencode --version` succeeds.
+5. Only report a ready or healthy status when T3 can initialize or reach the OpenCode server bridge, not merely when `opencode --version` succeeds.
 
 Implementation notes:
 
-1. Reuse `makeManagedServerProvider`, `spawnAndCollect`, and the Codex or Claude status patterns.
-2. Keep probe output aligned with the shared `ServerProvider` contract.
-3. Update `apps/server/src/provider/Layers/ProviderRegistry.test.ts` so it no longer asserts that OpenCode must stay unavailable until a bridge exists.
+1. Reuse `makeManagedServerProvider` for status refresh and settings-driven updates.
+2. Replace the current version-only CLI probe with a real readiness sequence built around `opencode serve`, `GET /global/health`, `GET /provider`, `GET /provider/auth`, and `GET /config/providers`.
+3. Keep probe output aligned with the shared `ServerProvider` contract.
+4. Update `apps/server/src/provider/Layers/ProviderRegistry.test.ts` so it no longer asserts that OpenCode must stay unavailable until a bridge exists.
 
 ## Phase 3: Canonical OpenCode Adapter
 
@@ -115,8 +129,14 @@ Adapter requirements:
 
 1. Translate OpenCode-native events into canonical `ProviderRuntimeEvent` values.
 2. Preserve raw payloads for debugging.
-3. Expose a stable `ProviderSession` shape with provider thread id, model, runtime mode, status, last error, and opaque resume cursor.
+3. Expose a stable `ProviderSession` shape with OpenCode session id, selected model, runtime mode, status, last error, and opaque resume cursor.
 4. Keep model-switch capabilities explicit through adapter capabilities instead of ad hoc provider checks elsewhere.
+
+Important contract mismatch to resolve:
+
+1. T3's current OpenCode contracts assume a model slug like `openai/gpt-5` under provider `opencode`.
+2. The validated OpenCode server contract expects model selection as `{ providerID, modelID }`, where those IDs come from OpenCode's own provider catalog.
+3. Phase 3 must therefore either redesign T3's OpenCode model-selection contract or add a translation layer from T3's persisted selection into an OpenCode-native provider or model pair.
 
 Primary reference contracts:
 
@@ -134,6 +154,11 @@ Key areas:
 3. Confirm `ProviderService` can recover and rehydrate OpenCode sessions after server restart.
 4. Define how `readThread` and `rollbackThread` map to OpenCode-native history or checkpoint capabilities.
 5. If exact rollback parity is impossible, make that an explicit capability or error decision before enabling checkpoint-driven rollback UX.
+
+Implementation note:
+
+1. OpenCode appears to be session-centric and message-part-centric rather than turn-centric. T3 will need explicit adapter logic to derive turn lifecycle from OpenCode session status, assistant messages, and part events.
+2. OpenCode exposes `session.diff`, `session.revert`, and message history APIs, but they are message-oriented. T3's turn rollback semantics should not assume a one-to-one match.
 
 Relevant files:
 
@@ -163,6 +188,10 @@ Relevant files:
 3. `apps/web/src/components/chat/ProviderModelPicker.tsx`
 4. `apps/web/src/components/settings/SettingsPanels.tsx`
 
+Additional contract work:
+
+1. Revisit `packages/contracts/src/model.ts` and related OpenCode model defaults. The current built-in OpenCode model list is likely wrong for the validated server path because OpenCode models come from `/config/providers` and are keyed by OpenCode provider or model IDs, not T3's hardcoded `openai/*` slugs.
+
 ## Phase 6: OpenCode Git Text Generation
 
 Add OpenCode support to git text generation instead of leaving it explicitly unsupported.
@@ -175,13 +204,9 @@ Required work:
    - PR content generation
    - branch name generation
    - thread title generation
-3. Follow the existing Codex and Claude patterns for:
-   - one-shot prompt execution per operation
-   - structured schema validation
-   - timeout handling
-   - provider-specific error normalization
-   - explicit model handling
-4. Keep git text generation separate from the long-lived chat-session manager unless the supported OpenCode transport clearly justifies shared runtime code.
+3. Use the validated OpenCode server prompt contract with `format: { type: "json_schema", schema }` so structured output comes back in `info.structured`.
+4. Follow the existing Codex and Claude patterns for timeout handling, provider-specific error normalization, and explicit model handling.
+5. Reuse the same OpenCode session manager or client boundary where practical. A separate raw CLI harness is no longer the preferred path for git flows.
 
 Reference implementations:
 
@@ -239,14 +264,17 @@ Manual end-to-end verification:
 8. Restart the server and resume the session.
 9. Exercise read-thread or rollback behavior.
 10. Generate commit message, PR content, branch name, and thread title through OpenCode.
+11. Verify structured-output responses are parsed from the OpenCode server result shape rather than hand-parsed from plain text.
 
 ## Decisions
 
 1. Included scope: full OpenCode chat or orchestration harness plus git text generation.
-2. Recommended harness shape: a T3-owned OpenCode sidecar or session-manager layer wrapping the OpenCode CLI or supported protocol client.
+2. Recommended harness shape: a T3-owned OpenCode session-manager layer built on the documented OpenCode server and JS SDK.
 3. Architectural boundary: keep all provider traffic flowing through `ProviderCommandReactor` -> `ProviderService` -> `ProviderAdapter` -> canonical `ProviderRuntimeEvent`.
 4. Readiness rule: OpenCode should not be marked available merely because `opencode --version` works; readiness must reflect whether T3 can actually start and manage an OpenCode session.
 5. Rollout rule: do not silently fall back to Codex or Claude for OpenCode git flows or failed OpenCode runtime operations.
+6. Transport decision: prefer the documented server or SDK boundary over ACP for the initial T3 integration.
+7. Model decision: T3 must explicitly reconcile its current OpenCode model-selection schema with OpenCode's native `{ providerID, modelID }` model contract.
 
 ## Relevant Files
 
@@ -266,15 +294,20 @@ Manual end-to-end verification:
 14. `apps/web/src/components/chat/ProviderModelPicker.tsx` — validate live readiness gating and locked or unlocked provider behavior with OpenCode enabled.
 15. `apps/web/src/components/settings/SettingsPanels.tsx` — validate status, auth copy, refresh behavior, and settings presentation.
 16. `apps/server/src/provider/Layers/ProviderRegistry.test.ts` — replace placeholder OpenCode-unavailable assertions with real readiness expectations.
+17. `packages/contracts/src/model.ts` — revisit OpenCode model defaults and selection shape.
+18. `packages/contracts/src/provider.ts` — revisit how OpenCode model selection and resume state should be represented.
+19. `apps/server/package.json` — likely add `@opencode-ai/sdk`.
 
 Likely new files:
 
 1. An OpenCode session manager service or layer under `apps/server/src/provider`.
-2. An OpenCode git text-generation layer under `apps/server/src/git/Layers`.
-3. Focused tests covering both additions.
+2. An OpenCode HTTP or SDK client wrapper under `apps/server/src/provider`.
+3. An OpenCode git text-generation layer under `apps/server/src/git/Layers`.
+4. Focused tests covering all three additions.
 
 ## Further Considerations
 
 1. If OpenCode does not expose a stable machine-readable streaming contract for approvals, resume, and history management, stop and revise the implementation shape before coding instead of forcing brittle parsing into the provider stack.
-2. If OpenCode rollback or history semantics differ materially from Codex and Claude, prefer an explicit capability or error model over fake parity.
-3. If OpenCode ships both a long-lived session protocol and a better one-shot structured-output mode, keep those as separate internal layers that share normalization helpers instead of over-coupling git generation to the chat-session harness.
+2. Phase 0 now suggests the opposite of the original assumption: the documented server or SDK contract is probably the right primary integration, and a raw custom subprocess protocol should be avoided unless the server path proves insufficient during implementation.
+3. If OpenCode rollback or history semantics differ materially from Codex and Claude, prefer an explicit capability or error model over fake parity.
+4. OpenCode's model routing is multi-provider by design. T3 needs to decide whether its OpenCode UX exposes that underlying provider or model structure directly or constrains it behind a simpler curated mapping.
