@@ -86,8 +86,8 @@ function resolveOpenCodeAuth(input: {
     },
     message:
       labels.length === 1
-        ? `OpenCode server bridge is healthy and ${label} is connected. Chat sessions remain gated until the runtime adapter is wired.`
-        : `OpenCode server bridge is healthy and ${label}. Chat sessions remain gated until the runtime adapter is wired.`,
+        ? `OpenCode server bridge is healthy and ${label} is connected.`
+        : `OpenCode server bridge is healthy and ${label}.`,
   };
 }
 
@@ -171,7 +171,7 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
     probe: {
       installed: true,
       version: probe.server.version,
-      status: "warning",
+      status: "ready",
       auth: authResolution.auth,
       message: authResolution.message,
     },

@@ -219,6 +219,35 @@ describe("store read model sync", () => {
     expect(next.threads[0]?.modelSelection.model).toBe("claude-sonnet-4-6");
   });
 
+  it("preserves opencode as the session provider during read model sync", () => {
+    const initialState = makeState(makeThread());
+    const readModel = makeReadModel(
+      makeReadModelThread({
+        modelSelection: {
+          provider: "opencode",
+          model: "github-copilot/gpt-5.4",
+        },
+        session: {
+          threadId: ThreadId.makeUnsafe("thread-1"),
+          status: "ready",
+          providerName: "opencode",
+          runtimeMode: "full-access",
+          activeTurnId: null,
+          lastError: null,
+          updatedAt: "2026-02-27T00:00:00.000Z",
+        },
+      }),
+    );
+
+    const next = syncServerReadModel(initialState, readModel);
+
+    expect(next.threads[0]?.session?.provider).toBe("opencode");
+    expect(next.threads[0]?.modelSelection).toEqual({
+      provider: "opencode",
+      model: "github-copilot/gpt-5.4",
+    });
+  });
+
   it("preserves project and thread updatedAt timestamps from the read model", () => {
     const initialState = makeState(makeThread());
     const readModel = makeReadModel(

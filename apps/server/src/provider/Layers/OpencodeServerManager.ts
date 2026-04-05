@@ -4,13 +4,14 @@ import { spawn, spawnSync } from "node:child_process";
 import {
   createOpencodeClient,
   type ConfigProvidersResponse,
+  type GlobalEvent,
   type GlobalHealthResponse,
   type OpencodeClient,
   type ProviderAuthMethod,
   type ProviderAuthResponse,
   type ProviderListResponse,
 } from "@opencode-ai/sdk/v2";
-import { Effect, Ref, Result } from "effect";
+import { Effect, Exit, Queue, Ref, Result, Scope, Stream } from "effect";
 import * as Layer from "effect/Layer";
 import * as Semaphore from "effect/Semaphore";
 
@@ -19,6 +20,7 @@ import {
   OpencodeServerManagerError,
   type OpencodeConfiguredProvider,
   type OpencodeKnownProvider,
+  type OpencodeServerEvent,
   type OpencodeServerHandle,
   type OpencodeServerManagerShape,
 } from "../Services/OpencodeServerManager";
@@ -28,6 +30,7 @@ const SERVER_START_TIMEOUT_MS = 5_000;
 const HEALTH_CHECK_TIMEOUT_MS = 1_000;
 const HEALTH_CHECK_INTERVAL_MS = 100;
 const LOG_BUFFER_MAX_CHARS = 8_000;
+const EVENT_STREAM_RETRY_DELAY = "1 second";
 
 interface OpencodeServerProcess {
   readonly pid?: number | undefined;
@@ -184,6 +187,11 @@ async function readSdkData<T>(request: Promise<unknown>, operation: string): Pro
   );
 }
 
+async function createEventStream(client: OpencodeClient): Promise<AsyncGenerator<GlobalEvent>> {
+  const result = await client.global.event();
+  return result.stream;
+}
+
 async function waitForHealthy(input: {
   readonly state: ManagedServerState;
   readonly startTimeoutMs: number;
@@ -336,6 +344,7 @@ export const makeOpencodeServerManager = (dependencies: OpencodeServerManagerDep
   Effect.gen(function* () {
     const stateRef = yield* Ref.make<ManagedServerState | null>(null);
     const semaphore = yield* Semaphore.make(1);
+    const eventStreamScope = yield* Scope.make("sequential");
 
     const spawnServer = dependencies.spawnServer ?? createLiveServerProcess;
     const createClient = dependencies.createClient ?? createLiveClient;
@@ -439,9 +448,51 @@ export const makeOpencodeServerManager = (dependencies: OpencodeServerManagerDep
         ),
       );
 
+    const streamEvents = (input: { readonly binaryPath: string }) =>
+      Stream.unwrap(
+        Effect.gen(function* () {
+          const eventQueue = yield* Queue.unbounded<OpencodeServerEvent>();
+
+          const streamOnce = Effect.gen(function* () {
+            const server = yield* ensureServer(input).pipe(
+              Effect.mapError((error) => toManagerError("streamEvents.ensureServer", error)),
+            );
+            const events = yield* Effect.tryPromise({
+              try: () => createEventStream(server.client),
+              catch: (error) => toManagerError("streamEvents.subscribe", error),
+            });
+
+            yield* Stream.fromAsyncIterable(events, (cause) =>
+              toManagerError("streamEvents.consume", cause),
+            ).pipe(Stream.runForEach((event) => Queue.offer(eventQueue, event)));
+          });
+
+          const pump = Effect.forever(
+            streamOnce.pipe(
+              Effect.matchEffect({
+                onFailure: (error) =>
+                  Effect.logWarning("OpenCode event stream disconnected; retrying", {
+                    operation: error.operation,
+                    detail: error.detail,
+                  }).pipe(Effect.andThen(Effect.sleep(EVENT_STREAM_RETRY_DELAY))),
+                onSuccess: () => Effect.void,
+              }),
+            ),
+          );
+
+          yield* pump.pipe(Effect.forkIn(eventStreamScope));
+          yield* Effect.addFinalizer(() => Queue.shutdown(eventQueue));
+
+          return Stream.fromQueue(eventQueue);
+        }),
+      );
+
+    yield* Effect.addFinalizer(() => Scope.close(eventStreamScope, Exit.void));
+
     return {
       ensureServer,
       probe,
+      streamEvents,
       stop: semaphore.withPermits(1)(stopCurrentServer),
     } satisfies OpencodeServerManagerShape;
   });

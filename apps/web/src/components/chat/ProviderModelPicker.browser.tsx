@@ -108,6 +108,29 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
       },
     ],
   },
+  {
+    provider: "opencode",
+    enabled: false,
+    installed: true,
+    version: "0.1.0",
+    status: "disabled",
+    auth: { status: "unknown" },
+    checkedAt: new Date().toISOString(),
+    models: [
+      {
+        slug: "openai/gpt-5",
+        name: "OpenAI GPT-5",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [],
+          supportsFastMode: false,
+          supportsThinkingToggle: false,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+    ],
+  },
 ];
 
 function buildCodexProvider(models: ServerProvider["models"]): ServerProvider {
@@ -387,7 +410,9 @@ describe("ProviderModelPicker", () => {
       await vi.waitFor(() => {
         const text = document.body.textContent ?? "";
         expect(text).toContain("Claude");
+        expect(text).toContain("OpenCode");
         expect(text).toContain("Disabled");
+        expect(text).not.toContain("Coming soon");
         expect(text).not.toContain("Claude Sonnet 4.6");
       });
     } finally {

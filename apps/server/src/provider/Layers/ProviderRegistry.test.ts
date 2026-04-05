@@ -121,6 +121,7 @@ function fakeOpencodeServerManagerLayer(manager: Partial<OpencodeServerManagerSh
     ensureServer: () =>
       Effect.die(new Error("fake OpencodeServerManager.ensureServer was not configured.")),
     probe: () => Effect.die(new Error("fake OpencodeServerManager.probe was not configured.")),
+    streamEvents: () => Stream.empty,
     stop: Effect.void,
     ...manager,
   } satisfies OpencodeServerManagerShape);
@@ -576,12 +577,12 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         ),
       );
 
-      it.effect("reports OpenCode bridge health while keeping runtime sessions gated", () =>
+      it.effect("reports OpenCode bridge health as ready when a provider is connected", () =>
         Effect.gen(function* () {
           const status = yield* checkOpencodeProviderStatus;
           assert.strictEqual(status.provider, "opencode");
           assert.strictEqual(status.enabled, true);
-          assert.strictEqual(status.status, "warning");
+          assert.strictEqual(status.status, "ready");
           assert.strictEqual(status.installed, true);
           assert.strictEqual(status.version, "1.3.15");
           assert.strictEqual(status.auth.status, "authenticated");
@@ -589,7 +590,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
           assert.strictEqual(status.auth.label, "OpenAI");
           assert.strictEqual(
             status.message,
-            "OpenCode server bridge is healthy and OpenAI is connected. Chat sessions remain gated until the runtime adapter is wired.",
+            "OpenCode server bridge is healthy and OpenAI is connected.",
           );
           assert.deepStrictEqual(
             status.models.map((model) => model.slug),

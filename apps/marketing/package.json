@@ -7,7 +7,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "typecheck": "astro check"
+    "typecheck": "node ../../scripts/ensure-zod-locales-index.mjs && astro check"
   },
   "dependencies": {
     "astro": "^6.0.4"

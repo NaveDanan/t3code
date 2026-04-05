@@ -1,13 +1,16 @@
 import type {
   ConfigProvidersResponse,
+  GlobalEvent,
   OpencodeClient,
   ProviderAuthMethod,
   ProviderListResponse,
 } from "@opencode-ai/sdk/v2";
 import { Effect, Schema, ServiceMap } from "effect";
+import type { Stream } from "effect";
 
 export type OpencodeConfiguredProvider = ConfigProvidersResponse["providers"][number];
 export type OpencodeKnownProvider = ProviderListResponse["all"][number];
+export type OpencodeServerEvent = GlobalEvent;
 
 export interface OpencodeServerHandle {
   readonly binaryPath: string;
@@ -45,6 +48,9 @@ export interface OpencodeServerManagerShape {
   readonly probe: (input: {
     readonly binaryPath: string;
   }) => Effect.Effect<OpencodeServerProbe, OpencodeServerManagerError>;
+  readonly streamEvents: (input: {
+    readonly binaryPath: string;
+  }) => Stream.Stream<OpencodeServerEvent>;
   readonly stop: Effect.Effect<void>;
 }
 

@@ -73,7 +73,7 @@ export const ClaudeSettings = Schema.Struct({
 export type ClaudeSettings = typeof ClaudeSettings.Type;
 
 export const OpencodeSettings = Schema.Struct({
-  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(() => false)),
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(() => true)),
   binaryPath: makeBinaryPathSetting("opencode"),
   customModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(() => [])),
 });
