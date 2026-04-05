@@ -1,0 +1,1243 @@
+$ turbo run test "--filter=t3"
+• turbo 2.8.17
+• Packages in scope: t3
+• Running test in 1 packages
+• Remote caching disabled
+@t3tools/contracts:build: cache hit, replaying logs 2af49211e36abddb
+@t3tools/contracts:build: $ tsdown src/index.ts --format esm,cjs --dts --clean
+@t3tools/contracts:build: [34mℹ[39m tsdown [2mv0.20.3[22m powered by rolldown [2mv1.0.0-rc.3[22m
+@t3tools/contracts:build: [34mℹ[39m entry: [34msrc\index.ts[39m
+@t3tools/contracts:build: [34mℹ[39m tsconfig: [34mtsconfig.json[39m
+@t3tools/contracts:build: [34mℹ[39m Build start
+@t3tools/contracts:build: [34mℹ[39m Cleaning 5 files
+@t3tools/contracts:build: [34mℹ[39m [33m[CJS][39m [2mdist\[22m[1mindex.cjs[22m  [2m130.70 kB[22m [2m│ gzip: 19.30 kB[22m
+@t3tools/contracts:build: [34mℹ[39m [33m[CJS][39m 1 files, total: 130.70 kB
+@t3tools/contracts:build: [33m[PLUGIN_TIMINGS] Warning:[0m Your build spent significant time in plugins. Here is a breakdown:
+@t3tools/contracts:build:   - tsdown:external (51%)
+@t3tools/contracts:build:   - tsdown:report (49%)
+@t3tools/contracts:build: See https://rolldown.rs/options/checks#plugintimings for more details.
+@t3tools/contracts:build: 
+@t3tools/contracts:build: [34mℹ[39m [33m[CJS][39m [2mdist\[22m[32m[1mindex.d.cts[22m[39m  [2m939.54 kB[22m [2m│ gzip: 51.95 kB[22m
+@t3tools/contracts:build: [34mℹ[39m [33m[CJS][39m 1 files, total: 939.54 kB
+@t3tools/contracts:build: [33m[PLUGIN_TIMINGS] Warning:[0m Your build spent significant time in plugins. Here is a breakdown:
+@t3tools/contracts:build:   - rolldown-plugin-dts:resolver (65%)
+@t3tools/contracts:build:   - rolldown-plugin-dts:generate (22%)
+@t3tools/contracts:build: See https://rolldown.rs/options/checks#plugintimings for more details.
+@t3tools/contracts:build: 
+@t3tools/contracts:build: [32m✔[39m Build complete in [32m6139ms[39m
+@t3tools/contracts:build: [34mℹ[39m [34m[ESM][39m [2mdist\[22m[1mindex.mjs[22m    [2m110.22 kB[22m [2m│ gzip: 17.32 kB[22m
+@t3tools/contracts:build: [34mℹ[39m [34m[ESM][39m [2mdist\[22m[32m[1mindex.d.mts[22m[39m  [2m939.54 kB[22m [2m│ gzip: 51.95 kB[22m
+@t3tools/contracts:build: [34mℹ[39m [34m[ESM][39m 2 files, total: 1049.77 kB
+@t3tools/contracts:build: [33m[PLUGIN_TIMINGS] Warning:[0m Your build spent significant time in plugins. Here is a breakdown:
+@t3tools/contracts:build:   - rolldown-plugin-dts:generate (45%)
+@t3tools/contracts:build:   - rolldown-plugin-dts:resolver (36%)
+@t3tools/contracts:build: See https://rolldown.rs/options/checks#plugintimings for more details.
+@t3tools/contracts:build: [32m✔[39m Build complete in [32m6141ms[39m
+@t3tools/contracts:build: 
+@t3tools/web:build: cache miss, executing 5c832b295683f9b5
+@t3tools/web:build: $ vite build
+@t3tools/web:build: [36mvite v8.0.0 [32mbuilding client environment for production...[36m[39m
+@t3tools/web:build: [2K
+@t3tools/web:build: transforming...✓ 3555 modules transformed.
+@t3tools/web:build: rendering chunks...
+@t3tools/web:build: computing gzip size...
+@t3tools/web:build: dist/index.html                                         0.82 kB │ gzip:   0.43 kB
+@t3tools/web:build: dist/assets/worker-D2cisDiq.js                        823.44 kB
+@t3tools/web:build: dist/assets/index-CNiyFLRW.css                        229.27 kB │ gzip:  31.28 kB
+@t3tools/web:build: dist/assets/codeowners-_3A-ClkN.js                      0.58 kB │ gzip:   0.34 kB │ map:      1.08 kB
+@t3tools/web:build: dist/assets/shellsession-DLjK1G4j.js                    0.76 kB │ gzip:   0.46 kB │ map:      1.32 kB
+@t3tools/web:build: dist/assets/tsv-BIkdBZX1.js                             0.77 kB │ gzip:   0.37 kB │ map:      1.37 kB
+@t3tools/web:build: dist/assets/html-derivative-B4-il6d2.js                 0.89 kB │ gzip:   0.49 kB │ map:      1.42 kB
+@t3tools/web:build: dist/assets/git-rebase-DPkRwuSC.js                      1.03 kB │ gzip:   0.47 kB │ map:      1.67 kB
+@t3tools/web:build: dist/assets/qmldir-Cqfb4Lox.js                          1.03 kB │ gzip:   0.48 kB │ map:      1.73 kB
+@t3tools/web:build: dist/assets/csv-DNUpVBxl.js                             1.17 kB │ gzip:   0.40 kB │ map:      1.99 kB
+@t3tools/web:build: dist/assets/git-commit-DGJi7qBD.js                      1.27 kB │ gzip:   0.56 kB │ map:      2.03 kB
+@t3tools/web:build: dist/assets/xsl-654YjXI8.js                             1.40 kB │ gzip:   0.53 kB │ map:      2.18 kB
+@t3tools/web:build: dist/assets/dotenv-BdJZEwA6.js                          1.45 kB │ gzip:   0.56 kB │ map:      2.33 kB
+@t3tools/web:build: dist/assets/sparql-B9c85a_o.js                          1.52 kB │ gzip:   0.85 kB │ map:      2.10 kB
+@t3tools/web:build: dist/assets/ini-D-v34c8N.js                             1.55 kB │ gzip:   0.53 kB │ map:      2.47 kB
+@t3tools/web:build: dist/assets/fortran-fixed-form-B02FOYI-.js              1.71 kB │ gzip:   0.72 kB │ map:      2.71 kB
+@t3tools/web:build: dist/assets/docker-ZyPHc6zB.js                          1.77 kB │ gzip:   0.63 kB │ map:      2.64 kB
+@t3tools/web:build: dist/assets/hxml-adC65L_J.js                            1.78 kB │ gzip:   0.91 kB │ map:      2.47 kB
+@t3tools/web:build: dist/assets/desktop-BD76cvxT.js                         1.87 kB │ gzip:   0.79 kB │ map:      2.75 kB
+@t3tools/web:build: dist/assets/erb-Ziylt_WT.js                             2.17 kB │ gzip:   0.66 kB │ map:      3.29 kB
+@t3tools/web:build: dist/assets/wenyan-BonVcr2i.js                          2.19 kB │ gzip:   1.12 kB │ map:      3.18 kB
+@t3tools/web:build: dist/assets/jssm-ByRpI9-B.js                            2.27 kB │ gzip:   0.64 kB │ map:      3.39 kB
+@t3tools/web:build: dist/assets/edge-BDEnwtSW.js                            2.34 kB │ gzip:   0.71 kB │ map:      3.55 kB
+@t3tools/web:build: dist/assets/reg-DXGFiJSl.js                             2.37 kB │ gzip:   0.72 kB │ map:      3.51 kB
+@t3tools/web:build: dist/assets/diff-CdkWtnkL.js                            2.60 kB │ gzip:   0.72 kB │ map:      3.86 kB
+@t3tools/web:build: dist/assets/gleam-BF2NigGj.js                           2.61 kB │ gzip:   0.85 kB │ map:      3.99 kB
+@t3tools/web:build: dist/assets/hy-t9zDXBje.js                              2.68 kB │ gzip:   1.21 kB │ map:      3.69 kB
+@t3tools/web:build: dist/assets/openscad-D2aTdNfr.js                        2.86 kB │ gzip:   1.04 kB │ map:      4.22 kB
+@t3tools/web:build: dist/assets/log-BQop7fzg.js                             2.88 kB │ gzip:   0.93 kB │ map:      4.35 kB
+@t3tools/web:build: dist/assets/json-Dv2KwoRu.js                            2.92 kB │ gzip:   0.85 kB │ map:      4.31 kB
+@t3tools/web:build: dist/assets/cairo-BDj8wWhy.js                           2.97 kB │ gzip:   0.84 kB │ map:      4.53 kB
+@t3tools/web:build: dist/assets/berry-Cyjuxiss.js                           3.04 kB │ gzip:   0.84 kB │ map:      4.84 kB
+@t3tools/web:build: dist/assets/jsonl-KrKLbtB7.js                           3.04 kB │ gzip:   0.82 kB │ map:      4.50 kB
+@t3tools/web:build: dist/assets/jsonc-BBgf3TX3.js                           3.14 kB │ gzip:   0.82 kB │ map:      4.60 kB
+@t3tools/web:build: dist/assets/logo-DKtnYmrp.js                            3.16 kB │ gzip:   1.50 kB │ map:      3.81 kB
+@t3tools/web:build: dist/assets/po-Be96RYkA.js                              3.27 kB │ gzip:   0.94 kB │ map:      5.08 kB
+@t3tools/web:build: dist/assets/json5-D0XL1D5m.js                           3.29 kB │ gzip:   0.86 kB │ map:      4.95 kB
+@t3tools/web:build: dist/assets/mipsasm-DXuU_0cI.js                         3.29 kB │ gzip:   1.20 kB │ map:      4.67 kB
+@t3tools/web:build: dist/assets/tasl-C28SYKbq.js                            3.32 kB │ gzip:   0.87 kB │ map:      5.12 kB
+@t3tools/web:build: dist/assets/genie-Bj-orPAV.js                           3.39 kB │ gzip:   1.24 kB │ map:      4.86 kB
+@t3tools/web:build: dist/assets/rel-CunnVTBK.js                             3.40 kB │ gzip:   1.14 kB │ map:      4.87 kB
+@t3tools/web:build: dist/assets/vala-DzajMnwt.js                            3.40 kB │ gzip:   1.22 kB │ map:      4.89 kB
+@t3tools/web:build: dist/assets/splunk-OB48_RcD.js                          3.47 kB │ gzip:   1.56 kB │ map:      4.44 kB
+@t3tools/web:build: dist/assets/hurl-DgGB1sxo.js                            3.55 kB │ gzip:   1.13 kB │ map:      5.41 kB
+@t3tools/web:build: dist/assets/fluent-DKAm3m7q.js                          3.64 kB │ gzip:   0.93 kB │ map:      5.20 kB
+@t3tools/web:build: dist/assets/jsonnet-B2ZwWMOt.js                         3.65 kB │ gzip:   1.07 kB │ map:      5.41 kB
+@t3tools/web:build: dist/assets/ssh-config-DA9YMRGV.js                      3.65 kB │ gzip:   1.63 kB │ map:      4.48 kB
+@t3tools/web:build: dist/assets/kdl-6FPPEH4H.js                             3.66 kB │ gzip:   1.07 kB │ map:      5.51 kB
+@t3tools/web:build: dist/assets/narrat-CxDcPPb9.js                          3.70 kB │ gzip:   1.13 kB │ map:      5.42 kB
+@t3tools/web:build: dist/assets/glsl-BzirHYa0.js                            3.73 kB │ gzip:   1.48 kB │ map:      4.37 kB
+@t3tools/web:build: dist/assets/turtle-CqNXyJWZ.js                          3.73 kB │ gzip:   1.00 kB │ map:      5.49 kB
+@t3tools/web:build: dist/assets/ron-DiDyR9oa.js                             3.94 kB │ gzip:   1.01 kB │ map:      6.02 kB
+@t3tools/web:build: dist/assets/zenscript-4WaROUyc.js                       3.95 kB │ gzip:   1.32 kB │ map:      5.75 kB
+@t3tools/web:build: dist/assets/gn-CMIt9roj.js                              4.03 kB │ gzip:   1.51 kB │ map:      5.27 kB
+@t3tools/web:build: dist/assets/pascal-D4n_G8vj.js                          4.18 kB │ gzip:   1.71 kB │ map:      5.53 kB
+@t3tools/web:build: dist/assets/http-BIVeDW-l.js                            4.45 kB │ gzip:   1.09 kB │ map:      6.69 kB
+@t3tools/web:build: dist/assets/tcl-DHq7zmoF.js                             4.46 kB │ gzip:   1.54 kB │ map:      6.48 kB
+@t3tools/web:build: dist/assets/nextflow-JEyYUlIq.js                        4.55 kB │ gzip:   1.20 kB │ map:      6.82 kB
+@t3tools/web:build: dist/assets/rosmsg-CHmL1Uyj.js                          4.56 kB │ gzip:   1.09 kB │ map:      6.75 kB
+@t3tools/web:build: dist/assets/polar-BmhMKWum.js                           4.70 kB │ gzip:   1.16 kB │ map:      7.25 kB
+@t3tools/web:build: dist/assets/sdbl-BmWYR-pI.js                            4.73 kB │ gzip:   2.04 kB │ map:      5.89 kB
+@t3tools/web:build: dist/assets/fennel-CC2BkRsS.js                          4.80 kB │ gzip:   1.57 kB │ map:      6.42 kB
+@t3tools/web:build: dist/assets/bibtex-BV_0nsPq.js                          4.83 kB │ gzip:   0.86 kB │ map:      7.02 kB
+@t3tools/web:build: dist/assets/llvm-Dy3qORTl.js                            5.08 kB │ gzip:   2.04 kB │ map:      6.67 kB
+@t3tools/web:build: dist/assets/wgsl-D59WYmNq.js                            5.17 kB │ gzip:   1.42 kB │ map:      7.50 kB
+@t3tools/web:build: dist/assets/gdresource-DgnrMPIx.js                      5.33 kB │ gzip:   1.36 kB │ map:      7.74 kB
+@t3tools/web:build: dist/assets/zig-CJoLJGwV.js                             5.37 kB │ gzip:   1.59 kB │ map:      7.87 kB
+@t3tools/web:build: dist/assets/qml-CYB_gT9C.js                             5.37 kB │ gzip:   1.42 kB │ map:      8.13 kB
+@t3tools/web:build: dist/assets/dax-nbnY1d79.js                             5.39 kB │ gzip:   2.25 kB │ map:      6.76 kB
+@t3tools/web:build: dist/assets/bicep-C2gEwu4J.js                           5.41 kB │ gzip:   1.18 kB │ map:      7.91 kB
+@t3tools/web:build: dist/assets/xml-NlFnBJdW.js                             5.48 kB │ gzip:   1.27 kB │ map:      7.84 kB
+@t3tools/web:build: dist/assets/awk-CMV5n9Z7.js                             5.49 kB │ gzip:   1.41 kB │ map:      7.99 kB
+@t3tools/web:build: dist/assets/coq-DTNXReIC.js                             5.58 kB │ gzip:   1.95 kB │ map:      7.51 kB
+@t3tools/web:build: dist/assets/jinja-BO_E1tLa.js                           5.67 kB │ gzip:   1.39 kB │ map:      8.50 kB
+@t3tools/web:build: dist/assets/lean-BMVMuP2E.js                            5.81 kB │ gzip:   1.95 kB │ map:      7.87 kB
+@t3tools/web:build: dist/assets/moonbit-DZzq699o.js                         5.93 kB │ gzip:   1.71 kB │ map:      8.66 kB
+@t3tools/web:build: dist/assets/powerquery-DVyQv3M2.js                      5.94 kB │ gzip:   1.55 kB │ map:      8.51 kB
+@t3tools/web:build: dist/assets/shaderlab-DZ3Lsiak.js                       5.96 kB │ gzip:   2.11 kB │ map:      7.69 kB
+@t3tools/web:build: dist/assets/verilog-AvXtwZir.js                         5.96 kB │ gzip:   1.92 kB │ map:      8.02 kB
+@t3tools/web:build: dist/assets/cypher-CguaznO2.js                          5.99 kB │ gzip:   1.75 kB │ map:      8.43 kB
+@t3tools/web:build: dist/assets/vb-7Xr8dEYW.js                              6.12 kB │ gzip:   2.37 kB │ map:      8.04 kB
+@t3tools/web:build: dist/assets/red-z4H4llUY.js                             6.30 kB │ gzip:   1.63 kB │ map:      8.88 kB
+@t3tools/web:build: dist/assets/min-dark-B8TUPGHg.js                        6.33 kB │ gzip:   1.74 kB │ map:      8.62 kB
+@t3tools/web:build: dist/assets/gdshader-PfnN_8tR.js                        6.36 kB │ gzip:   1.75 kB │ map:      9.18 kB
+@t3tools/web:build: dist/assets/prisma-CCFA9rEj.js                          6.36 kB │ gzip:   1.42 kB │ map:      9.27 kB
+@t3tools/web:build: dist/assets/ara-DqheWJCe.js                             6.39 kB │ gzip:   1.84 kB │ map:      9.25 kB
+@t3tools/web:build: dist/assets/clojure-6R01QgJC.js                         6.45 kB │ gzip:   1.44 kB │ map:      9.28 kB
+@t3tools/web:build: dist/assets/postcss-BTQso3H9.js                         6.45 kB │ gzip:   1.94 kB │ map:      9.11 kB
+@t3tools/web:build: dist/assets/toml-BH_iPsgK.js                            6.46 kB │ gzip:   1.31 kB │ map:      9.47 kB
+@t3tools/web:build: dist/assets/solarized-light-9-RPS998.js                 6.53 kB │ gzip:   1.75 kB │ map:      9.23 kB
+@t3tools/web:build: dist/assets/proto-C3eop1kM.js                           6.58 kB │ gzip:   1.45 kB │ map:      9.90 kB
+@t3tools/web:build: dist/assets/smalltalk-DVQuUMII.js                       6.62 kB │ gzip:   1.65 kB │ map:      9.24 kB
+@t3tools/web:build: dist/assets/r-BeCpkckU.js                               6.63 kB │ gzip:   1.86 kB │ map:     10.13 kB
+@t3tools/web:build: dist/assets/talonscript-DopQCWDL.js                     6.79 kB │ gzip:   1.52 kB │ map:     10.07 kB
+@t3tools/web:build: dist/assets/solarized-dark-BB1sh-pe.js                  6.89 kB │ gzip:   1.81 kB │ map:      9.69 kB
+@t3tools/web:build: dist/assets/riscv-C8BcOCkS.js                           6.95 kB │ gzip:   2.01 kB │ map:      9.59 kB
+@t3tools/web:build: dist/assets/soy-D37hQWI2.js                             6.96 kB │ gzip:   1.66 kB │ map:     10.71 kB
+@t3tools/web:build: dist/assets/min-light-BDOoBxcA.js                       7.01 kB │ gzip:   1.91 kB │ map:      9.54 kB
+@t3tools/web:build: dist/assets/scheme-BhwcV3Av.js                          7.20 kB │ gzip:   2.08 kB │ map:      9.79 kB
+@t3tools/web:build: dist/assets/hlsl-DpuYn7pp.js                            7.29 kB │ gzip:   2.21 kB │ map:      9.24 kB
+@t3tools/web:build: dist/assets/qss-Csho9BH8.js                             7.50 kB │ gzip:   2.60 kB │ map:      9.40 kB
+@t3tools/web:build: dist/assets/dart-RM3aRphk.js                            7.84 kB │ gzip:   1.95 kB │ map:     11.52 kB
+@t3tools/web:build: dist/assets/systemd-DMzItW5N.js                         7.90 kB │ gzip:   2.57 kB │ map:     10.63 kB
+@t3tools/web:build: dist/assets/monokai-E_VBmXGZ.js                         7.92 kB │ gzip:   1.94 kB │ map:     11.11 kB
+@t3tools/web:build: dist/assets/regexp-B1zcJcYj.js                          8.08 kB │ gzip:   1.49 kB │ map:     11.18 kB
+@t3tools/web:build: dist/assets/haml-DEI1QdSZ.js                            8.37 kB │ gzip:   1.88 kB │ map:     12.36 kB
+@t3tools/web:build: dist/assets/typst-T-Fsk-Sv.js                           8.42 kB │ gzip:   1.70 kB │ map:     12.30 kB
+@t3tools/web:build: dist/assets/vue-html-DwKvZmkk.js                        8.52 kB │ gzip:   1.71 kB │ map:     11.98 kB
+@t3tools/web:build: dist/assets/plsql-BSy3Ag0J.js                           8.54 kB │ gzip:   3.03 kB │ map:     10.89 kB
+@t3tools/web:build: dist/assets/horizon-C5RtD1fY.js                         8.82 kB │ gzip:   1.98 kB │ map:     12.08 kB
+@t3tools/web:build: dist/assets/kotlin-D4L3Nd2D.js                          8.82 kB │ gzip:   2.16 kB │ map:     12.78 kB
+@t3tools/web:build: dist/assets/horizon-bright-pEOice34.js                  8.83 kB │ gzip:   1.99 kB │ map:     12.12 kB
+@t3tools/web:build: dist/assets/ts-tags-CcGEEOyk.js                         8.96 kB │ gzip:   1.24 kB │ map:     14.58 kB
+@t3tools/web:build: dist/assets/make-DfmS6buu.js                            8.99 kB │ gzip:   1.79 kB │ map:     12.86 kB
+@t3tools/web:build: dist/assets/andromeeda-N4z3YzmR.js                      9.06 kB │ gzip:   2.39 kB │ map:     11.96 kB
+@t3tools/web:build: dist/assets/sas-CXmdTJsQ.js                             9.10 kB │ gzip:   3.85 kB │ map:     11.11 kB
+@t3tools/web:build: dist/assets/dark-plus-CqeW_0kH.js                       9.14 kB │ gzip:   2.14 kB │ map:     12.43 kB
+@t3tools/web:build: dist/assets/slack-dark-DOnVms5P.js                      9.16 kB │ gzip:   2.00 kB │ map:     12.52 kB
+@t3tools/web:build: dist/assets/sass-D3xZ5o-v.js                            9.32 kB │ gzip:   2.52 kB │ map:     13.41 kB
+@t3tools/web:build: dist/assets/plastic-uOsw7z1x.js                         9.33 kB │ gzip:   2.00 kB │ map:     12.49 kB
+@t3tools/web:build: dist/assets/slack-ochin-DcRTft4q.js                     9.47 kB │ gzip:   2.12 kB │ map:     13.11 kB
+@t3tools/web:build: dist/assets/tex-Dmb6_gi6.js                             9.71 kB │ gzip:   3.10 kB │ map:     12.42 kB
+@t3tools/web:build: dist/assets/jison-Cri7eKbo.js                           9.73 kB │ gzip:   1.90 kB │ map:     14.10 kB
+@t3tools/web:build: dist/assets/cmake-D5rSbMir.js                           9.89 kB │ gzip:   3.41 kB │ map:     11.26 kB
+@t3tools/web:build: dist/assets/light-plus-DHI2dh3p.js                      9.98 kB │ gzip:   2.30 kB │ map:     13.42 kB
+@t3tools/web:build: dist/assets/hcl-CbCtpSbi.js                            10.08 kB │ gzip:   1.96 kB │ map:     14.79 kB
+@t3tools/web:build: dist/assets/rst-BfUGn7kz.js                            10.35 kB │ gzip:   2.28 kB │ map:     15.57 kB
+@t3tools/web:build: dist/assets/pkl-DcjhAp0L.js                            10.40 kB │ gzip:   1.41 kB │ map:     15.47 kB
+@t3tools/web:build: dist/assets/beancount-DBt5Mbc_.js                      10.41 kB │ gzip:   1.46 kB │ map:     15.04 kB
+@t3tools/web:build: dist/assets/nextflow-groovy-wvmJO4hi.js                10.45 kB │ gzip:   2.15 kB │ map:     15.20 kB
+@t3tools/web:build: dist/assets/raku-Cj4JSa8p.js                           10.50 kB │ gzip:   2.97 kB │ map:     12.91 kB
+@t3tools/web:build: dist/assets/dream-maker-BJL4qlg3.js                    10.51 kB │ gzip:   2.29 kB │ map:     15.11 kB
+@t3tools/web:build: dist/assets/yaml-XLkQVNJq.js                           10.60 kB │ gzip:   2.34 kB │ map:     14.89 kB
+@t3tools/web:build: dist/assets/just-dbDfWeSH.js                           10.81 kB │ gzip:   2.63 kB │ map:     15.24 kB
+@t3tools/web:build: dist/assets/elm-CTXncbfj.js                            10.98 kB │ gzip:   2.13 kB │ map:     16.03 kB
+@t3tools/web:build: dist/assets/github-light-BxjqOQl0.js                   11.23 kB │ gzip:   2.53 kB │ map:     15.42 kB
+@t3tools/web:build: dist/assets/prolog-DWGEEo78.js                         11.39 kB │ gzip:   3.88 kB │ map:     13.30 kB
+@t3tools/web:build: dist/assets/terraform-CogS1YKX.js                      11.42 kB │ gzip:   2.55 kB │ map:     16.22 kB
+@t3tools/web:build: dist/assets/github-dark-ipGuFGYC.js                    11.45 kB │ gzip:   2.56 kB │ map:     15.69 kB
+@t3tools/web:build: dist/assets/puppet-C0_7Nv5A.js                         11.47 kB │ gzip:   2.14 kB │ map:     16.32 kB
+@t3tools/web:build: dist/assets/laserwave-7fEj4XGb.js                      11.54 kB │ gzip:   2.61 kB │ map:     14.71 kB
+@t3tools/web:build: dist/assets/gherkin-COVWpJ-Q.js                        11.98 kB │ gzip:   5.08 kB │ map:     13.12 kB
+@t3tools/web:build: dist/assets/wasm-Chsuwt1A.js                           12.04 kB │ gzip:   2.21 kB │ map:     16.84 kB
+@t3tools/web:build: dist/assets/hjson-_4-w-pHU.js                          12.08 kB │ gzip:   1.67 kB │ map:     17.29 kB
+@t3tools/web:build: dist/assets/handlebars-i7QAs6n9.js                     12.21 kB │ gzip:   2.41 kB │ map:     17.37 kB
+@t3tools/web:build: dist/assets/apache-DttKlSqg.js                         12.49 kB │ gzip:   3.74 kB │ map:     15.95 kB
+@t3tools/web:build: dist/assets/vesper-CtgQQ2sf.js                         12.73 kB │ gzip:   2.02 kB │ map:     16.17 kB
+@t3tools/web:build: dist/assets/bat-BaVbo_qw.js                            12.92 kB │ gzip:   3.26 kB │ map:     17.39 kB
+@t3tools/web:build: dist/assets/fish-D2ZCzqcE.js                           13.07 kB │ gzip:   1.77 kB │ map:     16.86 kB
+@t3tools/web:build: dist/assets/v-BhMEOw9x.js                              13.24 kB │ gzip:   2.76 kB │ map:     19.27 kB
+@t3tools/web:build: dist/assets/vitesse-light-BXxZh2iV.js                  13.66 kB │ gzip:   3.06 kB │ map:     18.55 kB
+@t3tools/web:build: dist/assets/aurora-x-CND-FqEb.js                       13.70 kB │ gzip:   2.32 kB │ map:     17.58 kB
+@t3tools/web:build: dist/assets/vitesse-black-jXdfyqgD.js                  13.72 kB │ gzip:   3.09 kB │ map:     18.64 kB
+@t3tools/web:build: dist/assets/vitesse-dark-B88PxG1r.js                   13.80 kB │ gzip:   3.09 kB │ map:     18.72 kB
+@t3tools/web:build: dist/assets/pug-o4wuE6HG.js                            13.89 kB │ gzip:   2.62 kB │ map:     20.51 kB
+@t3tools/web:build: dist/assets/luau-Dha4KG0q.js                           13.99 kB │ gzip:   3.20 kB │ map:     19.63 kB
+@t3tools/web:build: dist/assets/synthwave-84-eJ9uRN_S.js                   14.08 kB │ gzip:   2.88 kB │ map:     19.10 kB
+@t3tools/web:build: dist/assets/github-light-default-DwpDd1IQ.js           14.21 kB │ gzip:   3.05 kB │ map:     19.28 kB
+@t3tools/web:build: dist/assets/clarity-CFJ2Yc3q.js                        14.31 kB │ gzip:   2.50 kB │ map:     19.94 kB
+@t3tools/web:build: dist/assets/github-light-high-contrast-C0QeixPf.js     14.33 kB │ gzip:   3.03 kB │ map:     19.45 kB
+@t3tools/web:build: dist/assets/github-dark-dimmed-CH6p_7ez.js             14.48 kB │ gzip:   3.15 kB │ map:     19.65 kB
+@t3tools/web:build: dist/assets/github-dark-default-DX3IG_X0.js            14.48 kB │ gzip:   3.16 kB │ map:     19.65 kB
+@t3tools/web:build: dist/assets/github-dark-high-contrast-Bg2sSao5.js      14.65 kB │ gzip:   3.11 kB │ map:     19.88 kB
+@t3tools/web:build: dist/assets/gnuplot-DgWlRTEj.js                        14.82 kB │ gzip:   3.31 kB │ map:     20.82 kB
+@t3tools/web:build: dist/assets/rust-DjJFInu3.js                           15.10 kB │ gzip:   2.75 kB │ map:     21.46 kB
+@t3tools/web:build: dist/assets/kusto-D-mmc07O.js                          15.20 kB │ gzip:   3.96 kB │ map:     19.62 kB
+@t3tools/web:build: dist/assets/actionscript-3-o-aRvjY5.js                 15.25 kB │ gzip:   2.71 kB │ map:     21.45 kB
+@t3tools/web:build: dist/assets/nix-DsFTDHWT.js                            15.54 kB │ gzip:   2.51 kB │ map:     22.89 kB
+@t3tools/web:build: dist/assets/lua-DD_yx4lC.js                            15.63 kB │ gzip:   3.22 kB │ map:     22.12 kB
+@t3tools/web:build: dist/assets/abap-smLpETzL.js                           15.88 kB │ gzip:   5.96 kB │ map:     18.84 kB
+@t3tools/web:build: dist/assets/solidity-gQ4WXILB.js                       16.11 kB │ gzip:   3.13 kB │ map:     23.45 kB
+@t3tools/web:build: dist/assets/matlab-BT79Cq_j.js                         16.12 kB │ gzip:   3.10 kB │ map:     23.36 kB
+@t3tools/web:build: dist/assets/cue-DDdBc2s3.js                            16.23 kB │ gzip:   2.08 kB │ map:     23.79 kB
+@t3tools/web:build: dist/assets/elixir-tjuZR7ZR.js                         16.30 kB │ gzip:   2.80 kB │ map:     23.14 kB
+@t3tools/web:build: dist/assets/odin-mdTPwYOg.js                           16.54 kB │ gzip:   2.96 kB │ map:     23.79 kB
+@t3tools/web:build: dist/assets/bird2-BRyaEJd0.js                          17.00 kB │ gzip:   3.87 kB │ map:     23.23 kB
+@t3tools/web:build: dist/assets/kanagawa-wave-CLVCyc-n.js                  17.17 kB │ gzip:   2.94 kB │ map:     22.28 kB
+@t3tools/web:build: dist/assets/kanagawa-lotus-DpOXEGCa.js                 17.17 kB │ gzip:   2.94 kB │ map:     22.28 kB
+@t3tools/web:build: dist/assets/kanagawa-dragon-CtPmcCMp.js                17.17 kB │ gzip:   2.96 kB │ map:     22.29 kB
+@t3tools/web:build: dist/assets/move-DxDAOJVd.js                           17.54 kB │ gzip:   3.10 kB │ map:     26.27 kB
+@t3tools/web:build: dist/assets/graphql-C-dZSyPS.js                        18.12 kB │ gzip:   2.56 kB │ map:     25.45 kB
+@t3tools/web:build: dist/assets/liquid-BLBL0_bE.js                         18.14 kB │ gzip:   3.18 kB │ map:     25.23 kB
+@t3tools/web:build: dist/assets/svelte-cWEhKkAq.js                         18.29 kB │ gzip:   3.18 kB │ map:     25.73 kB
+@t3tools/web:build: dist/assets/material-theme-Dm6ETY8i.js                 18.66 kB │ gzip:   3.14 kB │ map:     24.12 kB
+@t3tools/web:build: dist/assets/material-theme-ocean-CUtPiiX3.js           18.68 kB │ gzip:   3.16 kB │ map:     24.15 kB
+@t3tools/web:build: dist/assets/material-theme-darker-BeyjmM5Z.js          18.68 kB │ gzip:   3.13 kB │ map:     24.16 kB
+@t3tools/web:build: dist/assets/material-theme-lighter-CCOYYzKL.js         18.69 kB │ gzip:   3.14 kB │ map:     24.16 kB
+@t3tools/web:build: dist/assets/material-theme-palenight-2L4zMwIM.js       18.69 kB │ gzip:   3.15 kB │ map:     24.17 kB
+@t3tools/web:build: dist/assets/gdscript-CsadCSaZ.js                       19.03 kB │ gzip:   3.78 kB │ map:     26.25 kB
+@t3tools/web:build: dist/assets/groovy-B9qLWIkE.js                         19.21 kB │ gzip:   3.63 kB │ map:     27.52 kB
+@t3tools/web:build: dist/assets/mdc-Dw_xOLL1.js                            19.58 kB │ gzip:   6.70 kB │ map:     23.08 kB
+@t3tools/web:build: dist/assets/ayu-dark-on7xzq_B.js                       20.12 kB │ gzip:   3.97 kB │ map:     27.05 kB
+@t3tools/web:build: dist/assets/ayu-mirage-DG3LlYC_.js                     20.13 kB │ gzip:   3.95 kB │ map:     27.06 kB
+@t3tools/web:build: dist/assets/glimmer-js-DXZTe-sO.js                     20.13 kB │ gzip:   2.97 kB │ map:     28.59 kB
+@t3tools/web:build: dist/assets/glimmer-ts-HGjhGl3L.js                     20.13 kB │ gzip:   2.97 kB │ map:     28.59 kB
+@t3tools/web:build: dist/assets/powershell-BmtCGJVD.js                     20.19 kB │ gzip:   4.09 kB │ map:     26.59 kB
+@t3tools/web:build: dist/assets/ayu-light-DnGeGGc2.js                      20.19 kB │ gzip:   3.93 kB │ map:     27.13 kB
+@t3tools/web:build: dist/assets/viml-Di0QpLfC.js                           20.40 kB │ gzip:   6.77 kB │ map:     23.50 kB
+@t3tools/web:build: dist/assets/nushell-BQ_rO0AM.js                        20.45 kB │ gzip:   5.25 kB │ map:     27.66 kB
+@t3tools/web:build: dist/assets/snazzy-light-x9CLJ1W9.js                   20.82 kB │ gzip:   3.84 kB │ map:     28.01 kB
+@t3tools/web:build: dist/assets/twig-8Uf0JeoK.js                           20.94 kB │ gzip:   3.70 kB │ map:     29.22 kB
+@t3tools/web:build: dist/assets/dracula-CtqCPLGa.js                        21.10 kB │ gzip:   4.03 kB │ map:     27.50 kB
+@t3tools/web:build: dist/assets/dracula-soft-DmBpwRAy.js                   21.12 kB │ gzip:   4.06 kB │ map:     27.52 kB
+@t3tools/web:build: dist/assets/wit-EA4fa3Dt.js                            21.50 kB │ gzip:   2.91 kB │ map:     30.10 kB
+@t3tools/web:build: dist/assets/rose-pine-BADquuIH.js                      21.78 kB │ gzip:   3.90 kB │ map:     28.77 kB
+@t3tools/web:build: dist/assets/rose-pine-moon-BK_tLY1Y.js                 21.80 kB │ gzip:   3.92 kB │ map:     28.80 kB
+@t3tools/web:build: dist/assets/rose-pine-dawn-BLcEeBoh.js                 21.80 kB │ gzip:   3.91 kB │ map:     28.80 kB
+@t3tools/web:build: dist/assets/nim-Bccu8zMW.js                            22.49 kB │ gzip:   3.19 kB │ map:     32.75 kB
+@t3tools/web:build: dist/assets/common-lisp-BvQzz173.js                    22.62 kB │ gzip:   6.11 kB │ map:     26.68 kB
+@t3tools/web:build: dist/assets/surrealql-nq8F1ywQ.js                      22.63 kB │ gzip:   4.35 kB │ map:     32.46 kB
+@t3tools/web:build: dist/assets/gruvbox-dark-hard-BIMX9ePb.js              22.68 kB │ gzip:   4.19 kB │ map:     30.57 kB
+@t3tools/web:build: dist/assets/gruvbox-dark-soft-ba2fjht0.js              22.68 kB │ gzip:   4.19 kB │ map:     30.57 kB
+@t3tools/web:build: dist/assets/gruvbox-light-hard-DAJK2PqC.js             22.68 kB │ gzip:   4.20 kB │ map:     30.57 kB
+@t3tools/web:build: dist/assets/gruvbox-light-soft-B0dBOoVB.js             22.68 kB │ gzip:   4.19 kB │ map:     30.57 kB
+@t3tools/web:build: dist/assets/gruvbox-dark-medium-DxuwyVzM.js            22.69 kB │ gzip:   4.19 kB │ map:     30.58 kB
+@t3tools/web:build: dist/assets/gruvbox-light-medium-WRifDAJD.js           22.69 kB │ gzip:   4.20 kB │ map:     30.58 kB
+@t3tools/web:build: dist/assets/sql-tygfGGOT.js                            23.50 kB │ gzip:   7.52 kB │ map:     27.91 kB
+@t3tools/web:build: dist/assets/cadence-CPz83cmI.js                        23.70 kB │ gzip:   3.68 kB │ map:     33.58 kB
+@t3tools/web:build: dist/assets/typespec-CQ9LYD_e.js                       24.05 kB │ gzip:   2.62 kB │ map:     33.44 kB
+@t3tools/web:build: dist/assets/astro-DIXLppCH.js                          24.06 kB │ gzip:   7.63 kB │ map:     29.14 kB
+@t3tools/web:build: dist/assets/apl-CiEppCwG.js                            24.07 kB │ gzip:   4.20 kB │ map:     33.33 kB
+@t3tools/web:build: dist/assets/templ-D1ey1A6o.js                          24.10 kB │ gzip:   5.44 kB │ map:     30.89 kB
+@t3tools/web:build: dist/assets/angular-html-D9KMlYro.js                   24.28 kB │ gzip:   4.02 kB │ map:     35.64 kB
+@t3tools/web:build: dist/assets/vhdl-BHu0zg1P.js                           24.29 kB │ gzip:   3.90 kB │ map:     33.37 kB
+@t3tools/web:build: dist/assets/vue-p-NYOTfH.js                            24.53 kB │ gzip:   2.99 kB │ map:     36.71 kB
+@t3tools/web:build: dist/assets/purescript-Bv-B8yRw.js                     24.72 kB │ gzip:   3.27 kB │ map:     34.88 kB
+@t3tools/web:build: dist/assets/one-light-D9c03w7t.js                      25.34 kB │ gzip:   3.67 kB │ map:     33.80 kB
+@t3tools/web:build: dist/assets/fsharp-DhdR18vN.js                         25.34 kB │ gzip:   4.16 kB │ map:     35.86 kB
+@t3tools/web:build: dist/assets/marko-D7oQoujE.js                          25.52 kB │ gzip:   3.63 kB │ map:     35.83 kB
+@t3tools/web:build: dist/assets/c3-DTTbp5N2.js                             25.66 kB │ gzip:   3.89 kB │ map:     37.18 kB
+@t3tools/web:build: dist/assets/night-owl-light-byb3AbEn.js                25.95 kB │ gzip:   4.27 kB │ map:     35.15 kB
+@t3tools/web:build: dist/assets/system-verilog-CnWMF7Nq.js                 26.24 kB │ gzip:   4.86 kB │ map:     36.26 kB
+@t3tools/web:build: dist/assets/nord-D5rQzHT-.js                           26.76 kB │ gzip:   4.39 kB │ map:     35.35 kB
+@t3tools/web:build: dist/assets/codeql-DlIhJTR7.js                         26.92 kB │ gzip:   3.84 kB │ map:     36.01 kB
+@t3tools/web:build: dist/assets/scss-C1GF8mOW.js                           27.30 kB │ gzip:   4.26 kB │ map:     38.32 kB
+@t3tools/web:build: dist/assets/java-DwfOsM4a.js                           27.31 kB │ gzip:   4.34 kB │ map:     38.62 kB
+@t3tools/web:build: dist/assets/coffee-Dfmx2FKA.js                         27.46 kB │ gzip:   6.38 kB │ map:     36.07 kB
+@t3tools/web:build: dist/assets/razor-C5Li47mB.js                          27.49 kB │ gzip:   3.58 kB │ map:     38.30 kB
+@t3tools/web:build: dist/assets/pierre-dark-DKQROCj3.js                    27.94 kB │ gzip:   4.53 kB │ map:     48.75 kB
+@t3tools/web:build: dist/assets/pierre-light-Bd4oD8xJ.js                   27.94 kB │ gzip:   4.50 kB │ map:     48.76 kB
+@t3tools/web:build: dist/assets/scala-B0IRml5w.js                          28.92 kB │ gzip:   3.96 kB │ map:     40.11 kB
+@t3tools/web:build: dist/assets/night-owl-DefhalNX.js                      28.95 kB │ gzip:   5.18 kB │ map:     39.05 kB
+@t3tools/web:build: dist/assets/crystal-DaXEG4-B.js                        29.45 kB │ gzip:   4.47 kB │ map:     41.17 kB
+@t3tools/web:build: dist/assets/mermaid-DLf3axBN.js                        29.54 kB │ gzip:   3.68 kB │ map:     44.11 kB
+@t3tools/web:build: dist/assets/applescript-DCbL_2FX.js                    29.61 kB │ gzip:   5.98 kB │ map:     39.34 kB
+@t3tools/web:build: dist/assets/julia-D5Ze2gLX.js                          31.04 kB │ gzip:   4.33 kB │ map:     40.54 kB
+@t3tools/web:build: dist/assets/stylus-sKwvsUaC.js                         31.11 kB │ gzip:   8.05 kB │ map:     38.87 kB
+@t3tools/web:build: dist/assets/poimandres-CyO4HORD.js                     33.53 kB │ gzip:   5.53 kB │ map:     43.06 kB
+@t3tools/web:build: dist/assets/one-dark-pro-DxXww9jg.js                   33.83 kB │ gzip:   5.54 kB │ map:     44.50 kB
+@t3tools/web:build: dist/assets/bsl-B1qbqNES.js                            33.90 kB │ gzip:   8.38 kB │ map:     37.60 kB
+@t3tools/web:build: dist/assets/haxe-DfXTCEOz.js                           35.19 kB │ gzip:   5.94 kB │ map:     49.51 kB
+@t3tools/web:build: dist/assets/nginx-BSeJE1b-.js                          35.39 kB │ gzip:   4.49 kB │ map:     48.47 kB
+@t3tools/web:build: dist/assets/houston-A0zg9vNP.js                        35.46 kB │ gzip:   5.80 kB │ map:     46.39 kB
+@t3tools/web:build: dist/assets/tokyo-night-B9N7LyrF.js                    35.71 kB │ gzip:   6.26 kB │ map:     45.34 kB
+@t3tools/web:build: dist/assets/erlang-Bc4hQuqa.js                         37.52 kB │ gzip:   4.40 kB │ map:     51.55 kB
+@t3tools/web:build: dist/assets/cobol-DeJ9PW50.js                          39.13 kB │ gzip:  10.93 kB │ map:     47.37 kB
+@t3tools/web:build: dist/assets/asm-rfjOMz3U.js                            40.75 kB │ gzip:   8.20 kB │ map:     52.99 kB
+@t3tools/web:build: dist/assets/haskell-BaGpmm_c.js                        41.52 kB │ gzip:   6.44 kB │ map:     57.84 kB
+@t3tools/web:build: dist/assets/shellscript-D6j2xMU4.js                    41.58 kB │ gzip:   6.17 kB │ map:     56.51 kB
+@t3tools/web:build: dist/assets/perl-ChcmFxZK.js                           43.18 kB │ gzip:   4.68 kB │ map:     60.74 kB
+@t3tools/web:build: dist/assets/d-CHcoyjv3.js                              43.82 kB │ gzip:   8.46 kB │ map:     62.68 kB
+@t3tools/web:build: dist/assets/ruby-BDG7yng4.js                           45.87 kB │ gzip:   5.60 kB │ map:     65.29 kB
+@t3tools/web:build: dist/assets/go-DLnOLj8q.js                             46.84 kB │ gzip:   5.19 kB │ map:     66.58 kB
+@t3tools/web:build: dist/assets/apex-DL7j-a2n.js                           47.02 kB │ gzip:   6.75 kB │ map:     65.71 kB
+@t3tools/web:build: dist/assets/catppuccin-mocha-D8Lmdks_.js               47.30 kB │ gzip:   8.02 kB │ map:     62.01 kB
+@t3tools/web:build: dist/assets/catppuccin-latte-C57EeX8c.js               47.30 kB │ gzip:   8.02 kB │ map:     62.01 kB
+@t3tools/web:build: dist/assets/catppuccin-frappe-Dr22sraq.js              47.31 kB │ gzip:   8.03 kB │ map:     62.02 kB
+@t3tools/web:build: dist/assets/catppuccin-macchiato-CpheI4uD.js           47.31 kB │ gzip:   8.03 kB │ map:     62.03 kB
+@t3tools/web:build: dist/assets/ada-D5RRX1i4.js                            48.11 kB │ gzip:   6.00 kB │ map:     70.95 kB
+@t3tools/web:build: dist/assets/css-HvxA86gc.js                            49.12 kB │ gzip:  11.98 kB │ map:     60.62 kB
+@t3tools/web:build: dist/assets/imba-Bxu-TDfw.js                           49.96 kB │ gzip:   9.51 kB │ map:     68.08 kB
+@t3tools/web:build: dist/assets/everforest-dark-CrbyKk4n.js                53.79 kB │ gzip:   8.41 kB │ map:     68.26 kB
+@t3tools/web:build: dist/assets/everforest-light-DRbSh8Tm.js               53.79 kB │ gzip:   8.41 kB │ map:     68.27 kB
+@t3tools/web:build: dist/assets/wikitext-ariTI2Wk.js                       55.92 kB │ gzip:   4.85 kB │ map:     77.63 kB
+@t3tools/web:build: dist/assets/stata-BuRmKOMc.js                          57.03 kB │ gzip:  12.44 kB │ map:     74.17 kB
+@t3tools/web:build: dist/assets/html-CBAJ5MZN.js                           57.35 kB │ gzip:  11.81 kB │ map:     72.99 kB
+@t3tools/web:build: dist/assets/ballerina-BjMqJjlr.js                      58.73 kB │ gzip:   8.14 kB │ map:     81.52 kB
+@t3tools/web:build: dist/assets/markdown-BaI9LyM4.js                       59.37 kB │ gzip:   5.70 kB │ map:     82.32 kB
+@t3tools/web:build: dist/assets/ocaml-e4_gKO6E.js                          62.48 kB │ gzip:   5.08 kB │ map:     81.10 kB
+@t3tools/web:build: dist/assets/mojo-1Omp2pIo.js                           69.83 kB │ gzip:   9.24 kB │ map:     94.93 kB
+@t3tools/web:build: dist/assets/python-CKg5r0C3.js                         69.98 kB │ gzip:   9.13 kB │ map:     95.23 kB
+@t3tools/web:build: dist/assets/c-DNY8mjAo.js                              72.20 kB │ gzip:  10.58 kB │ map:     95.37 kB
+@t3tools/web:build: dist/assets/latex-CbLApJVD.js                          72.66 kB │ gzip:   6.72 kB │ map:    100.57 kB
+@t3tools/web:build: dist/assets/vyper-C3R5yXgx.js                          74.68 kB │ gzip:  10.73 kB │ map:    100.70 kB
+@t3tools/web:build: dist/assets/hack-zfsnHxWM.js                           80.22 kB │ gzip:  26.31 kB │ map:     97.30 kB
+@t3tools/web:build: dist/assets/swift-C72NbAtg.js                          86.72 kB │ gzip:  14.72 kB │ map:    114.50 kB
+@t3tools/web:build: dist/assets/fortran-free-form-BPTf0lbT.js              89.01 kB │ gzip:  11.22 kB │ map:    124.04 kB
+@t3tools/web:build: dist/assets/csharp-BDKQY1K9.js                         89.72 kB │ gzip:  10.68 kB │ map:    125.67 kB
+@t3tools/web:build: dist/assets/racket-D8-uWeQH.js                         92.42 kB │ gzip:  15.11 kB │ map:    106.18 kB
+@t3tools/web:build: dist/assets/less-C95PyOu0.js                           97.66 kB │ gzip:  14.88 kB │ map:    131.85 kB
+@t3tools/web:build: dist/assets/blade-DQRNEY-C.js                         105.01 kB │ gzip:  28.34 kB │ map:    130.95 kB
+@t3tools/web:build: dist/assets/objective-c-BMq6JT_m.js                   105.45 kB │ gzip:  23.68 kB │ map:    129.64 kB
+@t3tools/web:build: dist/assets/php-sD8oLVhW.js                           111.09 kB │ gzip:  28.69 kB │ map:    139.37 kB
+@t3tools/web:build: dist/assets/asciidoc-BH2sf2K4.js                      131.56 kB │ gzip:   9.35 kB │ map:    189.10 kB
+@t3tools/web:build: dist/assets/mdx-CxGBwLNt.js                           136.14 kB │ gzip:  23.57 kB │ map:    176.72 kB
+@t3tools/web:build: dist/assets/objective-cpp-DRwojuGv.js                 172.01 kB │ gzip:  31.02 kB │ map:    218.52 kB
+@t3tools/web:build: dist/assets/javascript-B1me_fh6.js                    174.93 kB │ gzip:  16.72 kB │ map:    236.05 kB
+@t3tools/web:build: dist/assets/tsx-vAvp617i.js                           175.63 kB │ gzip:  16.71 kB │ map:    236.72 kB
+@t3tools/web:build: dist/assets/jsx-BJtzu8Hn.js                           177.88 kB │ gzip:  16.80 kB │ map:    238.98 kB
+@t3tools/web:build: dist/assets/DiffPanel-CA-99fLO.js                     179.63 kB │ gzip:  42.92 kB │ map:    448.94 kB
+@t3tools/web:build: dist/assets/typescript-CBhyD6FP.js                    181.18 kB │ gzip:  16.33 kB │ map:    244.39 kB
+@t3tools/web:build: dist/assets/angular-ts-B1VWkrPL.js                    183.77 kB │ gzip:  16.82 kB │ map:    249.42 kB
+@t3tools/web:build: dist/assets/vue-vine-B9ktYCYM.js                      190.10 kB │ gzip:  18.11 kB │ map:    255.14 kB
+@t3tools/web:build: dist/assets/wolfram-DDp7LhyU.js                       262.42 kB │ gzip:  77.67 kB │ map:    279.65 kB
+@t3tools/web:build: dist/assets/wasm-CEUrWlVz.js                          622.36 kB │ gzip: 232.13 kB │ map:    622.85 kB
+@t3tools/web:build: dist/assets/cpp-VNFMc1_n.js                           626.16 kB │ gzip:  48.12 kB │ map:    816.16 kB
+@t3tools/web:build: dist/assets/emacs-lisp-_LyYa2Ky.js                    779.89 kB │ gzip: 197.57 kB │ map:    789.80 kB
+@t3tools/web:build: dist/assets/index-CIsLdpvd.js                       2,769.34 kB │ gzip: 811.97 kB │ map: 11,544.18 kB
+@t3tools/web:build: 
+@t3tools/web:build: [33m[33m[PLUGIN_TIMINGS] Warning:[0m Your build spent significant time in plugins. Here is a breakdown:
+@t3tools/web:build:   - @rolldown/plugin-babel (70%)
+@t3tools/web:build:   - vite:worker (19%)
+@t3tools/web:build:   - vite:css-post (6%)
+@t3tools/web:build: See https://rolldown.rs/options/checks#plugintimings for more details.
+@t3tools/web:build: [39m
+@t3tools/web:build: [33m[plugin builtin:vite-reporter] 
+@t3tools/web:build: (!) Some chunks are larger than 500 kB after minification. Consider:
+@t3tools/web:build: - Using dynamic import() to code-split the application
+@t3tools/web:build: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+@t3tools/web:build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+@t3tools/web:build: [32m✓ built in 18.79s[39m
+t3:test: cache bypass, force executing cd00c8944a53419e
+t3:test: $ vitest run
+t3:test: 
+t3:test: [1m[46m RUN [49m[22m [36mv4.1.0 [39m[90mD:/Projects/t3code/apps/server[39m
+t3:test: 
+t3:test:  [31m❯[39m src/git/Layers/GitManager.test.ts [2m([22m[2m48 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[33m 433398[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status includes PR metadata when branch already has an open PR [33m 7593[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status returns an explicit non-repo result for non-git directories [33m 1860[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status briefly caches repeated lookups for the same cwd [33m 4733[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status ignores unrelated fork PRs when the current branch tracks the same repository [33m 4188[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status detects cross-repo PRs from the upstream remote URL owner [33m 7396[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status ignores synthetic local branch aliases when the upstream remote name contains slashes [33m 7139[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status returns merged PR state when latest PR was merged [33m 5931[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status prefers open PR when merged PR has newer updatedAt [33m 6105[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m status is resilient to gh lookup failures and returns pr null [33m 4555[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m creates a commit when working tree is dirty [33m 5926[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m uses custom commit message when provided [33m 5733[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m commits only selected files when filePaths is provided [33m 5731[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m creates feature branch, commits, and pushes with featureBranch option [33m 14076[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m featureBranch uses custom commit message and derives branch name [33m 6716[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m skips commit when there are no uncommitted changes [33m 5242[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m featureBranch returns error when worktree is clean [33m 5447[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m commits and pushes with upstream auto-setup when needed [33m 13762[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m pushes and creates PR from a no-upstream branch when local commits are ahead of base [33m 16590[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m skips push when branch is already up to date [33m 6914[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m pushes existing clean commits without rerunning commit logic [33m 13850[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m create_pr pushes a clean branch before creating the PR when needed [33m 16848[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m returns existing PR metadata for commit/push/pr action [33m 8852[2mms[22m[39m
+t3:test: [31m     [31m×[31m returns existing cross-repo PR metadata using the fork owner selector[39m[33m 12197[2mms[22m[39m
+t3:test: [31m     [31m×[31m returns the correct existing PR when a slash remote checks out to a synthetic local alias[39m[33m 12155[2mms[22m[39m
+t3:test: [31m     [31m×[31m prefers owner-qualified selectors before bare branch names for cross-repo PRs[39m[33m 12695[2mms[22m[39m
+t3:test: [31m     [31m×[31m stops probing head selectors after finding an existing PR[39m[33m 12084[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m creates PR when one does not already exist [33m 11559[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m creates a new PR instead of reusing an unrelated fork PR with the same head branch [33m 11205[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m creates cross-repo PRs with the fork owner selector and default base branch [33m 14207[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m rejects push/pr actions from detached HEAD [33m 3548[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m surfaces missing gh binary errors [33m 9334[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m surfaces gh auth errors with guidance [33m 8753[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m resolves pull requests from #number references [33m 995[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m prepares pull request threads in local mode by checking out the PR branch [33m 6398[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m prepares pull request threads in worktree mode on the PR head branch [33m 14589[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m launches setup only when creating a new PR worktree [33m 10724[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m preserves fork upstream tracking when preparing a worktree PR thread [33m 15349[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m preserves fork upstream tracking when preparing a local PR thread [33m 9706[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m derives fork repository identity from PR URL when GitHub omits nameWithOwner [33m 8915[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m reuses an existing dedicated worktree for the PR head branch [33m 6956[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m does not block fork PR worktree prep when the fork head branch collides with root main [33m 14899[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m does not overwrite an existing local main branch when preparing a fork PR worktree [33m 13058[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m reuses an existing PR worktree and restores fork upstream tracking [33m 10571[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m does not fail PR worktree prep when setup terminal startup fails [33m 11641[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m rejects worktree prep when the PR head branch is checked out in the main repo [33m 2183[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m emits ordered progress events for commit hooks [33m 8218[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m emits action_failed when a commit hook rejects [33m 6473[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m create_pr emits only the PR phase when the branch is already pushed [33m 9766[2mms[22m[39m
+t3:test:  [32m✓[39m src/provider/Layers/ClaudeAdapter.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 245[2mms[22m[39m
+t3:test: (node:44332) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+t3:test: (Use `node --trace-deprecation ...` to show where the warning was created)
+t3:test: [90mstdout[2m | src/git/Layers/GitCore.test.ts[2m > [22m[2mgit integration
+t3:test: [22m[39m[23:51:53.772] ERROR (#9448): Error [PlatformError]: NotFound: FileSystem.makeTempDirectoryScoped (C:\Users\naved\AppData\Local\Temp\1\t3-git-core-test-1S7BUi)
+t3:test:     at Module.systemError (file:///D:/Projects/t3code/node_modules/[4m.bun[24m/effect@4.0.0-beta.43/node_modules/[4meffect[24m/dist/PlatformError.js:59:39)
+t3:test:     at file:///D:/Projects/t3code/node_modules/[4m.bun[24m/@effect+platform-node-shared@4.0.0-beta.43+f0ee8dfa7cc0356b/node_modules/[4m@effect/platform-node-shared[24m/dist/internal/utils.js:28:24
+t3:test:     at file:///D:/Projects/t3code/node_modules/[4m.bun[24m/effect@4.0.0-beta.43/node_modules/[4meffect[24m/dist/Effect.js:7233:31
+t3:test: [90m    at node:fs:1215:14[39m
+t3:test: [90m    at node:internal/fs/utils:817:14[39m
+t3:test: [90m    at FSReqCallback.oncomplete (node:fs:195:21)[39m {
+t3:test:   reason: SystemError: NotFound: FileSystem.makeTempDirectoryScoped (C:\Users\naved\AppData\Local\Temp\1\t3-git-core-test-1S7BUi)
+t3:test:       at Module.systemError (file:///D:/Projects/t3code/node_modules/[4m.bun[24m/effect@4.0.0-beta.43/node_modules/[4meffect[24m/dist/PlatformError.js:59:57)
+t3:test:       at file:///D:/Projects/t3code/node_modules/[4m.bun[24m/@effect+platform-node-shared@4.0.0-beta.43+f0ee8dfa7cc0356b/node_modules/[4m@effect/platform-node-shared[24m/dist/internal/utils.js:28:24
+t3:test:       at file:///D:/Projects/t3code/node_modules/[4m.bun[24m/effect@4.0.0-beta.43/node_modules/[4meffect[24m/dist/Effect.js:7233:31
+t3:test:   [90m    at node:fs:1215:14[39m
+t3:test:   [90m    at node:internal/fs/utils:817:14[39m
+t3:test:   [90m    at FSReqCallback.oncomplete (node:fs:195:21)[39m {
+t3:test:     _tag: [32m'NotFound'[39m,
+t3:test:     module: [32m'FileSystem'[39m,
+t3:test:     method: [32m'makeTempDirectoryScoped'[39m,
+t3:test:     pathOrDescriptor: [32m'C:\\Users\\naved\\AppData\\Local\\Temp\\1\\t3-git-core-test-1S7BUi'[39m,
+t3:test:     syscall: [32m'lstat'[39m,
+t3:test:     [cause]: [Error: ENOENT: no such file or directory, lstat 'C:\Users\naved\AppData\Local\Temp\1\t3-git-core-test-1S7BUi'] {
+t3:test:       errno: [33m-4058[39m,
+t3:test:       code: [32m'ENOENT'[39m,
+t3:test:       syscall: [32m'lstat'[39m,
+t3:test:       path: [32m'C:\\Users\\naved\\AppData\\Local\\Temp\\1\\t3-git-core-test-1S7BUi'[39m
+t3:test:     }
+t3:test:   },
+t3:test:   _tag: [32m'PlatformError'[39m,
+t3:test:   [32m'~effect/platform/PlatformError'[39m: [32m'~effect/platform/PlatformError'[39m,
+t3:test:   [cause]: [Error: ENOENT: no such file or directory, lstat 'C:\Users\naved\AppData\Local\Temp\1\t3-git-core-test-1S7BUi'] {
+t3:test:     errno: [33m-4058[39m,
+t3:test:     code: [32m'ENOENT'[39m,
+t3:test:     syscall: [32m'lstat'[39m,
+t3:test:     path: [32m'C:\\Users\\naved\\AppData\\Local\\Temp\\1\\t3-git-core-test-1S7BUi'[39m,
+t3:test:     [cause]: [90mundefined[39m
+t3:test:   }
+t3:test: }
+t3:test: 
+t3:test:  [31m❯[39m src/git/Layers/GitCore.test.ts [2m([22m[2m71 tests[22m[2m)[22m[33m 407603[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m caps captured output when maxOutputBytes is exceeded [33m 375[2mms[22m[39m
+t3:test:        [32m✓[39m creates a valid git repo[32m 192[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m listGitBranches reports isRepo: true after init + commit [33m 2250[2mms[22m[39m
+t3:test:        [32m✓[39m filterIgnoredPaths chunks large path lists and preserves kept paths[32m 6[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m returns isRepo: false for non-git directory [33m 776[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m returns the current branch with current: true [33m 2191[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m does not include detached HEAD pseudo-refs as branches [33m 2349[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m keeps current branch first and sorts the remaining branches by recency [33m 8906[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m keeps default branch right after current branch [33m 9989[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m lists multiple branches after creating them [33m 2873[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m paginates branch results and returns paging metadata [33m 4855[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m parses separate branch names when column.ui is always enabled [33m 4563[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m isDefault is false when no remote exists [33m 2175[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m lists local branches first and remote branches last [33m 8207[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m includes remoteName metadata for remotes with slash in the name [33m 7298[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m filters branch queries before pagination and dedupes origin refs with local matches [33m 6730[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m checks out an existing branch [33m 3395[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m refreshes upstream behind count after checkout when remote branch advanced [33m 12975[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m statusDetails remains successful when upstream refresh fails after checkout [33m 8215[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m defers upstream refresh until statusDetails is requested [33m 8038[2mms[22m[39m
+t3:test:        [32m✓[39m shares upstream refreshes across worktrees that use the same git common dir[32m 5[2mms[22m[39m
+t3:test:        [32m✓[39m briefly backs off failed upstream refreshes across sibling worktrees[32m 5[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m throws when branch does not exist [33m 2513[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m does not silently checkout a local branch when a remote ref no longer exists [33m 5679[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m checks out a remote tracking branch when remote name contains slashes [33m 9426[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m falls back to detached checkout when --track would conflict with an existing local branch [33m 6683[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m throws when checkout would overwrite uncommitted changes [33m 7275[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m creates a new branch visible in listGitBranches [33m 2486[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m throws when branch already exists [33m 1924[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m renames the current branch [33m 4110[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m returns success without git invocation when old/new names match [33m 2018[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m appends numeric suffix when target branch already exists [33m 6195[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m increments suffix until it finds an available branch name [33m 4908[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m uses '--' separator for branch rename arguments [33m 3595[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m creates a worktree with a new branch from the base branch [33m 3158[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m worktree has the new branch checked out [33m 3005[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m creates a worktree for an existing branch when newBranch is omitted [33m 2978[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m throws when new branch name already exists [33m 3723[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m listGitBranches from worktree cwd reports worktree branch as current [33m 7060[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m removeGitWorktree cleans up the worktree [33m 3245[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m removeGitWorktree force removes a dirty worktree [33m 3853[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m init → commit → create branch → checkout → verify current [33m 3322[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m creates worktree with new branch from current branch [33m 4055[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m fetches a GitHub pull request ref into a local branch without checkout [33m 5881[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m checkout a → checkout b → checkout a → current matches [33m 7352[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m uncommitted changes prevent checkout to a diverged branch [33m 8995[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m supports branch lifecycle operations through the service API [33m 3301[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m reuses an existing remote when the target URL only differs by a trailing slash after .git [33m 1813[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m reports status details and dirty state [33m 11044[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m computes ahead count against base branch when no upstream is configured [33m 7174[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m computes ahead count against origin/default when local default branch is missing [33m 10541[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m computes ahead count against a non-origin remote-prefixed gh-merge-base candidate [33m 12408[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m skips push when no upstream is configured and branch is not ahead of base [33m 11147[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m pushes with upstream setup when no comparable base branch exists [33m 15693[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m pushes with upstream setup to the only configured non-origin remote [33m 14959[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m pushes with upstream setup when comparable base exists but remote branch is missing [33m 20366[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m prefers branch pushRemote over origin when setting upstream [33m 13428[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m pushes renamed PR worktree branches to their tracked upstream branch even when push.default is current [33m 10059[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m pushes to the tracked upstream when the remote name contains slashes [33m 9303[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m includes command context when worktree removal fails [33m 1816[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m refreshes upstream before statusDetails so behind count reflects remote updates [33m 8779[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m prepares commit context by auto-staging and creates commit [33m 2013[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m prepareCommitContext stages only selected files when filePaths provided [33m 2110[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m prepareCommitContext stages everything when filePaths is undefined [33m 1594[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m prepareCommitContext truncates oversized staged patches instead of failing [33m 1488[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m readRangeContext truncates oversized diff patches instead of failing [33m 2608[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m pushes with upstream setup and then skips when up to date [33m 14036[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m pulls behind branch and then reports up-to-date [33m 12142[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m top-level pullGitBranch rejects when no upstream exists [33m 5179[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m lists branches when recency lookup fails [33m 2001[2mms[22m[39m
+t3:test:        [33m[2m✓[22m[39m falls back to empty remote branch data when remote lookups fail [33m 2762[2mms[22m[39m
+t3:test: (node:13716) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+t3:test: (Use `node --trace-warnings ...` to show where the warning was created)
+t3:test:  [32m✓[39m src/orchestration/Layers/ProjectionPipeline.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 536[2mms[22m[39m
+t3:test: [90mstdout[2m | src/server.test.ts[2m > [22m[2mserver router seam[2m > [22m[2mroutes websocket rpc subscribeServerConfig streams snapshot then update
+t3:test: [22m[39m[23:52:08.025] ERROR (#566): Error [AssertionError]: expected false to equal true
+t3:test:     at Array.<anonymous> (D:/Projects/t3code/apps/server/src/server.test.ts:592:16) {
+t3:test:   actual: [33mfalse[39m,
+t3:test:   expected: [33mtrue[39m,
+t3:test:   showDiff: [33mtrue[39m,
+t3:test:   operator: [32m'strictEqual'[39m,
+t3:test:   [cause]: [90mundefined[39m
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/server.test.ts[2m > [22m[2mserver router seam[2m > [22m[2mroutes websocket rpc projects.searchEntries errors
+t3:test: [22m[39m[23:52:08.169] ERROR (#845): Error [AssertionError]: Expected
+t3:test: 
+t3:test: Failed to search workspace entries: Workspace root does not exist: D:\definitely\not\a\real\workspace\path
+t3:test: 
+t3:test: to include
+t3:test: 
+t3:test: Workspace root does not exist: /definitely/not/a/real/workspace/path
+t3:test: 
+t3:test: Failed to search workspace entries: Workspace root does not exist: D:\definitely\not\a\real\workspace\path
+t3:test: 
+t3:test: to include
+t3:test: 
+t3:test: Workspace root does not exist: /definitely/not/a/real/workspace/path
+t3:test:     at fail (file:///D:/Projects/t3code/node_modules/[4m.bun[24m/@effect+vitest@4.0.0-beta.43+a5cd52a97be059d7/node_modules/[4m@effect/vitest[24m/dist/utils.js:17:10)
+t3:test:     at assertInclude (file:///D:/Projects/t3code/node_modules/[4m.bun[24m/@effect+vitest@4.0.0-beta.43+a5cd52a97be059d7/node_modules/[4m@effect/vitest[24m/dist/utils.js:97:7)
+t3:test:     at Array.<anonymous> (D:/Projects/t3code/apps/server/src/server.test.ts:740:7) {
+t3:test:   generatedMessage: [33mfalse[39m,
+t3:test:   code: [32m'ERR_ASSERTION'[39m,
+t3:test:   actual: [90mundefined[39m,
+t3:test:   expected: [90mundefined[39m,
+t3:test:   operator: [32m'fail'[39m,
+t3:test:   diff: [32m'simple'[39m,
+t3:test:   [cause]: [90mundefined[39m
+t3:test: }
+t3:test: 
+t3:test:  [31m❯[39m src/server.test.ts [2m([22m[2m31 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 9798[2mms[22m[39m
+t3:test:      [32m✓[39m serves static index content for GET / when staticDir is configured[32m 49[2mms[22m[39m
+t3:test:      [32m✓[39m redirects to dev URL when configured[32m 10[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m serves project favicon requests before the dev URL redirect [33m 3029[2mms[22m[39m
+t3:test:      [32m✓[39m serves the fallback project favicon when no icon exists[32m 20[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m serves attachment files from state dir [33m 3039[2mms[22m[39m
+t3:test:      [33m[2m✓[22m[39m serves attachment files for URL-encoded paths [33m 3027[2mms[22m[39m
+t3:test:      [32m✓[39m returns 404 for missing attachment id lookups[32m 8[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc server.upsertKeybinding[32m 28[2mms[22m[39m
+t3:test:      [32m✓[39m rejects websocket rpc handshake when auth token is missing[32m 15[2mms[22m[39m
+t3:test:      [32m✓[39m accepts websocket rpc handshake when auth token is provided[32m 18[2mms[22m[39m
+t3:test: [31m     [31m×[31m routes websocket rpc subscribeServerConfig streams snapshot then update[39m[32m 118[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc subscribeServerConfig emits provider status updates[32m 97[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc subscribeServerLifecycle replays snapshot and streams updates[32m 15[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc projects.searchEntries[32m 15[2mms[22m[39m
+t3:test: [31m     [31m×[31m routes websocket rpc projects.searchEntries errors[39m[32m 14[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc projects.writeFile[32m 17[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc projects.writeFile errors[32m 13[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc shell.openInEditor[32m 12[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc shell.openInEditor errors[32m 11[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc git methods[32m 67[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc git.pull errors[32m 8[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc orchestration methods[32m 35[2mms[22m[39m
+t3:test:      [32m✓[39m closes thread terminals after a successful archive command[32m 9[2mms[22m[39m
+t3:test:      [32m✓[39m bootstraps first-send worktree turns on the server before dispatching turn start[32m 13[2mms[22m[39m
+t3:test:      [32m✓[39m records setup-script failures without aborting bootstrap turn start[32m 9[2mms[22m[39m
+t3:test:      [32m✓[39m does not misattribute setup activity dispatch failures as setup launch failures[32m 10[2mms[22m[39m
+t3:test:      [32m✓[39m cleans up created bootstrap threads when worktree creation defects[32m 10[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc subscribeOrchestrationDomainEvents with replay/live overlap resilience[32m 15[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc orchestration.getSnapshot errors[32m 10[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc terminal methods[32m 41[2mms[22m[39m
+t3:test:      [32m✓[39m routes websocket rpc terminal.write errors[32m 11[2mms[22m[39m
+t3:test: (node:30652) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+t3:test: (Use `node --trace-warnings ...` to show where the warning was created)
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mruns a single turn end-to-end and persists checkpoint state in sqlite + git
+t3:test: [22m[39m[23:52:10.695] INFO (#7): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mruns a single turn end-to-end and persists checkpoint state in sqlite + git
+t3:test: [22m[39m[23:52:10.728] INFO (#7): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mruns multi-turn file edits and persists checkpoint diffs
+t3:test: [22m[39m[23:52:16.606] INFO (#277): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mruns multi-turn file edits and persists checkpoint diffs
+t3:test: [22m[39m[23:52:16.636] INFO (#277): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mtracks approval requests and resolves pending approvals on user response
+t3:test: [22m[39m[23:52:25.739] INFO (#699): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mtracks approval requests and resolves pending approvals on user response
+t3:test: [22m[39m[23:52:25.764] INFO (#699): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mrecords failed turn runtime state and checkpoint status as error
+t3:test: [22m[39m[23:52:27.455] INFO (#831): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mrecords failed turn runtime state and checkpoint status as error
+t3:test: [22m[39m[23:52:27.480] INFO (#831): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mreverts to an earlier checkpoint and trims checkpoint projections + git refs
+t3:test: [22m[39m[23:52:32.901] INFO (#1101): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mreverts to an earlier checkpoint and trims checkpoint projections + git refs
+t3:test: [22m[39m[23:52:32.928] INFO (#1101): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mreverts to an earlier checkpoint and trims checkpoint projections + git refs
+t3:test: [22m[39m[23:52:41.050] ERROR (#1095): Error [AssertionError]: expected 'v2\r\n' to equal 'v2\n'
+t3:test:     at Array.<anonymous> (D:/Projects/t3code/apps/server/integration/orchestrationEngine.integration.test.ts:854:14) {
+t3:test:   actual: [32m'v2\r\n'[39m,
+t3:test:   expected: [32m'v2\n'[39m,
+t3:test:   showDiff: [33mtrue[39m,
+t3:test:   operator: [32m'strictEqual'[39m,
+t3:test:   [cause]: [90mundefined[39m
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mappends checkpoint.revert.failed activity when revert is requested without an active session
+t3:test: [22m[39m[23:52:41.976] INFO (#1531): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mappends checkpoint.revert.failed activity when revert is requested without an active session
+t3:test: [22m[39m[23:52:42.003] INFO (#1531): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mstarts a claudeAgent session on first turn when provider is requested
+t3:test: [22m[39m[23:52:43.026] INFO (#1651): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mstarts a claudeAgent session on first turn when provider is requested
+t3:test: [22m[39m[23:52:43.051] INFO (#1651): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mrecovers claudeAgent sessions after provider stopAll using persisted resume state
+t3:test: [22m[39m[23:52:44.800] INFO (#1783): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mrecovers claudeAgent sessions after provider stopAll using persisted resume state
+t3:test: [22m[39m[23:52:44.824] INFO (#1783): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mforwards claudeAgent approval responses to the provider session
+t3:test: [22m[39m[23:52:46.668] INFO (#1919): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mforwards claudeAgent approval responses to the provider session
+t3:test: [22m[39m[23:52:46.695] INFO (#1919): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mforwards thread.turn.interrupt to claudeAgent provider sessions
+t3:test: [22m[39m[23:52:48.408] INFO (#2051): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mforwards thread.turn.interrupt to claudeAgent provider sessions
+t3:test: [22m[39m[23:52:48.432] INFO (#2051): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mreverts claudeAgent turns and rolls back provider conversation state
+t3:test: [22m[39m[23:52:50.148] INFO (#2183): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | integration/orchestrationEngine.integration.test.ts[2m > [22m[2mreverts claudeAgent turns and rolls back provider conversation state
+t3:test: [22m[39m[23:52:50.172] INFO (#2183): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test:  [31m❯[39m integration/orchestrationEngine.integration.test.ts [2m([22m[2m12 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 49688[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m runs a single turn end-to-end and persists checkpoint state in sqlite + git [33m 5860[2mms[22m[39m
+t3:test:    [2m[90m↓[39m[22m keeps the same Codex provider thread across runtime mode switches
+t3:test:    [33m[2m✓[22m[39m runs multi-turn file edits and persists checkpoint diffs [33m 9240[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m tracks approval requests and resolves pending approvals on user response [33m 1683[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m records failed turn runtime state and checkpoint status as error [33m 5441[2mms[22m[39m
+t3:test: [31m   [31m×[31m reverts to an earlier checkpoint and trims checkpoint projections + git refs[39m[33m 9150[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m appends checkpoint.revert.failed activity when revert is requested without an active session [33m 1042[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m starts a claudeAgent session on first turn when provider is requested [33m 1778[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m recovers claudeAgent sessions after provider stopAll using persisted resume state [33m 1758[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m forwards claudeAgent approval responses to the provider session [33m 1819[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m forwards thread.turn.interrupt to claudeAgent provider sessions [33m 1789[2mms[22m[39m
+t3:test:    [33m[2m✓[22m[39m reverts claudeAgent turns and rolls back provider conversation state [33m 10124[2mms[22m[39m
+t3:test: (node:9448) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+t3:test: (Use `node --trace-warnings ...` to show where the warning was created)
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures pre-turn baseline on turn.started and post-turn checkpoint on turn.completed
+t3:test: [22m[39m[23:53:01.761] INFO (#3): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures pre-turn baseline on turn.started and post-turn checkpoint on turn.completed
+t3:test: [22m[39m[23:53:01.778] INFO (#3): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mignores auxiliary thread turn completion while primary turn is active
+t3:test: [22m[39m[23:53:07.734] INFO (#236): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mignores auxiliary thread turn completion while primary turn is active
+t3:test: [22m[39m[23:53:07.746] INFO (#236): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures pre-turn and completion checkpoints for claude runtime events
+t3:test: [22m[39m[23:53:12.746] INFO (#473): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures pre-turn and completion checkpoints for claude runtime events
+t3:test: [22m[39m[23:53:12.779] INFO (#473): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mappends capture failure activity when turn diff summary cannot be derived
+t3:test: [22m[39m[23:53:18.249] INFO (#713): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mappends capture failure activity when turn diff summary cannot be derived
+t3:test: [22m[39m[23:53:18.260] INFO (#713): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mappends capture failure activity when turn diff summary cannot be derived
+t3:test: [22m[39m[23:53:19.012] WARN (#728): checkpoint capture missing pre-turn baseline {
+t3:test:   threadId: [32m'thread-1'[39m,
+t3:test:   turnId: [32m'turn-missing-baseline'[39m,
+t3:test:   fromTurnCount: [33m0[39m
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mappends capture failure activity when turn diff summary cannot be derived
+t3:test: [22m[39m[23:53:20.801] WARN (#728): failed to derive checkpoint file summary {
+t3:test:   threadId: [32m'thread-1'[39m,
+t3:test:   turnId: [32m'turn-missing-baseline'[39m,
+t3:test:   turnCount: [33m1[39m,
+t3:test:   detail: [32m'Git command failed in CheckpointStore.diffCheckpoints: git diff (C:\\Users\\naved\\AppData\\Local\\Temp\\1\\t3-checkpoint-handler-R4En5f) - Checkpoint ref is unavailable for diff operation.'[39m
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures pre-turn baseline from project workspace root when thread worktree is unset
+t3:test: [22m[39m[23:53:21.800] INFO (#944): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures pre-turn baseline from project workspace root when thread worktree is unset
+t3:test: [22m[39m[23:53:21.808] INFO (#944): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures turn completion checkpoint from project workspace root when provider session cwd is unavailable
+t3:test: [22m[39m[23:53:26.403] INFO (#1026): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures turn completion checkpoint from project workspace root when provider session cwd is unavailable
+t3:test: [22m[39m[23:53:26.414] INFO (#1026): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures turn completion checkpoint from project workspace root when provider session cwd is unavailable
+t3:test: [22m[39m[23:53:27.215] WARN (#1041): checkpoint capture missing pre-turn baseline { threadId: [32m'thread-1'[39m, turnId: [32m'turn-missing-cwd'[39m, fromTurnCount: [33m0[39m }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcaptures turn completion checkpoint from project workspace root when provider session cwd is unavailable
+t3:test: [22m[39m[23:53:29.236] WARN (#1041): failed to derive checkpoint file summary {
+t3:test:   threadId: [32m'thread-1'[39m,
+t3:test:   turnId: [32m'turn-missing-cwd'[39m,
+t3:test:   turnCount: [33m1[39m,
+t3:test:   detail: [32m'Git command failed in CheckpointStore.diffCheckpoints: git diff (C:\\Users\\naved\\AppData\\Local\\Temp\\1\\t3-checkpoint-handler-cBAv5m) - Checkpoint ref is unavailable for diff operation.'[39m
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mignores non-v2 checkpoint.captured runtime events
+t3:test: [22m[39m[23:53:30.817] INFO (#1275): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mignores non-v2 checkpoint.captured runtime events
+t3:test: [22m[39m[23:53:30.825] INFO (#1275): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcontinues processing runtime events after a single checkpoint runtime failure
+t3:test: [22m[39m[23:53:35.275] INFO (#1423): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mcontinues processing runtime events after a single checkpoint runtime failure
+t3:test: [22m[39m[23:53:35.284] INFO (#1423): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mexecutes provider revert and emits thread.reverted for checkpoint revert requests
+t3:test: [22m[39m[23:53:40.444] INFO (#1513): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mexecutes provider revert and emits thread.reverted for checkpoint revert requests
+t3:test: [22m[39m[23:53:40.452] INFO (#1513): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mexecutes provider revert and emits thread.reverted for claude sessions
+t3:test: [22m[39m[23:53:49.206] INFO (#1761): Running all migrations...
+t3:test: 
+t3:test: [90mstdout[2m | src/orchestration/Layers/CheckpointReactor.test.ts[2m > [22m[2mCheckpointReactor[2m > [22m[2mexecutes provider revert and emits thread.reverted for claude sessions
+t3:test: [22m[39m[23:53:49.213] INFO (#1761): Migrations ran successfully {
+t3:test:   migrations: [
+t3:test:     [32m'1_OrchestrationEvents'[39m,
+t3:test:     [32m'2_OrchestrationCommandReceipts'[39m,
+t3:test:     [32m'3_CheckpointDiffBlobs'[39m,
+t3:test:     [32m'4_ProviderSessionRuntime'[39m,
+t3:test:     [32m'5_Projections'[39m,
+t3:test:     [32m'6_ProjectionThreadSessionRuntimeModeColumns'[39m,
+t3:test:     [32m'7_ProjectionThreadMessageAttachments'[39m,
+t3:test:     [32m'8_ProjectionThreadActivitySequence'[39m,
+t3:test:     [32m'9_ProviderSessionRuntimeMode'[39m,
+t3:test:     [32m'10_ProjectionThreadsRuntimeMode'[39m,
+t3:test:     [32m'11_OrchestrationThreadCreatedRuntimeMode'[39m,
+t3:test:     [32m'12_ProjectionThreadsInteractionMode'[39m,
+t3:test:     [32m'13_ProjectionThreadProposedPlans'[39m,
+t3:test:     [32m'14_ProjectionThreadProposedPlanImplementation'[39m,
+t3:test:     [32m'15_ProjectionTurnsSourceProposedPlan'[39m,
+t3:test:     [32m'16_CanonicalizeModelSelections'[39m,
+t3:test:     [32m'17_ProjectionThreadsArchivedAt'[39m,
+t3:test:     [32m'18_ProjectionThreadsArchivedAtIndex'[39m,
+t3:test:     [32m'19_ProjectionSnapshotLookupIndexes'[39m
+t3:test:   ]
+t3:test: }
+t3:test: 

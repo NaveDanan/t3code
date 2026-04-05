@@ -2,15 +2,9 @@ import {
   ArchiveIcon,
   ArchiveX,
   ChevronDownIcon,
-  EyeIcon,
-  EyeOffIcon,
-  InfoIcon,
-  LinkIcon,
   LoaderIcon,
-  PlusIcon,
   RefreshCwIcon,
   Undo2Icon,
-  XIcon,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,7 +14,6 @@ import {
   type ServerProvider,
   type ServerProviderModel,
   ThreadId,
-  type UpstreamProvider,
 } from "@t3tools/contracts";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 import { normalizeModelSlug } from "@t3tools/shared/model";
@@ -54,7 +47,6 @@ import { ensureNativeApi, readNativeApi } from "../../nativeApi";
 import { useStore } from "../../store";
 import { formatRelativeTime, formatRelativeTimeLabel } from "../../timestampFormat";
 import { cn } from "../../lib/utils";
-import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Collapsible, CollapsibleContent } from "../ui/collapsible";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
@@ -64,6 +56,7 @@ import { Switch } from "../ui/switch";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ProjectFavicon } from "../ProjectFavicon";
+import { ProviderHarnessDetails } from "./ProviderHarnessDetails";
 import {
   useServerAvailableEditors,
   useServerKeybindingsConfigPath,
@@ -556,7 +549,6 @@ export function GeneralSettingsPanel() {
       settings.providers.opencode.customModels.length > 0,
     ),
   });
-  const [openUpstreamProviders, setOpenUpstreamProviders] = useState(false);
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
     Record<ProviderKind, string>
   >({
@@ -1312,245 +1304,35 @@ export function GeneralSettingsPanel() {
                       </div>
                     ) : null}
 
-                    {providerCard.liveProvider?.upstreamProviders &&
-                    providerCard.liveProvider.upstreamProviders.length > 0 ? (
-                      <div className="border-t border-border/60 px-4 py-3 sm:px-5">
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between"
-                          onClick={() => setOpenUpstreamProviders((open) => !open)}
-                          aria-expanded={openUpstreamProviders}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-foreground">Providers</span>
-                            <Badge variant="outline" size="sm">
-                              {providerCard.liveProvider.upstreamProviders.length}
-                            </Badge>
-                          </div>
-                          <ChevronDownIcon
-                            className={cn(
-                              "size-3.5 text-muted-foreground transition-transform",
-                              openUpstreamProviders && "rotate-180",
-                            )}
-                          />
-                        </button>
-                        <Collapsible
-                          open={openUpstreamProviders}
-                          onOpenChange={setOpenUpstreamProviders}
-                        >
-                          <CollapsibleContent>
-                            <div className="mt-2 max-h-40 overflow-y-auto">
-                              {providerCard.liveProvider.upstreamProviders.map(
-                                (upstream: UpstreamProvider) => (
-                                  <div
-                                    key={upstream.id}
-                                    className="group flex items-center justify-between gap-2 py-1.5"
-                                  >
-                                    <span className="min-w-0 truncate text-xs text-foreground/90">
-                                      {upstream.name}
-                                    </span>
-                                    <div className="flex shrink-0 items-center gap-2">
-                                      {upstream.connected ? (
-                                        <Badge variant="success" size="sm">
-                                          Connected
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="outline" size="sm">
-                                          Not connected
-                                        </Badge>
-                                      )}
-                                      <Tooltip>
-                                        <TooltipTrigger
-                                          render={
-                                            <Button
-                                              variant="ghost"
-                                              size="icon-xs"
-                                              disabled
-                                              className="opacity-0 transition-opacity group-hover:opacity-100"
-                                              aria-label={`Connect ${upstream.name}`}
-                                            />
-                                          }
-                                        >
-                                          <LinkIcon className="size-3" />
-                                        </TooltipTrigger>
-                                        <TooltipPopup side="top" sideOffset={4}>
-                                          Coming soon
-                                        </TooltipPopup>
-                                      </Tooltip>
-                                    </div>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      </div>
-                    ) : null}
-
-                    <div className="border-t border-border/60 px-4 py-3 sm:px-5">
-                      <div className="text-xs font-medium text-foreground">Models</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {providerCard.models.length} model
-                        {providerCard.models.length === 1 ? "" : "s"} available.
-                      </div>
-                      <div
-                        ref={(el) => {
-                          modelListRefs.current[providerCard.provider] = el;
-                        }}
-                        className="mt-2 max-h-40 overflow-y-auto pb-1"
-                      >
-                        {providerCard.models.map((model) => {
-                          const caps = model.capabilities;
-                          const capLabels: string[] = [];
-                          if (caps?.supportsFastMode) capLabels.push("Fast mode");
-                          if (caps?.supportsThinkingToggle) capLabels.push("Thinking");
-                          if (
-                            caps?.reasoningEffortLevels &&
-                            caps.reasoningEffortLevels.length > 0
-                          ) {
-                            capLabels.push("Reasoning");
-                          }
-                          const hasDetails = capLabels.length > 0 || model.name !== model.slug;
-                          const isHidden = providerCard.providerConfig.hiddenModels.includes(
-                            model.slug,
-                          );
-
-                          return (
-                            <div
-                              key={`${providerCard.provider}:${model.slug}`}
-                              className="group/model flex items-center gap-2 py-1"
-                            >
-                              <button
-                                type="button"
-                                className={cn(
-                                  "shrink-0 transition-colors",
-                                  isHidden
-                                    ? "text-muted-foreground/40 hover:text-muted-foreground"
-                                    : "text-success/70 opacity-0 group-hover/model:opacity-100 hover:text-success",
-                                )}
-                                aria-label={
-                                  isHidden
-                                    ? `Show ${model.name} in chat`
-                                    : `Hide ${model.name} from chat`
-                                }
-                                onClick={() =>
-                                  toggleModelVisibility(providerCard.provider, model.slug)
-                                }
-                              >
-                                {isHidden ? (
-                                  <EyeOffIcon className="size-3.5" />
-                                ) : (
-                                  <EyeIcon className="size-3.5" />
-                                )}
-                              </button>
-                              <span
-                                className={cn(
-                                  "min-w-0 truncate text-xs",
-                                  isHidden
-                                    ? "text-muted-foreground/50 line-through"
-                                    : "text-foreground/90",
-                                )}
-                              >
-                                {" "}
-                                {model.name}
-                              </span>
-                              {hasDetails ? (
-                                <Tooltip>
-                                  <TooltipTrigger
-                                    render={
-                                      <button
-                                        type="button"
-                                        className="shrink-0 text-muted-foreground/40 transition-colors hover:text-muted-foreground"
-                                        aria-label={`Details for ${model.name}`}
-                                      />
-                                    }
-                                  >
-                                    <InfoIcon className="size-3" />
-                                  </TooltipTrigger>
-                                  <TooltipPopup side="top" className="max-w-56">
-                                    <div className="space-y-1">
-                                      <code className="block text-[11px] text-foreground">
-                                        {model.slug}
-                                      </code>
-                                      {capLabels.length > 0 ? (
-                                        <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-                                          {capLabels.map((label) => (
-                                            <span
-                                              key={label}
-                                              className="text-[10px] text-muted-foreground"
-                                            >
-                                              {label}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  </TooltipPopup>
-                                </Tooltip>
-                              ) : null}
-                              {model.isCustom ? (
-                                <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                                  <span className="text-[10px] text-muted-foreground">custom</span>
-                                  <button
-                                    type="button"
-                                    className="text-muted-foreground transition-colors hover:text-foreground"
-                                    aria-label={`Remove ${model.slug}`}
-                                    onClick={() =>
-                                      removeCustomModel(providerCard.provider, model.slug)
-                                    }
-                                  >
-                                    <XIcon className="size-3" />
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id={`custom-model-${providerCard.provider}`}
-                          value={customModelInput}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setCustomModelInputByProvider((existing) => ({
-                              ...existing,
-                              [providerCard.provider]: value,
-                            }));
-                            if (customModelError) {
-                              setCustomModelErrorByProvider((existing) => ({
-                                ...existing,
-                                [providerCard.provider]: null,
-                              }));
-                            }
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key !== "Enter") return;
-                            event.preventDefault();
-                            addCustomModel(providerCard.provider);
-                          }}
-                          placeholder={
-                            providerCard.provider === "codex"
-                              ? "gpt-6.7-codex-ultra-preview"
-                              : "claude-sonnet-5-0"
-                          }
-                          spellCheck={false}
-                        />
-                        <Button
-                          className="shrink-0"
-                          variant="outline"
-                          onClick={() => addCustomModel(providerCard.provider)}
-                        >
-                          <PlusIcon className="size-3.5" />
-                          Add
-                        </Button>
-                      </div>
-
-                      {customModelError ? (
-                        <p className="mt-2 text-xs text-destructive">{customModelError}</p>
-                      ) : null}
-                    </div>
+                    <ProviderHarnessDetails
+                      provider={providerCard.provider}
+                      models={providerCard.models}
+                      hiddenModels={providerCard.providerConfig.hiddenModels}
+                      upstreamProviders={providerCard.liveProvider?.upstreamProviders}
+                      customModelInput={customModelInput}
+                      customModelError={customModelError}
+                      customModelPlaceholder={
+                        providerCard.provider === "codex"
+                          ? "gpt-6.7-codex-ultra-preview"
+                          : "claude-sonnet-5-0"
+                      }
+                      modelListRef={modelListRefs}
+                      onToggleVisibility={toggleModelVisibility}
+                      onRemoveCustomModel={removeCustomModel}
+                      onCustomModelInputChange={(provider, value) => {
+                        setCustomModelInputByProvider((existing) => ({
+                          ...existing,
+                          [provider]: value,
+                        }));
+                        if (customModelError) {
+                          setCustomModelErrorByProvider((existing) => ({
+                            ...existing,
+                            [provider]: null,
+                          }));
+                        }
+                      }}
+                      onAddCustomModel={addCustomModel}
+                    />
                   </div>
                 </CollapsibleContent>
               </Collapsible>
