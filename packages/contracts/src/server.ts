@@ -56,6 +56,14 @@ export const ServerProviderModel = Schema.Struct({
 });
 export type ServerProviderModel = typeof ServerProviderModel.Type;
 
+export const UpstreamProvider = Schema.Struct({
+  id: TrimmedNonEmptyString,
+  name: TrimmedNonEmptyString,
+  connected: Schema.Boolean,
+  hasAuthMethods: Schema.Boolean,
+});
+export type UpstreamProvider = typeof UpstreamProvider.Type;
+
 export const ServerProvider = Schema.Struct({
   provider: ProviderKind,
   enabled: Schema.Boolean,
@@ -66,6 +74,7 @@ export const ServerProvider = Schema.Struct({
   checkedAt: IsoDateTime,
   message: Schema.optional(TrimmedNonEmptyString),
   models: Schema.Array(ServerProviderModel),
+  upstreamProviders: Schema.optional(Schema.Array(UpstreamProvider)),
 });
 export type ServerProvider = typeof ServerProvider.Type;
 

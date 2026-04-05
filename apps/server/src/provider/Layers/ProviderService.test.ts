@@ -518,6 +518,139 @@ it.effect(
     }).pipe(Effect.provide(NodeServices.layer)),
 );
 
+it.effect(
+  "ProviderServiceLive restores OpenCode sendTurn routing after restart using persisted model and cwd",
+  () =>
+    Effect.gen(function* () {
+      const tempDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "t3-provider-service-opencode-restart-"),
+      );
+      const dbPath = path.join(tempDir, "orchestration.sqlite");
+      const persistenceLayer = makeSqlitePersistenceLive(dbPath);
+      const runtimeRepositoryLayer = ProviderSessionRuntimeRepositoryLive.pipe(
+        Layer.provide(persistenceLayer),
+      );
+
+      const firstOpencode = makeFakeCodexAdapter("opencode");
+      const firstRegistry: typeof ProviderAdapterRegistry.Service = {
+        getByProvider: (provider) =>
+          provider === "opencode"
+            ? Effect.succeed(firstOpencode.adapter)
+            : Effect.fail(new ProviderUnsupportedError({ provider })),
+        listProviders: () => Effect.succeed(["opencode"]),
+      };
+
+      const firstDirectoryLayer = ProviderSessionDirectoryLive.pipe(
+        Layer.provide(runtimeRepositoryLayer),
+      );
+      const firstProviderLayer = makeProviderServiceLive().pipe(
+        Layer.provide(Layer.succeed(ProviderAdapterRegistry, firstRegistry)),
+        Layer.provide(firstDirectoryLayer),
+        Layer.provide(defaultServerSettingsLayer),
+        Layer.provide(AnalyticsService.layerTest),
+      );
+
+      const opencodeResumeCursor = {
+        sessionId: "opencode-session-abc123",
+        cwd: "/tmp/opencode-project",
+      };
+
+      const startedSession = yield* Effect.gen(function* () {
+        const provider = yield* ProviderService;
+        const threadId = asThreadId("thread-opencode-restart");
+        const session = yield* provider.startSession(threadId, {
+          provider: "opencode",
+          cwd: "/tmp/opencode-project",
+          runtimeMode: "approval-required",
+          threadId,
+          modelSelection: {
+            provider: "opencode",
+            model: "openai/gpt-5",
+            options: { effort: "high" },
+          },
+        });
+        // Simulate the adapter updating the resume cursor after a successful turn.
+        firstOpencode.updateSession(threadId, (existing) => ({
+          ...existing,
+          status: "ready",
+          resumeCursor: opencodeResumeCursor,
+          updatedAt: new Date(Date.now() + 1_000).toISOString(),
+        }));
+        return session;
+      }).pipe(Effect.provide(firstProviderLayer));
+
+      // Verify the runtime state was persisted with the updated resume cursor.
+      const persistedRuntime = yield* Effect.gen(function* () {
+        const repository = yield* ProviderSessionRuntimeRepository;
+        return yield* repository.getByThreadId({ threadId: startedSession.threadId });
+      }).pipe(Effect.provide(runtimeRepositoryLayer));
+      assert.equal(Option.isSome(persistedRuntime), true);
+      if (Option.isSome(persistedRuntime)) {
+        assert.equal(persistedRuntime.value.status, "stopped");
+        assert.deepEqual(persistedRuntime.value.resumeCursor, opencodeResumeCursor);
+      }
+
+      // Simulate server restart with a fresh provider instance backed by the same DB.
+      const secondOpencode = makeFakeCodexAdapter("opencode");
+      const secondRegistry: typeof ProviderAdapterRegistry.Service = {
+        getByProvider: (provider) =>
+          provider === "opencode"
+            ? Effect.succeed(secondOpencode.adapter)
+            : Effect.fail(new ProviderUnsupportedError({ provider })),
+        listProviders: () => Effect.succeed(["opencode"]),
+      };
+      const secondDirectoryLayer = ProviderSessionDirectoryLive.pipe(
+        Layer.provide(runtimeRepositoryLayer),
+      );
+      const secondProviderLayer = makeProviderServiceLive().pipe(
+        Layer.provide(Layer.succeed(ProviderAdapterRegistry, secondRegistry)),
+        Layer.provide(secondDirectoryLayer),
+        Layer.provide(defaultServerSettingsLayer),
+        Layer.provide(AnalyticsService.layerTest),
+      );
+
+      secondOpencode.startSession.mockClear();
+      secondOpencode.sendTurn.mockClear();
+
+      // After restart, sendTurn should recover the session using persisted data.
+      yield* Effect.gen(function* () {
+        const provider = yield* ProviderService;
+        yield* provider.sendTurn({
+          threadId: startedSession.threadId,
+          input: "resume turn after restart",
+          attachments: [],
+        });
+      }).pipe(Effect.provide(secondProviderLayer));
+
+      assert.equal(secondOpencode.startSession.mock.calls.length, 1);
+      const resumedStartInput = secondOpencode.startSession.mock.calls[0]?.[0];
+      assert.equal(typeof resumedStartInput === "object" && resumedStartInput !== null, true);
+      if (resumedStartInput && typeof resumedStartInput === "object") {
+        const startPayload = resumedStartInput as {
+          provider?: string;
+          cwd?: string;
+          modelSelection?: unknown;
+          resumeCursor?: unknown;
+          threadId?: string;
+          runtimeMode?: string;
+        };
+        assert.equal(startPayload.provider, "opencode");
+        assert.equal(startPayload.cwd, "/tmp/opencode-project");
+        assert.deepEqual(startPayload.modelSelection, {
+          provider: "opencode",
+          model: "openai/gpt-5",
+          options: { effort: "high" },
+        });
+        assert.deepEqual(startPayload.resumeCursor, opencodeResumeCursor);
+        assert.equal(startPayload.threadId, startedSession.threadId);
+        assert.equal(startPayload.runtimeMode, "approval-required");
+      }
+      assert.equal(secondOpencode.sendTurn.mock.calls.length, 1);
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }).pipe(Effect.provide(NodeServices.layer)),
+);
+
 routing.layer("ProviderServiceLive routing", (it) => {
   it.effect("routes provider operations and rollback conversation", () =>
     Effect.gen(function* () {

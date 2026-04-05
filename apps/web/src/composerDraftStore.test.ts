@@ -80,7 +80,7 @@ function resetComposerDraftStore() {
 }
 
 function modelSelection(
-  provider: "codex" | "claudeAgent",
+  provider: "codex" | "claudeAgent" | "opencode",
   model: string,
   options?: ModelSelection["options"],
 ): ModelSelection {
@@ -934,6 +934,127 @@ describe("composerDraftStore setModelSelection", () => {
     expect(
       useComposerDraftStore.getState().draftsByThreadId[threadId]?.modelSelectionByProvider.codex,
     ).toEqual(modelSelection("codex", "gpt-5.3-codex"));
+  });
+});
+
+describe("composerDraftStore OpenCode draft restoration", () => {
+  const threadId = ThreadId.makeUnsafe("thread-opencode-draft");
+
+  beforeEach(() => {
+    resetComposerDraftStore();
+  });
+
+  it("stores and retrieves an opencode model selection with effort option", () => {
+    const store = useComposerDraftStore.getState();
+
+    store.setModelSelection(
+      threadId,
+      modelSelection("opencode", "openai/gpt-4o", { effort: "high" }),
+    );
+
+    expect(
+      useComposerDraftStore.getState().draftsByThreadId[threadId]?.modelSelectionByProvider
+        .opencode,
+    ).toEqual(modelSelection("opencode", "openai/gpt-4o", { effort: "high" }));
+  });
+
+  it("restores opencode effort from persisted model options via merge", () => {
+    const persistApi = useComposerDraftStore.persist as unknown as {
+      getOptions: () => {
+        merge: (
+          persistedState: unknown,
+          currentState: ReturnType<typeof useComposerDraftStore.getState>,
+        ) => ReturnType<typeof useComposerDraftStore.getState>;
+      };
+    };
+
+    const mergedState = persistApi.getOptions().merge(
+      {
+        draftsByThreadId: {
+          [threadId]: {
+            prompt: "continue this",
+            attachments: [],
+            terminalContexts: [],
+            modelSelectionByProvider: {
+              opencode: {
+                provider: "opencode",
+                model: "anthropic/claude-opus-4-5",
+                options: { effort: "medium" },
+              },
+            },
+            activeProvider: "opencode",
+          },
+        },
+        draftThreadsByThreadId: {},
+        projectDraftThreadIdByProjectId: {},
+      },
+      useComposerDraftStore.getInitialState(),
+    );
+
+    expect(mergedState.draftsByThreadId[threadId]?.modelSelectionByProvider.opencode).toEqual(
+      modelSelection("opencode", "anthropic/claude-opus-4-5", { effort: "medium" }),
+    );
+    expect(mergedState.draftsByThreadId[threadId]?.activeProvider).toBe("opencode");
+  });
+
+  it("drops invalid opencode effort values during merge restoration", () => {
+    const persistApi = useComposerDraftStore.persist as unknown as {
+      getOptions: () => {
+        merge: (
+          persistedState: unknown,
+          currentState: ReturnType<typeof useComposerDraftStore.getState>,
+        ) => ReturnType<typeof useComposerDraftStore.getState>;
+      };
+    };
+
+    const mergedState = persistApi.getOptions().merge(
+      {
+        draftsByThreadId: {
+          [threadId]: {
+            prompt: "",
+            attachments: [],
+            terminalContexts: [],
+            modelSelectionByProvider: {
+              opencode: {
+                provider: "opencode",
+                model: "openai/gpt-4o",
+                options: { effort: "not-a-valid-effort" },
+              },
+            },
+            activeProvider: "opencode",
+          },
+        },
+        draftThreadsByThreadId: {},
+        projectDraftThreadIdByProjectId: {},
+      },
+      useComposerDraftStore.getInitialState(),
+    );
+
+    // Invalid effort should be dropped, resulting in no options
+    expect(mergedState.draftsByThreadId[threadId]?.modelSelectionByProvider.opencode).toEqual(
+      modelSelection("opencode", "openai/gpt-4o"),
+    );
+  });
+
+  it("preserves other provider options when setting opencode model selection", () => {
+    const store = useComposerDraftStore.getState();
+
+    store.setModelOptions(
+      threadId,
+      providerModelOptions({
+        codex: { fastMode: true },
+        opencode: { effort: "low" },
+      }),
+    );
+
+    store.setModelSelection(
+      threadId,
+      modelSelection("opencode", "openai/gpt-4o", { effort: "high" }),
+    );
+
+    const draft = useComposerDraftStore.getState().draftsByThreadId[threadId];
+    expect(draft?.modelSelectionByProvider.opencode?.options).toEqual({ effort: "high" });
+    expect(draft?.modelSelectionByProvider.codex?.options).toEqual({ fastMode: true });
   });
 });
 

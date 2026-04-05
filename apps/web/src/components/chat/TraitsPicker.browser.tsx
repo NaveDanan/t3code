@@ -6,6 +6,7 @@ import {
   CodexModelOptions,
   DEFAULT_MODEL_BY_PROVIDER,
   DEFAULT_SERVER_SETTINGS,
+  type OpencodeModelOptions,
   ProjectId,
   type ServerProvider,
   ThreadId,
@@ -128,9 +129,11 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
         isCustom: false,
         capabilities: {
           reasoningEffortLevels: [
+            { value: "minimal", label: "Minimal" },
             { value: "low", label: "Low" },
             { value: "medium", label: "Medium", isDefault: true },
             { value: "high", label: "High" },
+            { value: "xhigh", label: "Extra High" },
           ],
           supportsFastMode: false,
           supportsThinkingToggle: false,
@@ -533,10 +536,7 @@ describe("TraitsPicker (Codex)", () => {
 
 // ── OpenCode TraitsPicker tests ───────────────────────────────────────
 
-async function mountOpencodePicker(props: {
-  model?: string;
-  options?: { effort?: "low" | "medium" | "high" };
-}) {
+async function mountOpencodePicker(props: { model?: string; options?: OpencodeModelOptions }) {
   const threadId = ThreadId.makeUnsafe("thread-opencode-traits");
   const model = props.model ?? DEFAULT_MODEL_BY_PROVIDER.opencode;
   const draftsByThreadId: Record<ThreadId, ComposerThreadDraftState> = {
@@ -615,9 +615,21 @@ describe("TraitsPicker (OpenCode)", () => {
     await vi.waitFor(() => {
       const text = document.body.textContent ?? "";
       expect(text).toContain("Effort");
+      expect(text).toContain("Minimal");
       expect(text).toContain("Low");
       expect(text).toContain("Medium");
       expect(text).toContain("High");
+      expect(text).toContain("Extra High");
+    });
+  });
+
+  it("shows richer OpenCode effort variants in the trigger label", async () => {
+    await using _ = await mountOpencodePicker({
+      options: { effort: "xhigh" },
+    });
+
+    await vi.waitFor(() => {
+      expect(document.body.textContent ?? "").toContain("Extra High");
     });
   });
 

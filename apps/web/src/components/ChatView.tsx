@@ -1400,11 +1400,17 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const availableEditors = useServerAvailableEditors();
   const modelOptionsByProvider = useMemo(
     () => ({
-      codex: getProviderModels(providerStatuses, "codex"),
-      claudeAgent: getProviderModels(providerStatuses, "claudeAgent"),
-      opencode: getProviderModels(providerStatuses, "opencode"),
+      codex: getProviderModels(providerStatuses, "codex").filter(
+        (model) => !settings.providers.codex.hiddenModels.includes(model.slug),
+      ),
+      claudeAgent: getProviderModels(providerStatuses, "claudeAgent").filter(
+        (model) => !settings.providers.claudeAgent.hiddenModels.includes(model.slug),
+      ),
+      opencode: getProviderModels(providerStatuses, "opencode").filter(
+        (model) => !settings.providers.opencode.hiddenModels.includes(model.slug),
+      ),
     }),
-    [providerStatuses],
+    [providerStatuses, settings.providers],
   );
   const selectedModelForPickerWithCustomFallback = useMemo(() => {
     const currentOptions = modelOptionsByProvider[selectedProvider];

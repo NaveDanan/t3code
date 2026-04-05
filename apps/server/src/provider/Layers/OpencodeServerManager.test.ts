@@ -6,7 +6,6 @@ import { describe, it, assert } from "@effect/vitest";
 import { Effect, Stream } from "effect";
 
 import { makeOpencodeServerManager } from "./OpencodeServerManager";
-import { OpencodeServerManagerError } from "../Services/OpencodeServerManager";
 
 class FakeOpencodeProcess extends EventEmitter {
   readonly stdout = new PassThrough();
@@ -273,7 +272,7 @@ describe("OpencodeServerManager", () => {
       assert.strictEqual(spawn.spawnCount, 1);
 
       // Simulate the server process exiting externally.
-      currentProcess?.emit("exit", 1, null);
+      (currentProcess as FakeOpencodeProcess | null)?.emit("exit", 1, null);
 
       const second = yield* manager.ensureServer({ binaryPath: "opencode" });
       assert.strictEqual(spawn.spawnCount, 2);
@@ -296,31 +295,33 @@ describe("OpencodeServerManager", () => {
       const result = yield* manager.ensureServer({ binaryPath: "opencode" }).pipe(Effect.result);
       assert.strictEqual(result._tag, "Failure");
       if (result._tag === "Failure") {
-        assert.ok(result.failure instanceof OpencodeServerManagerError);
-        assert.strictEqual(result.failure.operation, "ensureServer");
+        assert.strictEqual(result.failure._tag, "OpencodeServerManagerError");
+        assert.strictEqual((result.failure as { operation?: string }).operation, "ensureServer");
       }
     }),
   );
 
-  it.effect("fails with OpencodeServerManagerError when the server exits before becoming healthy", () =>
-    Effect.gen(function* () {
-      const manager = yield* makeOpencodeServerManager({
-        spawnServer: () => {
-          const proc = new FakeOpencodeProcess(() => {});
-          // Emit exit immediately to simulate a crash before the first health-check.
-          setTimeout(() => proc.emit("exit", 1, null), 0);
-          return proc;
-        },
-        startTimeoutMs: 200,
-        healthCheckIntervalMs: 20,
-      });
+  it.effect(
+    "fails with OpencodeServerManagerError when the server exits before becoming healthy",
+    () =>
+      Effect.gen(function* () {
+        const manager = yield* makeOpencodeServerManager({
+          spawnServer: () => {
+            const proc = new FakeOpencodeProcess(() => {});
+            // Emit exit immediately to simulate a crash before the first health-check.
+            setTimeout(() => proc.emit("exit", 1, null), 0);
+            return proc;
+          },
+          startTimeoutMs: 200,
+          healthCheckIntervalMs: 20,
+        });
 
-      const result = yield* manager.ensureServer({ binaryPath: "opencode" }).pipe(Effect.result);
-      assert.strictEqual(result._tag, "Failure");
-      if (result._tag === "Failure") {
-        assert.ok(result.failure instanceof OpencodeServerManagerError);
-      }
-    }),
+        const result = yield* manager.ensureServer({ binaryPath: "opencode" }).pipe(Effect.result);
+        assert.strictEqual(result._tag, "Failure");
+        if (result._tag === "Failure") {
+          assert.strictEqual(result.failure._tag, "OpencodeServerManagerError");
+        }
+      }),
   );
 
   it.effect("streamEvents reconnects when the SSE stream ends normally", () =>
@@ -330,8 +331,7 @@ describe("OpencodeServerManager", () => {
       const makeClient = () =>
         ({
           global: {
-            health: () =>
-              Promise.resolve({ data: { healthy: true, version: "1.0.0" } }),
+            health: () => Promise.resolve({ data: { healthy: true, version: "1.0.0" } }),
             event: async () => {
               connectionCount += 1;
               // First connection ends immediately after one event.
@@ -363,13 +363,14 @@ describe("OpencodeServerManager", () => {
 
       // Collect exactly 2 events; the second must arrive from a reconnected stream.
       const collected = yield* Effect.scoped(
-        Stream.runCollect(
-          manager.streamEvents({ binaryPath: "opencode" }).pipe(Stream.take(2)),
-        ),
+        Stream.runCollect(manager.streamEvents({ binaryPath: "opencode" }).pipe(Stream.take(2))),
       );
 
       assert.strictEqual(collected.length, 2);
-      assert.ok(connectionCount >= 2, `Expected at least 2 SSE connections, got ${connectionCount}`);
+      assert.ok(
+        connectionCount >= 2,
+        `Expected at least 2 SSE connections, got ${connectionCount}`,
+      );
 
       yield* manager.stop;
     }),

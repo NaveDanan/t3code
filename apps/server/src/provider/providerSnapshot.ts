@@ -3,6 +3,7 @@ import type {
   ServerProviderAuth,
   ServerProviderModel,
   ServerProviderState,
+  UpstreamProvider,
 } from "@t3tools/contracts";
 import { Effect, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
@@ -145,6 +146,7 @@ export function buildServerProvider(input: {
   checkedAt: string;
   models: ReadonlyArray<ServerProviderModel>;
   probe: ProviderProbeResult;
+  upstreamProviders?: ReadonlyArray<UpstreamProvider>;
 }): ServerProvider {
   return {
     provider: input.provider,
@@ -156,6 +158,7 @@ export function buildServerProvider(input: {
     checkedAt: input.checkedAt,
     ...(input.probe.message ? { message: input.probe.message } : {}),
     models: input.models,
+    ...(input.upstreamProviders ? { upstreamProviders: input.upstreamProviders } : {}),
   };
 }
 

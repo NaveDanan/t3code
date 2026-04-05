@@ -1166,6 +1166,20 @@ async function stopBackendAndWaitForExit(timeoutMs = 5_000): Promise<void> {
   });
 }
 
+async function shutdownAndQuit(reason: string): Promise<void> {
+  if (isQuitting) {
+    return;
+  }
+
+  isQuitting = true;
+  updateInstallInFlight = false;
+  writeDesktopLogHeader(`${reason} received`);
+  clearUpdatePollTimer();
+  await stopBackendAndWaitForExit();
+  restoreStdIoCapture?.();
+  app.quit();
+}
+
 function registerIpcHandlers(): void {
   ipcMain.removeAllListeners(GET_WS_URL_CHANNEL);
   ipcMain.on(GET_WS_URL_CHANNEL, (event) => {
@@ -1482,28 +1496,16 @@ app
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin" && !isQuitting) {
-    app.quit();
+    void shutdownAndQuit("window-all-closed");
   }
 });
 
 if (process.platform !== "win32") {
   process.on("SIGINT", () => {
-    if (isQuitting) return;
-    isQuitting = true;
-    writeDesktopLogHeader("SIGINT received");
-    clearUpdatePollTimer();
-    stopBackend();
-    restoreStdIoCapture?.();
-    app.quit();
+    void shutdownAndQuit("SIGINT");
   });
 
   process.on("SIGTERM", () => {
-    if (isQuitting) return;
-    isQuitting = true;
-    writeDesktopLogHeader("SIGTERM received");
-    clearUpdatePollTimer();
-    stopBackend();
-    restoreStdIoCapture?.();
-    app.quit();
+    void shutdownAndQuit("SIGTERM");
   });
 }

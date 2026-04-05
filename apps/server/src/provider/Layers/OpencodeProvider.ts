@@ -1,4 +1,9 @@
-import type { ModelCapabilities, OpencodeSettings, ServerProviderModel } from "@t3tools/contracts";
+import type {
+  ModelCapabilities,
+  OpencodeSettings,
+  ServerProviderModel,
+  UpstreamProvider,
+} from "@t3tools/contracts";
 import { Effect, Equal, Layer, Result, Stream } from "effect";
 
 import {
@@ -14,30 +19,76 @@ import { ServerSettingsService } from "../../serverSettings";
 
 const PROVIDER = "opencode" as const;
 
-const OPENCODE_REASONING_CAPABILITIES: ModelCapabilities = {
-  reasoningEffortLevels: [
-    { value: "low", label: "Low" },
-    { value: "medium", label: "Medium", isDefault: true },
-    { value: "high", label: "High" },
-  ],
-  supportsFastMode: false,
-  supportsThinkingToggle: false,
-  contextWindowOptions: [],
-  promptInjectedEffortLevels: [],
-};
+const DEFAULT_OPENCODE_REASONING_VARIANTS = ["low", "medium", "high"] as const;
+
+function formatOpencodeEffortLabel(value: string): string {
+  switch (value) {
+    case "xhigh":
+      return "Extra High";
+    case "minimal":
+      return "Minimal";
+    case "none":
+      return "None";
+    default:
+      return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+}
+
+function buildOpencodeReasoningCapabilities(
+  variants: ReadonlyArray<string> = DEFAULT_OPENCODE_REASONING_VARIANTS,
+): ModelCapabilities {
+  const normalizedVariants = variants
+    .map((variant) => variant.trim())
+    .filter((variant, index, values) => variant.length > 0 && values.indexOf(variant) === index);
+  const effectiveVariants =
+    normalizedVariants.length > 0 ? normalizedVariants : [...DEFAULT_OPENCODE_REASONING_VARIANTS];
+
+  return {
+    reasoningEffortLevels: effectiveVariants.map((variant) => {
+      const option: { value: string; label: string; isDefault?: true } = {
+        value: variant,
+        label: formatOpencodeEffortLabel(variant),
+      };
+      if (variant === "medium") {
+        option.isDefault = true;
+      }
+      return option;
+    }),
+    supportsFastMode: false,
+    supportsThinkingToggle: false,
+    contextWindowOptions: [],
+    promptInjectedEffortLevels: [],
+  };
+}
+
+const OPENCODE_REASONING_CAPABILITIES: ModelCapabilities = buildOpencodeReasoningCapabilities();
+
+function resolveOpencodeReasoningVariants(input: {
+  readonly providerId: string;
+  readonly modelId: string;
+  readonly variants?: Readonly<Record<string, unknown>>;
+}): ReadonlyArray<string> {
+  const configuredVariants = input.variants ? Object.keys(input.variants) : [];
+  if (configuredVariants.length > 0) {
+    return configuredVariants;
+  }
+  if (input.providerId === "openai" && input.modelId.startsWith("gpt-5")) {
+    return DEFAULT_OPENCODE_REASONING_VARIANTS;
+  }
+  return [];
+}
 
 function resolveOpencodeModelCapabilities(input: {
   readonly providerId: string;
   readonly modelId: string;
   readonly supportsReasoning: boolean;
+  readonly variants?: Readonly<Record<string, unknown>>;
 }): ModelCapabilities | null {
   if (!input.supportsReasoning) {
     return null;
   }
-  if (input.providerId === "openai" && input.modelId.startsWith("gpt-5")) {
-    return OPENCODE_REASONING_CAPABILITIES;
-  }
-  return null;
+
+  return buildOpencodeReasoningCapabilities(resolveOpencodeReasoningVariants(input));
 }
 
 const BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [
@@ -69,6 +120,7 @@ function resolveOpencodeModels(input: {
           readonly capabilities?: {
             readonly reasoning?: boolean;
           };
+          readonly variants?: Readonly<Record<string, unknown>>;
         }
       >
     >;
@@ -84,6 +136,7 @@ function resolveOpencodeModels(input: {
           providerId: provider.id,
           modelId: model.id,
           supportsReasoning: model.capabilities?.reasoning === true,
+          ...(model.variants ? { variants: model.variants } : {}),
         }),
       })),
     )
@@ -130,6 +183,25 @@ function resolveOpenCodeAuth(input: {
         ? `OpenCode server bridge is healthy and ${label} is connected.`
         : `OpenCode server bridge is healthy and ${label}.`,
   };
+}
+
+function resolveUpstreamProviders(input: {
+  readonly knownProviders: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+  readonly connectedProviderIds: ReadonlyArray<string>;
+  readonly authMethodsByProviderId: Readonly<Record<string, ReadonlyArray<unknown>>>;
+}): ReadonlyArray<UpstreamProvider> {
+  const connectedSet = new Set(input.connectedProviderIds);
+  return input.knownProviders
+    .map((provider) => ({
+      id: provider.id,
+      name: provider.name,
+      connected: connectedSet.has(provider.id),
+      hasAuthMethods: (input.authMethodsByProviderId[provider.id]?.length ?? 0) > 0,
+    }))
+    .toSorted((left, right) => {
+      if (left.connected !== right.connected) return left.connected ? -1 : 1;
+      return left.name.localeCompare(right.name);
+    });
 }
 
 export const checkOpencodeProviderStatus = Effect.gen(function* () {
@@ -204,11 +276,18 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
         })
       : fallbackModels;
 
+  const upstreamProviders = resolveUpstreamProviders({
+    knownProviders: probe.knownProviders,
+    connectedProviderIds: probe.connectedProviderIds,
+    authMethodsByProviderId: probe.authMethodsByProviderId,
+  });
+
   return buildServerProvider({
     provider: PROVIDER,
     enabled: true,
     checkedAt,
     models,
+    upstreamProviders,
     probe: {
       installed: true,
       version: probe.server.version,

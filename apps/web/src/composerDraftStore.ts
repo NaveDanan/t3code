@@ -906,10 +906,20 @@ function normalizePersistedDraftsByThreadId(
       draftCandidate.modelSelectionByProvider &&
       typeof draftCandidate.modelSelectionByProvider === "object"
     ) {
-      // v3 format
-      modelSelectionByProvider = draftCandidate.modelSelectionByProvider as Partial<
-        Record<ProviderKind, ModelSelection>
-      >;
+      // v3 format — normalize each entry to drop invalid options (e.g. invalid effort values)
+      const rawByProvider = draftCandidate.modelSelectionByProvider as Record<string, unknown>;
+      for (const [provider, rawSelection] of Object.entries(rawByProvider)) {
+        const normalized = normalizeModelSelection(rawSelection);
+        if (normalized !== null) {
+          modelSelectionByProvider[normalized.provider] = normalized;
+        } else {
+          // Provider key mismatch or invalid entry — try treating it as a legacy v2 selection
+          const legacyNormalized = normalizeModelSelection(rawSelection, { provider });
+          if (legacyNormalized !== null) {
+            modelSelectionByProvider[legacyNormalized.provider] = legacyNormalized;
+          }
+        }
+      }
       activeProvider = normalizeProviderKind(draftCandidate.activeProvider);
     } else {
       // v2 or legacy format: migrate

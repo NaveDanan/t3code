@@ -49,9 +49,11 @@ const claudeCaps: ModelCapabilities = {
 
 const opencodeCaps: ModelCapabilities = {
   reasoningEffortLevels: [
+    { value: "minimal", label: "Minimal" },
     { value: "low", label: "Low" },
     { value: "medium", label: "Medium", isDefault: true },
     { value: "high", label: "High" },
+    { value: "xhigh", label: "Extra High" },
   ],
   supportsFastMode: false,
   supportsThinkingToggle: false,
@@ -117,6 +119,7 @@ describe("resolveEffort", () => {
     expect(resolveEffort(codexCaps, "xhigh")).toBe("xhigh");
     expect(resolveEffort(codexCaps, "high")).toBe("high");
     expect(resolveEffort(claudeCaps, "medium")).toBe("medium");
+    expect(resolveEffort(opencodeCaps, "xhigh")).toBe("xhigh");
     expect(resolveEffort(opencodeCaps, "low")).toBe("low");
   });
 

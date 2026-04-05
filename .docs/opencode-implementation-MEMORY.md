@@ -1,169 +1,346 @@
 # OpenCode Implementation Memory
 
-This file is the durable implementation memory for the OpenCode harness work.
+This file is not the main architecture doc anymore.
 
-Read this file before continuing any remaining OpenCode phase, test gap, contract decision, or verification task.
+Read `.plans/18-opencode-harness-implementation.md` for the current implementation shape.
 
-This memory is based on the original OpenCode plan, the former standalone TODO list, the current repository code, and the audit performed on 2026-04-05.
+This file exists to preserve the maintenance memory that is easiest to lose:
 
-## Purpose
+- the invariants that already caused real bugs
+- the decisions that should not be casually reopened
+- the file clusters that need to change together
+- the regression signals that matter most when touching OpenCode again
 
-- Preserve the implementation knowledge that is easy to lose when the plan and checklist drift behind the code.
-- Record the decisions that already proved correct.
-- Record the unresolved problems that still need explicit decisions.
-- Prevent future work from re-solving problems that were already understood during implementation and audit.
+## What This File Is For
 
-## Current Truth
+Use this file when you are:
 
-- OpenCode is no longer a stub in this repository.
-- The runtime boundary is a T3-managed `opencode serve` process.
-- The server integration uses `@opencode-ai/sdk/v2` instead of an invented subprocess protocol.
-- Provider readiness uses real bridge health, provider catalog, and auth metadata instead of a version-only CLI probe.
-- The provider adapter supports session start, turn send, interrupt, approval replies, structured user-input replies, read-thread, rollback, stop, and event streaming.
-- Git text generation is implemented for commit message, PR content, branch name, and thread title generation.
-- Web support is enabled through the existing provider-neutral flow rather than a provider-specific path.
-- The original plan's `Current State` section is historical. It describes the old stub-era baseline and must not be treated as the current repository state.
+- changing OpenCode runtime behavior
+- changing model resolution or effort variants
+- changing resume, recovery, interrupt, or rollback behavior
+- debugging a subtle event-ordering bug
+- deciding whether a proposed simplification is actually safe
 
-## Thoughts And Lessons
+Do not use this file as the primary explanation of how OpenCode works. That now lives in `.plans/18-opencode-harness-implementation.md`.
 
-### The documented server and SDK were the right boundary
+## Read Order
 
-- The old scaffold implied that T3 needed a custom sidecar or undocumented bridge.
-- That assumption was wrong once the documented `opencode serve` and SDK surfaces were validated.
-- The practical lesson is to prefer the documented external contract first and only invent transport glue when there is no stable official surface.
+When working on OpenCode, the useful order is:
 
-### The plan became stale faster than the code
+1. `.plans/18-opencode-harness-implementation.md`
+2. this file
+3. `.docs/opencode-desktop-cli-integration.md` if you are reconsidering the runtime boundary or upstream assumptions
 
-- The original plan still described OpenCode as effectively unimplemented.
-- The repository moved ahead of that narrative.
-- The practical lesson is to audit code and tests before trusting planning prose as current truth.
+## Decisions Already Made
 
-### OpenCode fits the provider-neutral stack only after deliberate translation
+These are current design decisions, not loose suggestions.
 
-- OpenCode is session-centric and message-part-centric.
-- T3 is turn-centric and expects stable provider session behavior.
-- The solution was not to create a second orchestration model, but to translate OpenCode session and message behavior back into the existing canonical abstractions.
+### 1. The runtime boundary is a managed local `opencode serve` process
 
-## Struggles And Solutions
+- T3 does not drive the TUI.
+- T3 does not parse terminal transcripts.
+- T3 uses `@opencode-ai/sdk/v2` against the local OpenCode server.
 
-### 1. SDK or server boundary vs custom subprocess bridge
+### 2. Process management stays separate from provider adaptation
 
-- Struggle: the old shape implied that T3 needed a custom sidecar or undocumented bridge.
-- Why it mattered: inventing a transport would have created unnecessary maintenance risk and protocol drift.
-- Solution found: use `@opencode-ai/sdk/v2` and manage `opencode serve` directly.
-- Result: the integration aligns with documented OpenCode behavior and avoids a second protocol stack.
+- `OpencodeServerManager` owns spawn, health, probe, reuse, restart, and SSE reconnect behavior.
+- `OpencodeAdapter` owns translation into T3 provider semantics.
+- Do not collapse those responsibilities together without a strong reason.
 
-### 2. Model contract mismatch
+### 3. Readiness means usable bridge, not installed binary
 
-- Struggle: T3 stores OpenCode selections as slugs like `openai/gpt-5`, while OpenCode expects `{ providerID, modelID }`.
-- Why it mattered: persisted thread settings, chat turns, and git generation all need a stable selection shape.
-- Solution found: keep the slug as the current T3-facing abstraction, then resolve it at runtime against the live OpenCode provider catalog with `resolveOpencodeModel` and `resolveFallbackOpencodeModel`.
-- Result: the current implementation works without exposing provider-native model tuples everywhere.
-- Remaining issue: contracts still hardcode OpenCode defaults and aliases, so this is only partially solved.
+- `opencode --version` is not a sufficient readiness check.
+- A provider is only meaningfully ready when T3 can start the bridge and query real metadata.
 
-### 3. Session-centric streaming vs turn-centric orchestration
+### 4. T3 keeps a slug-based OpenCode model selection at the edges
 
-- Struggle: OpenCode emits session, message, and part events rather than T3-native turns.
-- Why it mattered: T3 needs stable turn IDs for lifecycle, interruption, recovery, and read-thread behavior.
-- Solution found: create provider-native user message IDs (`msg-*`), derive turn IDs as `opencode-turn:${messageId}`, and map assistant `parentID` back to the correct active turn.
-- Result: the adapter fits OpenCode into the existing orchestration path without a provider-specific protocol branch.
+- T3 stores models like `openai/gpt-5`.
+- OpenCode requests still use native `{ providerID, modelID }`.
+- Translation happens at request time through the live provider catalog.
 
-### 4. Resume and recovery shape
+### 5. Resume state is adapter-owned
 
-- Struggle: it was unclear whether T3 should persist raw OpenCode session IDs directly or wrap them in adapter-owned state.
-- Why it mattered: service restart and stale-session recovery need deterministic rehydration.
-- Solution found: persist an adapter-owned opaque resume cursor carrying OpenCode session identity and cwd.
-- Result: stale-session recovery for send-turn and rollback already has focused coverage.
-- Remaining issue: there is still missing OpenCode-specific restart and rehydration coverage across actual `ProviderService` restart boundaries.
+- The persisted resume cursor shape is `{ sessionId, cwd }`.
+- Treat that cursor as adapter state, not as a UI-level contract.
 
-### 5. Readiness must mean usable bridge, not just installed binary
+### 6. Chat and git generation share the same OpenCode foundation
 
-- Struggle: `opencode --version` is not enough to call the provider usable.
-- Why it mattered: false-positive readiness would let the UI advertise a provider that T3 cannot actually manage.
-- Solution found: readiness is based on manager probe plus health, provider catalog, auth metadata, and model discovery.
-- Result: disabled, ready, and missing-install states are covered.
-- Remaining issue: non-ENOENT failure coverage and unauthenticated or unknown auth-state coverage still need expansion.
+- Chat and one-shot generation must keep using the same server manager and model-resolution logic.
+- Do not fork a second OpenCode integration path for git features.
 
-### 6. Git text generation needed to reuse the same OpenCode contract
+### 7. External-server attach mode is not part of the current product
 
-- Struggle: one-shot git flows could have become a second OpenCode integration path.
-- Why it mattered: duplicate logic would drift from chat behavior and double the maintenance surface.
-- Solution found: reuse the OpenCode server manager, resolve models against the live catalog, and request structured JSON output through OpenCode's JSON schema support.
-- Result: OpenCode git generation is implemented and focused tests already exist.
+- There is no attach-to-existing-server setting.
+- There is no custom OpenCode server URL.
+- If that changes, it is a scope decision and should be documented explicitly.
 
-### 7. Web enablement was broader than one availability flag
+## Invariants That Already Caused Real Bugs
 
-- Struggle: the old `available: false` fence in session logic was only one of several OpenCode seams.
-- Why it mattered: picker behavior, store sync, effort options, traits, and model normalization all needed to stop assuming only Codex and Claude.
-- Solution found: enable OpenCode through the existing generic provider flow and add provider-aware normalization where needed.
-- Result: session logic, store sync, composer registry, disabled-provider picker behavior, and traits coverage exist.
-- Remaining issue: settings coverage and draft-restoration coverage are still missing.
+These are the most important things to not accidentally regress.
 
-### 8. Rollback parity is still not a fully closed decision
+### 1. OpenCode user message IDs must be provider-native ascending `msg_...` ids
 
-- Struggle: OpenCode history and revert behavior are message-oriented, not strictly turn-oriented.
-- Why it mattered: fake rollback parity would create misleading UX and brittle semantics.
-- Solution found so far: implement rollback behavior through the adapter and keep thread snapshots canonical.
-- Remaining issue: the repo still needs an explicit decision on whether rollback remains fully exposed or becomes capability-limited when exact turn parity is not guaranteed.
+This is the single most important OpenCode-specific invariant we learned.
 
-### 9. Verification is partly blocked by environment, not by code
+Why it matters:
 
-- Struggle: browser UI verification depends on Playwright browsers being installed.
-- Why it mattered: missing browsers can look like product regressions when they are really environment gaps.
-- Solution found: trust the non-browser web suites and the focused server suites for current signal, and record that browser verification still requires Playwright installation.
+- upstream OpenCode compares message IDs lexicographically in resumed-session reply logic
+- UUID-shaped ids or `msg-<uuid>` look valid enough to be misleading
+- they can sort incorrectly against older provider-native ids and suppress the next assistant reply
 
-## Verified Signals From The Audit
+The current rule:
 
-- `bun run lint` passed.
-- `bun run fmt:check` passed.
-- `bun run --cwd apps/server typecheck` passed.
-- `bun run --cwd apps/web typecheck` passed.
-- Focused OpenCode server suites passed: 6 files, 109 tests passed, 1 skipped.
-- Focused non-browser web suites passed: 3 files, 74 tests passed.
-- Browser UI suites were blocked in the audit environment because Playwright browsers were missing.
+- do not replace `createOpencodeMessageId()` with a UUID or any non-ascending custom scheme
+- keep the provider-native `msg_...` shape and ascending ordering behavior
 
-## Environment And Tooling Notes
+The symptom of breaking this rule is very specific:
 
-- Browser suites need Playwright browsers installed before their results are meaningful.
-- The monorepo-root `bun run typecheck` run did not return a clean footer in the shared terminal during the audit, so package-level server and web typechecks were used as the reliable signal.
-- On Windows, the OpenCode manager spawns with `shell: true`; the focused server tests pass but emit the child-process deprecation warning.
-- The hidden `.docs` folder already exists and is the correct place for OpenCode working memory.
+- session resumes normally
+- `sendTurn.promptAsync.accepted` happens
+- then `session.idle` arrives without any assistant output
+- second turn appears to do nothing
 
-## Files That Matter Most
+### 2. OpenCode replays history aggressively; the adapter must filter it aggressively
+
+OpenCode can replay:
+
+- old `message.updated` events
+- old assistant messages
+- user-authored text parts
+- stale idle or busy state
+
+The adapter only works correctly because it keeps enough state to reject replayed events that do not belong to the live turn.
+
+Do not casually remove or weaken:
+
+- `messageInfoById`
+- parent-message checks
+- active-turn message binding
+- current-turn activity gating
+
+### 3. User text-part replay must never become assistant output
+
+OpenCode can emit `message.part.updated` and `message.part.delta` for user messages.
+
+If you stop checking message role carefully, T3 can echo the prompt back as assistant content.
+
+The symptom of breaking this rule is:
+
+- the user prompt appears as streamed assistant text
+- turn lifecycle looks corrupted or double-counted
+
+### 4. `session.status busy` is not enough to mean the current turn is really active
+
+OpenCode can emit `busy` after a turn is already effectively complete.
+
+The adapter must only translate `busy` into canonical running state while an active live turn still exists.
+
+The symptom of breaking this rule is:
+
+- the UI stays on `Working...` after the answer already finished
+
+### 5. `session.idle` must not complete a turn until the current turn actually showed activity
+
+OpenCode can replay or emit a stale idle immediately after a new prompt starts.
+
+The adapter must ignore idle until current-turn activity is proven.
+
+Important detail:
+
+- the echoed current user `message.updated` does not count as completion-worthy activity by itself
+
+The symptom of breaking this rule is:
+
+- a fresh turn jumps from running to completed immediately
+- often on second-turn or resumed-session flows
+
+### 6. Rollback is best-effort message-boundary revert, not exact turn-native rewind
+
+OpenCode history is message-oriented.
+
+T3 currently implements rollback by repeatedly finding the latest user message and calling `session.revert(messageID)`.
+
+That means:
+
+- rollback is supported
+- rollback is useful
+- rollback is not exact checkpoint parity with providers that have stronger turn-native rewind semantics
+
+Do not describe or implement it as something stronger than that unless the underlying OpenCode semantics change.
+
+### 7. OpenCode effort UI must stay capability-driven
+
+We already hit one bug where the UI and contracts assumed OpenCode only had `low`, `medium`, and `high`.
+
+Current rule:
+
+- use probed model `variants` when available to build OpenCode reasoning effort capabilities
+- do not reintroduce a hardcoded three-value OpenCode reasoning list in the UI path
+
+Current persisted effort union is still finite:
+
+- `none`
+- `minimal`
+- `low`
+- `medium`
+- `high`
+- `xhigh`
+
+So there is a real distinction between:
+
+- runtime capability discovery
+- persisted options typing
+
+If upstream OpenCode starts exposing additional variants that T3 should preserve, the contract layer will need to widen again.
+
+### 8. Custom OpenCode models from settings do not automatically gain capabilities
+
+`providerModelsFromSettings()` appends unknown custom models with:
+
+- `isCustom: true`
+- `capabilities: null`
+
+That is intentional and affects UI behavior.
+
+If a custom model is not present in the live OpenCode provider catalog, T3 cannot infer effort controls for it.
+
+## Places Where Changes Must Stay In Sync
+
+These clusters matter more than individual files.
+
+### If you change model resolution
+
+Change and review together:
+
+- `apps/server/src/provider/opencode.ts`
+- `apps/server/src/provider/Layers/OpencodeAdapter.ts`
+- `apps/server/src/git/Layers/OpencodeTextGeneration.ts`
+- relevant adapter and text-generation tests
+
+### If you change provider readiness or model discovery
+
+Change and review together:
 
 - `apps/server/src/provider/Layers/OpencodeServerManager.ts`
 - `apps/server/src/provider/Layers/OpencodeProvider.ts`
-- `apps/server/src/provider/Layers/OpencodeAdapter.ts`
-- `apps/server/src/provider/opencode.ts`
-- `apps/server/src/git/Layers/OpencodeTextGeneration.ts`
-- `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts`
-- `apps/server/src/provider/Layers/ProviderService.ts`
-- `apps/web/src/session-logic.ts`
-- `apps/web/src/store.ts`
-- `apps/web/src/components/chat/ProviderModelPicker.tsx`
-- `apps/web/src/components/settings/SettingsPanels.tsx`
+- `apps/server/src/provider/Layers/ProviderRegistry.test.ts`
+
+### If you change effort variants or OpenCode traits UI
+
+Change and review together:
+
 - `packages/contracts/src/model.ts`
-- `packages/contracts/src/provider.ts`
+- `packages/shared/src/model.ts`
+- `packages/shared/src/model.test.ts`
+- `apps/server/src/provider/Layers/OpencodeProvider.ts`
+- `apps/web/src/composerDraftStore.ts`
+- `apps/web/src/composerDraftStore.test.ts`
+- `apps/web/src/components/chat/composerProviderRegistry.tsx`
+- `apps/web/src/components/chat/composerProviderRegistry.test.tsx`
+- `apps/web/src/components/chat/TraitsPicker.tsx`
+- `apps/web/src/components/chat/TraitsPicker.browser.tsx`
+- `apps/server/src/provider/Layers/ProviderRegistry.test.ts`
 
-## Remaining Hard Problems
+### If you change resume, recovery, or interrupt behavior
 
-1. Decide whether rollback stays fully exposed or becomes explicitly capability-limited.
-2. Add OpenCode-specific `ProviderService` restart and rehydration coverage across actual service restart boundaries.
-3. Add `OpencodeServerManager` coverage for SSE disconnect and retry, unhealthy-server replacement, and shutdown edge cases.
-4. Add provider-probe coverage for non-ENOENT runtime failures and unauthenticated or unknown auth states.
-5. Add settings and draft-restoration web coverage.
-6. Decide whether the slug abstraction remains stable or should evolve toward explicit `{ providerID, modelID }` contracts.
-7. Decide whether optional attach-to-existing OpenCode server support is in scope.
+Change and review together:
 
-## Recommended Next-Step Order
+- `apps/server/src/provider/Layers/OpencodeAdapter.ts`
+- `apps/server/src/provider/Layers/ProviderService.ts`
+- `apps/server/src/provider/Layers/ProviderService.test.ts`
+- any persistence-facing session runtime code touched by the change
 
-1. Finish the missing server-side coverage before changing contracts.
-2. Make the rollback capability decision explicit before expanding rollback UX assumptions.
-3. Add the missing web settings and draft-restoration coverage.
-4. Install Playwright browsers and rerun the browser suites.
-5. Revisit contract cleanup only after the current abstraction and test surface are stable.
+### If you change rollback semantics
+
+Change and review together:
+
+- `apps/server/src/provider/Layers/OpencodeAdapter.ts`
+- `.plans/18-opencode-harness-implementation.md`
+- this file
+
+## Regression Suites Worth Keeping Green
+
+These are the tests most likely to catch real OpenCode regressions.
+
+### Server
+
+- `apps/server/src/provider/Layers/OpencodeServerManager.test.ts`
+- `apps/server/src/provider/Layers/OpencodeAdapter.test.ts`
+- `apps/server/src/provider/Layers/ProviderRegistry.test.ts`
+- `apps/server/src/provider/Layers/ProviderService.test.ts`
+- `apps/server/src/git/Layers/OpencodeTextGeneration.test.ts`
+
+### Web and shared
+
+- `apps/web/src/composerDraftStore.test.ts`
+- `apps/web/src/components/chat/composerProviderRegistry.test.tsx`
+- `apps/web/src/session-logic.test.ts`
+- `packages/shared/src/model.test.ts`
+
+Browser-facing coverage also matters, but some `.browser.tsx` files are not collected by a plain package-level Vitest include pattern. Do not treat “No test files found” as real validation for those files.
+
+## Good Debugging Heuristics
+
+These are the fast checks that usually save time.
+
+### If the second resumed turn produces no assistant output
+
+Check message-id generation first.
+
+### If the prompt appears as assistant content
+
+Check role filtering for replayed text parts.
+
+### If the UI gets stuck in running state after the answer is done
+
+Check `session.status busy` handling.
+
+### If a new turn completes almost instantly with no real work
+
+Check stale `session.idle` handling and whether echoed user events are being counted as current-turn activity.
+
+### If OpenCode looks healthy but effort controls are missing or wrong
+
+Check:
+
+- live `configuredProviders`
+- model `variants`
+- capability mapping in `OpencodeProvider.ts`
+- persisted effort typing in `packages/contracts/src/model.ts`
+
+### If chat works but git generation fails
+
+Check model resolution and structured-output decoding first. The git path still depends on the same live provider catalog.
+
+### If an OpenCode thread fails around checkpoint or orchestration behavior
+
+Do not assume the bridge is the problem first. Some historical failures blamed on OpenCode were actually caused by surrounding orchestration assumptions, especially around Git capability checks.
+
+## Known Limits That Are Intentional
+
+These are current product limits, not bugs hidden in one file.
+
+- no external OpenCode server attach mode
+- no custom remote server URL
+- no upstream-desktop-style Basic Auth wrapper around the local server
+- no packaged OpenCode binary strategy inside T3 today
+- no promise of exact rollback parity with turn-native providers
+- no fully dynamic persisted effort typing for every possible future OpenCode variant
+
+## Open Questions That Are Still Real
+
+These are the main questions that may be revisited later.
+
+1. Should T3 keep the slug abstraction forever, or eventually expose native `{ providerID, modelID }` contracts more directly?
+2. Should T3 add attach-to-existing-server mode for advanced users or development workflows?
+3. Should persisted OpenCode effort typing become more open-ended if upstream variants keep expanding?
+4. Should rollback remain presented as a normal capability, or should the message-boundary limitation become more explicit in UX or capability metadata?
 
 ## Update Rule
 
-- If OpenCode behavior changes, tests are added, a transport assumption changes, or the contract decision changes, update this file in the same change.
-- If the plan disagrees with the current code and tests, trust the code and tests first, then update the docs.
+If you learn a subtle OpenCode invariant, fix a lifecycle regression, or change one of the decisions above:
+
+- update `.plans/18-opencode-harness-implementation.md` if the architecture changed
+- update this file if the maintenance memory changed
+
+When docs and code disagree, trust the code and tests first, then update the docs immediately.

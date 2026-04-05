@@ -22,6 +22,10 @@ import {
 import { Effect, Exit, Layer, ManagedRuntime, PubSub, Scope, Stream } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 
+import {
+  CheckpointStore,
+  type CheckpointStoreShape,
+} from "../../checkpointing/Services/CheckpointStore.ts";
 import { OrchestrationEventStoreLive } from "../../persistence/Layers/OrchestrationEventStore.ts";
 import { OrchestrationCommandReceiptRepositoryLive } from "../../persistence/Layers/OrchestrationCommandReceipts.ts";
 import { SqlitePersistenceMemory } from "../../persistence/Layers/Sqlite.ts";
@@ -136,6 +140,23 @@ function createProviderServiceHarness() {
   };
 }
 
+function makeTestCheckpointStoreLayer(gitAvailable = true) {
+  const unsupported = <A>() =>
+    Effect.die(new Error("Unsupported checkpoint store call in test")) as Effect.Effect<A, never>;
+
+  const service = {
+    isGitRepository: (cwd: string) =>
+      Effect.succeed(gitAvailable && fs.existsSync(path.join(cwd, ".git"))),
+    captureCheckpoint: () => unsupported<void>(),
+    hasCheckpointRef: () => unsupported<boolean>(),
+    restoreCheckpoint: () => unsupported<boolean>(),
+    diffCheckpoints: () => unsupported<string>(),
+    deleteCheckpointRefs: () => unsupported<void>(),
+  } satisfies CheckpointStoreShape;
+
+  return Layer.succeed(CheckpointStore, service);
+}
+
 async function waitForThread(
   engine: OrchestrationEngineShape,
   predicate: (thread: ProviderRuntimeTestThread) => boolean,
@@ -193,7 +214,10 @@ describe("ProviderRuntimeIngestion", () => {
     }
   });
 
-  async function createHarness(options?: { serverSettings?: Partial<ServerSettings> }) {
+  async function createHarness(options?: {
+    serverSettings?: Partial<ServerSettings>;
+    gitAvailable?: boolean;
+  }) {
     const workspaceRoot = makeTempDir("t3-provider-project-");
     fs.mkdirSync(path.join(workspaceRoot, ".git"));
     const provider = createProviderServiceHarness();
@@ -208,6 +232,7 @@ describe("ProviderRuntimeIngestion", () => {
       Layer.provideMerge(orchestrationLayer),
       Layer.provideMerge(SqlitePersistenceMemory),
       Layer.provideMerge(Layer.succeed(ProviderService, provider.service)),
+      Layer.provideMerge(makeTestCheckpointStoreLayer(options?.gitAvailable ?? true)),
       Layer.provideMerge(makeTestServerSettingsLayer(options?.serverSettings)),
       Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
       Layer.provideMerge(NodeServices.layer),
@@ -1987,6 +2012,31 @@ describe("ProviderRuntimeIngestion", () => {
     expect(checkpoint?.status).toBe("missing");
     expect(checkpoint?.assistantMessageId).toBe("assistant:item-p1-assistant");
     expect(checkpoint?.checkpointRef).toBe("provider-diff:evt-turn-diff-updated");
+  });
+
+  it("skips diff checkpoints when git is unavailable for a git workspace", async () => {
+    const harness = await createHarness({ gitAvailable: false });
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "turn.diff.updated",
+      eventId: asEventId("evt-turn-diff-updated-no-git"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-no-git"),
+      itemId: asItemId("item-no-git-assistant"),
+      payload: {
+        unifiedDiff: "diff --git a/file.txt b/file.txt\n+hello\n",
+      },
+    });
+
+    await harness.drain();
+
+    const readModel = await Effect.runPromise(harness.engine.getReadModel());
+    const thread = readModel.threads.find((entry) => entry.id === ThreadId.makeUnsafe("thread-1"));
+
+    expect(thread?.checkpoints).toHaveLength(0);
   });
 
   it("projects context window updates into normalized thread activities", async () => {

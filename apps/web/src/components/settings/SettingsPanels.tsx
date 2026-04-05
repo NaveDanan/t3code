@@ -2,7 +2,10 @@ import {
   ArchiveIcon,
   ArchiveX,
   ChevronDownIcon,
+  EyeIcon,
+  EyeOffIcon,
   InfoIcon,
+  LinkIcon,
   LoaderIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -17,6 +20,7 @@ import {
   type ServerProvider,
   type ServerProviderModel,
   ThreadId,
+  type UpstreamProvider,
 } from "@t3tools/contracts";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 import { normalizeModelSlug } from "@t3tools/shared/model";
@@ -50,6 +54,7 @@ import { ensureNativeApi, readNativeApi } from "../../nativeApi";
 import { useStore } from "../../store";
 import { formatRelativeTime, formatRelativeTimeLabel } from "../../timestampFormat";
 import { cn } from "../../lib/utils";
+import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Collapsible, CollapsibleContent } from "../ui/collapsible";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
@@ -551,6 +556,7 @@ export function GeneralSettingsPanel() {
       settings.providers.opencode.customModels.length > 0,
     ),
   });
+  const [openUpstreamProviders, setOpenUpstreamProviders] = useState(false);
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
     Record<ProviderKind, string>
   >({
@@ -743,6 +749,25 @@ export function GeneralSettingsPanel() {
         ...existing,
         [provider]: null,
       }));
+    },
+    [settings, updateSettings],
+  );
+
+  const toggleModelVisibility = useCallback(
+    (provider: ProviderKind, slug: string) => {
+      const currentHidden = settings.providers[provider].hiddenModels;
+      const isHidden = currentHidden.includes(slug);
+      updateSettings({
+        providers: {
+          ...settings.providers,
+          [provider]: {
+            ...settings.providers[provider],
+            hiddenModels: isHidden
+              ? currentHidden.filter((model) => model !== slug)
+              : [...currentHidden, slug],
+          },
+        },
+      });
     },
     [settings, updateSettings],
   );
@@ -1287,6 +1312,81 @@ export function GeneralSettingsPanel() {
                       </div>
                     ) : null}
 
+                    {providerCard.liveProvider?.upstreamProviders &&
+                    providerCard.liveProvider.upstreamProviders.length > 0 ? (
+                      <div className="border-t border-border/60 px-4 py-3 sm:px-5">
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between"
+                          onClick={() => setOpenUpstreamProviders((open) => !open)}
+                          aria-expanded={openUpstreamProviders}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-foreground">Providers</span>
+                            <Badge variant="outline" size="sm">
+                              {providerCard.liveProvider.upstreamProviders.length}
+                            </Badge>
+                          </div>
+                          <ChevronDownIcon
+                            className={cn(
+                              "size-3.5 text-muted-foreground transition-transform",
+                              openUpstreamProviders && "rotate-180",
+                            )}
+                          />
+                        </button>
+                        <Collapsible
+                          open={openUpstreamProviders}
+                          onOpenChange={setOpenUpstreamProviders}
+                        >
+                          <CollapsibleContent>
+                            <div className="mt-2 max-h-40 overflow-y-auto">
+                              {providerCard.liveProvider.upstreamProviders.map(
+                                (upstream: UpstreamProvider) => (
+                                  <div
+                                    key={upstream.id}
+                                    className="group flex items-center justify-between gap-2 py-1.5"
+                                  >
+                                    <span className="min-w-0 truncate text-xs text-foreground/90">
+                                      {upstream.name}
+                                    </span>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      {upstream.connected ? (
+                                        <Badge variant="success" size="sm">
+                                          Connected
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" size="sm">
+                                          Not connected
+                                        </Badge>
+                                      )}
+                                      <Tooltip>
+                                        <TooltipTrigger
+                                          render={
+                                            <Button
+                                              variant="ghost"
+                                              size="icon-xs"
+                                              disabled
+                                              className="opacity-0 transition-opacity group-hover:opacity-100"
+                                              aria-label={`Connect ${upstream.name}`}
+                                            />
+                                          }
+                                        >
+                                          <LinkIcon className="size-3" />
+                                        </TooltipTrigger>
+                                        <TooltipPopup side="top" sideOffset={4}>
+                                          Coming soon
+                                        </TooltipPopup>
+                                      </Tooltip>
+                                    </div>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </div>
+                    ) : null}
+
                     <div className="border-t border-border/60 px-4 py-3 sm:px-5">
                       <div className="text-xs font-medium text-foreground">Models</div>
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -1311,13 +1411,47 @@ export function GeneralSettingsPanel() {
                             capLabels.push("Reasoning");
                           }
                           const hasDetails = capLabels.length > 0 || model.name !== model.slug;
+                          const isHidden = providerCard.providerConfig.hiddenModels.includes(
+                            model.slug,
+                          );
 
                           return (
                             <div
                               key={`${providerCard.provider}:${model.slug}`}
-                              className="flex items-center gap-2 py-1"
+                              className="group/model flex items-center gap-2 py-1"
                             >
-                              <span className="min-w-0 truncate text-xs text-foreground/90">
+                              <button
+                                type="button"
+                                className={cn(
+                                  "shrink-0 transition-colors",
+                                  isHidden
+                                    ? "text-muted-foreground/40 hover:text-muted-foreground"
+                                    : "text-success/70 opacity-0 group-hover/model:opacity-100 hover:text-success",
+                                )}
+                                aria-label={
+                                  isHidden
+                                    ? `Show ${model.name} in chat`
+                                    : `Hide ${model.name} from chat`
+                                }
+                                onClick={() =>
+                                  toggleModelVisibility(providerCard.provider, model.slug)
+                                }
+                              >
+                                {isHidden ? (
+                                  <EyeOffIcon className="size-3.5" />
+                                ) : (
+                                  <EyeIcon className="size-3.5" />
+                                )}
+                              </button>
+                              <span
+                                className={cn(
+                                  "min-w-0 truncate text-xs",
+                                  isHidden
+                                    ? "text-muted-foreground/50 line-through"
+                                    : "text-foreground/90",
+                                )}
+                              >
+                                {" "}
                                 {model.name}
                               </span>
                               {hasDetails ? (

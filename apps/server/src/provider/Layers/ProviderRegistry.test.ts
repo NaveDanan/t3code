@@ -597,9 +597,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             ["openai/gpt-5", "anthropic/claude-sonnet-4-5"],
           );
           assert.deepStrictEqual(status.models[0]?.capabilities?.reasoningEffortLevels, [
+            { value: "minimal", label: "Minimal" },
             { value: "low", label: "Low" },
             { value: "medium", label: "Medium", isDefault: true },
             { value: "high", label: "High" },
+            { value: "xhigh", label: "Extra High" },
           ]);
           assert.strictEqual(status.models[1]?.capabilities, null);
         }).pipe(
@@ -674,6 +676,13 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
                             },
                             status: "active",
                             options: {},
+                            variants: {
+                              minimal: {},
+                              low: {},
+                              medium: {},
+                              high: {},
+                              xhigh: {},
+                            },
                             headers: {},
                             release_date: "2025-01-01",
                           },
@@ -746,7 +755,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
           // Installed is true because the error is not an ENOENT (binary is present).
           assert.strictEqual(status.installed, true);
           assert.ok(
-            status.message.includes("Failed to execute OpenCode CLI health check"),
+            status.message?.includes("Failed to execute OpenCode CLI health check"),
             `Expected health check failure message, got: ${status.message}`,
           );
         }).pipe(
@@ -773,101 +782,105 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         ),
       );
 
-      it.effect("reports OpenCode as unauthenticated when no upstream providers are connected", () =>
-        Effect.gen(function* () {
-          const status = yield* checkOpencodeProviderStatus;
-          assert.strictEqual(status.provider, "opencode");
-          assert.strictEqual(status.enabled, true);
-          assert.strictEqual(status.status, "ready");
-          assert.strictEqual(status.installed, true);
-          assert.strictEqual(status.auth.status, "unauthenticated");
-          assert.ok(
-            status.message.includes("no upstream providers are authenticated"),
-            `Expected unauthenticated message, got: ${status.message}`,
-          );
-        }).pipe(
-          Effect.provide(
-            Layer.mergeAll(
-              ServerSettingsService.layerTest({
-                providers: {
-                  opencode: {
-                    enabled: true,
+      it.effect(
+        "reports OpenCode as unauthenticated when no upstream providers are connected",
+        () =>
+          Effect.gen(function* () {
+            const status = yield* checkOpencodeProviderStatus;
+            assert.strictEqual(status.provider, "opencode");
+            assert.strictEqual(status.enabled, true);
+            assert.strictEqual(status.status, "ready");
+            assert.strictEqual(status.installed, true);
+            assert.strictEqual(status.auth.status, "unauthenticated");
+            assert.ok(
+              status.message?.includes("no upstream providers are authenticated"),
+              `Expected unauthenticated message, got: ${status.message}`,
+            );
+          }).pipe(
+            Effect.provide(
+              Layer.mergeAll(
+                ServerSettingsService.layerTest({
+                  providers: {
+                    opencode: {
+                      enabled: true,
+                    },
                   },
-                },
-              }),
-              fakeOpencodeServerManagerLayer({
-                probe: () =>
-                  Effect.succeed({
-                    server: {
-                      binaryPath: "opencode",
-                      url: "http://127.0.0.1:4196",
-                      client: {} as never,
-                      version: "1.3.15",
-                    },
-                    configuredProviders: [],
-                    knownProviders: [
-                      {
-                        id: "openai",
-                        name: "OpenAI",
-                        env: [],
-                        models: {
-                          "gpt-5": opencodeProviderListModel,
-                        },
+                }),
+                fakeOpencodeServerManagerLayer({
+                  probe: () =>
+                    Effect.succeed({
+                      server: {
+                        binaryPath: "opencode",
+                        url: "http://127.0.0.1:4196",
+                        client: {} as never,
+                        version: "1.3.15",
                       },
-                    ],
-                    connectedProviderIds: [],
-                    authMethodsByProviderId: {
-                      openai: [{ type: "api", label: "API Key" }],
-                    },
-                    defaultModelByProviderId: {},
-                  }),
-              }),
+                      configuredProviders: [],
+                      knownProviders: [
+                        {
+                          id: "openai",
+                          name: "OpenAI",
+                          env: [],
+                          models: {
+                            "gpt-5": opencodeProviderListModel,
+                          },
+                        },
+                      ],
+                      connectedProviderIds: [],
+                      authMethodsByProviderId: {
+                        openai: [{ type: "api", label: "API Key" }],
+                      },
+                      defaultModelByProviderId: {},
+                    }),
+                }),
+              ),
             ),
           ),
-        ),
       );
 
-      it.effect("reports OpenCode auth as unknown when no providers and no auth methods exist", () =>
-        Effect.gen(function* () {
-          const status = yield* checkOpencodeProviderStatus;
-          assert.strictEqual(status.provider, "opencode");
-          assert.strictEqual(status.enabled, true);
-          assert.strictEqual(status.status, "ready");
-          assert.strictEqual(status.installed, true);
-          assert.strictEqual(status.auth.status, "unknown");
-          assert.ok(
-            status.message.includes("provider authentication could not be verified"),
-            `Expected unknown auth message, got: ${status.message}`,
-          );
-        }).pipe(
-          Effect.provide(
-            Layer.mergeAll(
-              ServerSettingsService.layerTest({
-                providers: {
-                  opencode: {
-                    enabled: true,
-                  },
-                },
-              }),
-              fakeOpencodeServerManagerLayer({
-                probe: () =>
-                  Effect.succeed({
-                    server: {
-                      binaryPath: "opencode",
-                      url: "http://127.0.0.1:4196",
-                      client: {} as never,
-                      version: "1.3.15",
+      it.effect(
+        "reports OpenCode auth as unknown when no providers and no auth methods exist",
+        () =>
+          Effect.gen(function* () {
+            const status = yield* checkOpencodeProviderStatus;
+            assert.strictEqual(status.provider, "opencode");
+            assert.strictEqual(status.enabled, true);
+            assert.strictEqual(status.status, "ready");
+            assert.strictEqual(status.installed, true);
+            assert.strictEqual(status.auth.status, "unknown");
+            assert.ok(
+              status.message?.includes("provider authentication could not be verified"),
+              `Expected unknown auth message, got: ${status.message}`,
+            );
+          }).pipe(
+            Effect.provide(
+              Layer.mergeAll(
+                ServerSettingsService.layerTest({
+                  providers: {
+                    opencode: {
+                      enabled: true,
                     },
-                    configuredProviders: [],
-                    knownProviders: [],
-                    connectedProviderIds: [],
-                    authMethodsByProviderId: {},
-                    defaultModelByProviderId: {},
-                  }),
-              }),
+                  },
+                }),
+                fakeOpencodeServerManagerLayer({
+                  probe: () =>
+                    Effect.succeed({
+                      server: {
+                        binaryPath: "opencode",
+                        url: "http://127.0.0.1:4196",
+                        client: {} as never,
+                        version: "1.3.15",
+                      },
+                      configuredProviders: [],
+                      knownProviders: [],
+                      connectedProviderIds: [],
+                      authMethodsByProviderId: {},
+                      defaultModelByProviderId: {},
+                    }),
+                }),
+              ),
             ),
           ),
-        ),
       );
 
       it.effect("reports connected label for multiple connected OpenCode providers", () =>
@@ -879,7 +892,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             `Expected multi-provider label, got: ${status.auth.label ?? "undefined"}`,
           );
           assert.ok(
-            status.message.includes("2 providers connected"),
+            status.message?.includes("2 providers connected"),
             `Expected multi-provider message, got: ${status.message}`,
           );
         }).pipe(

@@ -19,6 +19,7 @@ const watchedDirectories = [
 const forcedShutdownTimeoutMs = 1_500;
 const restartDebounceMs = 120;
 const childTreeGracePeriodMs = 1_200;
+const manualCloseExitCode = 130;
 
 await waitForResources({
   baseDir: desktopDir,
@@ -37,7 +38,16 @@ const expectedExits = new WeakSet();
 const watchers = [];
 
 function killChildTreeByPid(pid, signal) {
-  if (process.platform === "win32" || typeof pid !== "number") {
+  if (typeof pid !== "number") {
+    return;
+  }
+
+  if (process.platform === "win32") {
+    const args = ["/PID", String(pid), "/T"];
+    if (signal === "KILL") {
+      args.push("/F");
+    }
+    spawnSync("taskkill", args, { stdio: "ignore" });
     return;
   }
 
@@ -88,9 +98,16 @@ function startApp() {
     }
 
     const exitedAbnormally = signal !== null || code !== 0;
-    if (!shuttingDown && !expectedExits.has(app) && exitedAbnormally) {
-      scheduleRestart();
+    if (shuttingDown || expectedExits.has(app)) {
+      return;
     }
+
+    if (!exitedAbnormally) {
+      void shutdown(manualCloseExitCode);
+      return;
+    }
+
+    scheduleRestart();
   });
 }
 
