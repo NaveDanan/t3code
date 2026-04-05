@@ -935,6 +935,77 @@ describe("ProviderCommandReactor", () => {
     });
   });
 
+  it("restarts opencode sessions when opencode effort changes", async () => {
+    const harness = await createHarness({
+      threadModelSelection: { provider: "opencode", model: "openai/gpt-5" },
+    });
+    const now = new Date().toISOString();
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.makeUnsafe("cmd-turn-start-opencode-effort-1"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        message: {
+          messageId: asMessageId("user-message-opencode-effort-1"),
+          role: "user",
+          text: "first opencode turn",
+          attachments: [],
+        },
+        modelSelection: {
+          provider: "opencode",
+          model: "openai/gpt-5",
+          options: {
+            effort: "medium",
+          },
+        },
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(() => harness.startSession.mock.calls.length === 1);
+    await waitFor(() => harness.sendTurn.mock.calls.length === 1);
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.makeUnsafe("cmd-turn-start-opencode-effort-2"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        message: {
+          messageId: asMessageId("user-message-opencode-effort-2"),
+          role: "user",
+          text: "second opencode turn",
+          attachments: [],
+        },
+        modelSelection: {
+          provider: "opencode",
+          model: "openai/gpt-5",
+          options: {
+            effort: "high",
+          },
+        },
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(() => harness.startSession.mock.calls.length === 2);
+    await waitFor(() => harness.sendTurn.mock.calls.length === 2);
+    expect(harness.startSession.mock.calls[1]?.[1]).toMatchObject({
+      resumeCursor: { opaque: "resume-1" },
+      modelSelection: {
+        provider: "opencode",
+        model: "openai/gpt-5",
+        options: {
+          effort: "high",
+        },
+      },
+    });
+  });
+
   it("restarts the provider session when runtime mode is updated on the thread", async () => {
     const harness = await createHarness();
     const now = new Date().toISOString();
@@ -1578,5 +1649,130 @@ describe("ProviderCommandReactor", () => {
     expect(thread?.session?.status).toBe("stopped");
     expect(thread?.session?.threadId).toBe("thread-1");
     expect(thread?.session?.activeTurnId).toBeNull();
+  });
+
+  it("restarts opencode sessions when runtime mode changes between turns", async () => {
+    const harness = await createHarness({
+      threadModelSelection: { provider: "opencode", model: "openai/gpt-5" },
+    });
+    const now = new Date().toISOString();
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.runtime-mode.set",
+        commandId: CommandId.makeUnsafe("cmd-opencode-runtime-mode-initial"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        runtimeMode: "full-access",
+        createdAt: now,
+      }),
+    );
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.makeUnsafe("cmd-opencode-runtime-mode-turn-1"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        message: {
+          messageId: asMessageId("user-message-opencode-runtime-mode-1"),
+          role: "user",
+          text: "first opencode turn with full-access",
+          attachments: [],
+        },
+        modelSelection: {
+          provider: "opencode",
+          model: "openai/gpt-5",
+        },
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "full-access",
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(() => harness.startSession.mock.calls.length === 1);
+    await waitFor(() => harness.sendTurn.mock.calls.length === 1);
+    expect(harness.startSession.mock.calls[0]?.[1]).toMatchObject({
+      provider: "opencode",
+      runtimeMode: "full-access",
+    });
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.runtime-mode.set",
+        commandId: CommandId.makeUnsafe("cmd-opencode-runtime-mode-change"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        runtimeMode: "approval-required",
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(() => harness.startSession.mock.calls.length === 2);
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.turn.start",
+        commandId: CommandId.makeUnsafe("cmd-opencode-runtime-mode-turn-2"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        message: {
+          messageId: asMessageId("user-message-opencode-runtime-mode-2"),
+          role: "user",
+          text: "second opencode turn with approval-required",
+          attachments: [],
+        },
+        modelSelection: {
+          provider: "opencode",
+          model: "openai/gpt-5",
+        },
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: "approval-required",
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(() => harness.sendTurn.mock.calls.length === 2);
+
+    // The second startSession should carry the resume cursor from the first session
+    // and the new approval-required runtime mode.
+    expect(harness.startSession.mock.calls[1]?.[1]).toMatchObject({
+      provider: "opencode",
+      resumeCursor: { opaque: "resume-1" },
+      runtimeMode: "approval-required",
+    });
+    // Two sessions were started due to the runtime-mode change.
+    expect(harness.startSession.mock.calls.length).toBe(2);
+  });
+
+  it("reuses opencode sessions when effort and runtime mode are both unchanged", async () => {
+    const harness = await createHarness({
+      threadModelSelection: { provider: "opencode", model: "openai/gpt-5" },
+    });
+    const now = new Date().toISOString();
+
+    for (let turn = 1; turn <= 2; turn++) {
+      await Effect.runPromise(
+        harness.engine.dispatch({
+          type: "thread.turn.start",
+          commandId: CommandId.makeUnsafe(`cmd-opencode-stable-turn-${turn}`),
+          threadId: ThreadId.makeUnsafe("thread-1"),
+          message: {
+            messageId: asMessageId(`user-message-opencode-stable-${turn}`),
+            role: "user",
+            text: `stable opencode turn ${turn}`,
+            attachments: [],
+          },
+          modelSelection: {
+            provider: "opencode",
+            model: "openai/gpt-5",
+            options: { effort: "medium" },
+          },
+          interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+          runtimeMode: "approval-required",
+          createdAt: now,
+        }),
+      );
+      await waitFor(() => harness.sendTurn.mock.calls.length === turn);
+    }
+
+    // Only one session should have been started because neither effort nor runtime mode changed.
+    expect(harness.startSession.mock.calls.length).toBe(1);
   });
 });

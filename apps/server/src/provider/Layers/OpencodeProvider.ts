@@ -1,4 +1,4 @@
-import type { OpencodeSettings, ServerProviderModel } from "@t3tools/contracts";
+import type { ModelCapabilities, OpencodeSettings, ServerProviderModel } from "@t3tools/contracts";
 import { Effect, Equal, Layer, Result, Stream } from "effect";
 
 import {
@@ -14,18 +14,44 @@ import { ServerSettingsService } from "../../serverSettings";
 
 const PROVIDER = "opencode" as const;
 
+const OPENCODE_REASONING_CAPABILITIES: ModelCapabilities = {
+  reasoningEffortLevels: [
+    { value: "low", label: "Low" },
+    { value: "medium", label: "Medium", isDefault: true },
+    { value: "high", label: "High" },
+  ],
+  supportsFastMode: false,
+  supportsThinkingToggle: false,
+  contextWindowOptions: [],
+  promptInjectedEffortLevels: [],
+};
+
+function resolveOpencodeModelCapabilities(input: {
+  readonly providerId: string;
+  readonly modelId: string;
+  readonly supportsReasoning: boolean;
+}): ModelCapabilities | null {
+  if (!input.supportsReasoning) {
+    return null;
+  }
+  if (input.providerId === "openai" && input.modelId.startsWith("gpt-5")) {
+    return OPENCODE_REASONING_CAPABILITIES;
+  }
+  return null;
+}
+
 const BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [
   {
     slug: "openai/gpt-5",
     name: "OpenAI GPT-5",
     isCustom: false,
-    capabilities: null,
+    capabilities: OPENCODE_REASONING_CAPABILITIES,
   },
   {
     slug: "openai/gpt-5-mini",
     name: "OpenAI GPT-5 Mini",
     isCustom: false,
-    capabilities: null,
+    capabilities: OPENCODE_REASONING_CAPABILITIES,
   },
 ];
 
@@ -34,7 +60,18 @@ function resolveOpencodeModels(input: {
   readonly configuredProviders: ReadonlyArray<{
     readonly id: string;
     readonly name: string;
-    readonly models: Readonly<Record<string, { readonly id: string; readonly name: string }>>;
+    readonly models: Readonly<
+      Record<
+        string,
+        {
+          readonly id: string;
+          readonly name: string;
+          readonly capabilities?: {
+            readonly reasoning?: boolean;
+          };
+        }
+      >
+    >;
   }>;
 }): ReadonlyArray<ServerProviderModel> {
   const discoveredModels = input.configuredProviders
@@ -43,7 +80,11 @@ function resolveOpencodeModels(input: {
         slug: `${provider.id}/${model.id}`,
         name: `${provider.name} ${model.name}`,
         isCustom: false,
-        capabilities: null,
+        capabilities: resolveOpencodeModelCapabilities({
+          providerId: provider.id,
+          modelId: model.id,
+          supportsReasoning: model.capabilities?.reasoning === true,
+        }),
       })),
     )
     .toSorted((left, right) => left.slug.localeCompare(right.slug));

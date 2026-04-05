@@ -6,7 +6,9 @@ export const CODEX_REASONING_EFFORT_OPTIONS = ["xhigh", "high", "medium", "low"]
 export type CodexReasoningEffort = (typeof CODEX_REASONING_EFFORT_OPTIONS)[number];
 export const CLAUDE_CODE_EFFORT_OPTIONS = ["low", "medium", "high", "max", "ultrathink"] as const;
 export type ClaudeCodeEffort = (typeof CLAUDE_CODE_EFFORT_OPTIONS)[number];
-export type ProviderReasoningEffort = CodexReasoningEffort | ClaudeCodeEffort;
+export const OPENCODE_EFFORT_OPTIONS = ["low", "medium", "high"] as const;
+export type OpencodeEffort = (typeof OPENCODE_EFFORT_OPTIONS)[number];
+export type ProviderReasoningEffort = CodexReasoningEffort | ClaudeCodeEffort | OpencodeEffort;
 
 export const CodexModelOptions = Schema.Struct({
   reasoningEffort: Schema.optional(Schema.Literals(CODEX_REASONING_EFFORT_OPTIONS)),
@@ -22,7 +24,9 @@ export const ClaudeModelOptions = Schema.Struct({
 });
 export type ClaudeModelOptions = typeof ClaudeModelOptions.Type;
 
-export const OpencodeModelOptions = Schema.Struct({});
+export const OpencodeModelOptions = Schema.Struct({
+  effort: Schema.optional(Schema.Literals(OPENCODE_EFFORT_OPTIONS)),
+});
 export type OpencodeModelOptions = typeof OpencodeModelOptions.Type;
 
 export const ProviderModelOptions = Schema.Struct({
@@ -67,7 +71,7 @@ export const DEFAULT_MODEL = DEFAULT_MODEL_BY_PROVIDER.codex;
 export const DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER: Record<ProviderKind, string> = {
   codex: "gpt-5.4-mini",
   claudeAgent: "claude-haiku-4-5",
-  opencode: "openai/gpt-5-mini",
+  opencode: "openai/gpt-5",
 };
 
 export const MODEL_SLUG_ALIASES_BY_PROVIDER: Record<ProviderKind, Record<string, string>> = {

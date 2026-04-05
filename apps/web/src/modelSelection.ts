@@ -7,6 +7,7 @@ import {
 import { normalizeModelSlug, resolveSelectableModel } from "@t3tools/shared/model";
 import { getComposerProviderState } from "./components/chat/composerProviderRegistry";
 import { UnifiedSettings } from "@t3tools/contracts/settings";
+import { buildModelSelection } from "./modelSelectionUtils";
 import {
   getDefaultServerModel,
   getProviderModels,
@@ -206,9 +207,5 @@ export function resolveAppModelSelectionState(
     },
   });
 
-  return {
-    provider,
-    model,
-    ...(modelOptionsForDispatch ? { options: modelOptionsForDispatch } : {}),
-  };
+  return buildModelSelection(provider, model, modelOptionsForDispatch);
 }

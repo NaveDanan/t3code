@@ -2,6 +2,8 @@ import {
   CODEX_REASONING_EFFORT_OPTIONS,
   type ClaudeCodeEffort,
   type CodexReasoningEffort,
+  OPENCODE_EFFORT_OPTIONS,
+  type OpencodeEffort,
   DEFAULT_MODEL_BY_PROVIDER,
   ModelSelection,
   ProjectId,
@@ -19,6 +21,7 @@ import { normalizeModelSlug } from "@t3tools/shared/model";
 import { useMemo } from "react";
 import { getLocalStorageItem } from "./hooks/useLocalStorage";
 import { resolveAppModelSelection } from "./modelSelection";
+import { buildModelSelection } from "./modelSelectionUtils";
 import { DEFAULT_INTERACTION_MODE, DEFAULT_RUNTIME_MODE, type ChatImageAttachment } from "./types";
 import {
   type TerminalContextDraft,
@@ -494,12 +497,29 @@ function normalizeProviderModelOptions(
         }
       : undefined;
 
-  if (!codex && !claude) {
+  const opencodeCandidate =
+    candidate?.opencode && typeof candidate.opencode === "object"
+      ? (candidate.opencode as Record<string, unknown>)
+      : null;
+  const opencodeEffort: OpencodeEffort | undefined = OPENCODE_EFFORT_OPTIONS.includes(
+    opencodeCandidate?.effort as OpencodeEffort,
+  )
+    ? (opencodeCandidate?.effort as OpencodeEffort)
+    : undefined;
+  const opencode =
+    opencodeEffort !== undefined
+      ? {
+          effort: opencodeEffort,
+        }
+      : undefined;
+
+  if (!codex && !claude && !opencode) {
     return null;
   }
   return {
     ...(codex ? { codex } : {}),
     ...(claude ? { claudeAgent: claude } : {}),
+    ...(opencode ? { opencode } : {}),
   };
 }
 
@@ -536,11 +556,7 @@ function normalizeModelSelection(
       : provider === "claudeAgent"
         ? modelOptions?.claudeAgent
         : modelOptions?.opencode;
-  return {
-    provider,
-    model,
-    ...(options ? { options } : {}),
-  };
+  return buildModelSelection(provider, model, options);
 }
 
 // ── Legacy sync helpers (used only during migration from v2 storage) ──
@@ -553,11 +569,7 @@ function legacySyncModelSelectionOptions(
     return null;
   }
   const options = modelOptions?.[modelSelection.provider];
-  return {
-    provider: modelSelection.provider,
-    model: modelSelection.model,
-    ...(options ? { options } : {}),
-  };
+  return buildModelSelection(modelSelection.provider, modelSelection.model, options);
 }
 
 function legacyMergeModelSelectionIntoProviderModelOptions(
@@ -604,14 +616,13 @@ function legacyToModelSelectionByProvider(
     for (const provider of KNOWN_PROVIDER_KINDS) {
       const options = modelOptions[provider];
       if (options && Object.keys(options).length > 0) {
-        result[provider] = {
+        result[provider] = buildModelSelection(
           provider,
-          model:
-            modelSelection?.provider === provider
-              ? modelSelection.model
-              : DEFAULT_MODEL_BY_PROVIDER[provider],
+          modelSelection?.provider === provider
+            ? modelSelection.model
+            : DEFAULT_MODEL_BY_PROVIDER[provider],
           options,
-        };
+        );
       }
     }
   }
@@ -1643,11 +1654,11 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
               nextMap[normalized.provider] = normalized;
             } else {
               // No options in selection → preserve existing options, update provider+model
-              nextMap[normalized.provider] = {
-                provider: normalized.provider,
-                model: normalized.model,
-                ...(current?.options ? { options: current.options } : {}),
-              };
+              nextMap[normalized.provider] = buildModelSelection(
+                normalized.provider,
+                normalized.model,
+                current?.options,
+              );
             }
           }
           const nextActiveProvider = normalized?.provider ?? base.activeProvider;
@@ -1689,15 +1700,14 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
             const opts = normalizedOpts[provider];
             const current = nextMap[provider];
             if (opts) {
-              nextMap[provider] = {
+              nextMap[provider] = buildModelSelection(
                 provider,
-                model: current?.model ?? DEFAULT_MODEL_BY_PROVIDER[provider],
-                options: opts,
-              };
+                current?.model ?? DEFAULT_MODEL_BY_PROVIDER[provider],
+                opts,
+              );
             } else if (current?.options) {
               // Remove options but keep the selection
-              const { options: _, ...rest } = current;
-              nextMap[provider] = rest as ModelSelection;
+              nextMap[provider] = buildModelSelection(current.provider, current.model);
             }
           }
           if (Equal.equals(base.modelSelectionByProvider, nextMap)) {
@@ -1739,14 +1749,16 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
           const nextMap = { ...base.modelSelectionByProvider };
           const currentForProvider = nextMap[normalizedProvider];
           if (providerOpts) {
-            nextMap[normalizedProvider] = {
-              provider: normalizedProvider,
-              model: currentForProvider?.model ?? DEFAULT_MODEL_BY_PROVIDER[normalizedProvider],
-              options: providerOpts,
-            };
+            nextMap[normalizedProvider] = buildModelSelection(
+              normalizedProvider,
+              currentForProvider?.model ?? DEFAULT_MODEL_BY_PROVIDER[normalizedProvider],
+              providerOpts,
+            );
           } else if (currentForProvider?.options) {
-            const { options: _, ...rest } = currentForProvider;
-            nextMap[normalizedProvider] = rest as ModelSelection;
+            nextMap[normalizedProvider] = buildModelSelection(
+              currentForProvider.provider,
+              currentForProvider.model,
+            );
           }
 
           // Handle sticky persistence
@@ -1757,19 +1769,21 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
             const stickyBase =
               nextStickyMap[normalizedProvider] ??
               base.modelSelectionByProvider[normalizedProvider] ??
-              ({
-                provider: normalizedProvider,
-                model: DEFAULT_MODEL_BY_PROVIDER[normalizedProvider],
-              } as ModelSelection);
+              buildModelSelection(
+                normalizedProvider,
+                DEFAULT_MODEL_BY_PROVIDER[normalizedProvider],
+              );
             if (providerOpts) {
-              nextStickyMap[normalizedProvider] = {
-                ...stickyBase,
-                provider: normalizedProvider,
-                options: providerOpts,
-              };
+              nextStickyMap[normalizedProvider] = buildModelSelection(
+                normalizedProvider,
+                stickyBase.model,
+                providerOpts,
+              );
             } else if (stickyBase.options) {
-              const { options: _, ...rest } = stickyBase;
-              nextStickyMap[normalizedProvider] = rest as ModelSelection;
+              nextStickyMap[normalizedProvider] = buildModelSelection(
+                stickyBase.provider,
+                stickyBase.model,
+              );
             }
             nextStickyActiveProvider = base.activeProvider ?? normalizedProvider;
           }

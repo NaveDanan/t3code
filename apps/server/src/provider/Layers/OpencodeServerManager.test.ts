@@ -3,9 +3,10 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 
 import { describe, it, assert } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Stream } from "effect";
 
 import { makeOpencodeServerManager } from "./OpencodeServerManager";
+import { OpencodeServerManagerError } from "../Services/OpencodeServerManager";
 
 class FakeOpencodeProcess extends EventEmitter {
   readonly stdout = new PassThrough();
@@ -228,6 +229,147 @@ describe("OpencodeServerManager", () => {
 
       assert.strictEqual(spawn.spawnCount, 2);
       assert.notStrictEqual(first.url, second.url);
+
+      yield* manager.stop;
+    }),
+  );
+
+  it.effect("stop clears state so the next ensureServer starts a fresh server", () =>
+    Effect.gen(function* () {
+      const spawn = createSpawnServer();
+      const manager = yield* makeOpencodeServerManager({
+        spawnServer: spawn.spawnServer as never,
+      });
+
+      yield* manager.ensureServer({ binaryPath: "opencode" });
+      assert.strictEqual(spawn.spawnCount, 1);
+
+      yield* manager.stop;
+
+      // After stop the state is cleared; the next call should spawn again.
+      yield* manager.ensureServer({ binaryPath: "opencode" });
+      assert.strictEqual(spawn.spawnCount, 2);
+
+      yield* manager.stop;
+    }),
+  );
+
+  it.effect("replaces an exited server with a new one on the next ensureServer call", () =>
+    Effect.gen(function* () {
+      let currentProcess: FakeOpencodeProcess | null = null;
+      const spawn = createSpawnServer();
+      const originalSpawn = spawn.spawnServer;
+      const spawnWithRef = (input: Parameters<typeof originalSpawn>[0]) => {
+        const proc = originalSpawn(input);
+        currentProcess = proc as unknown as FakeOpencodeProcess;
+        return proc;
+      };
+
+      const manager = yield* makeOpencodeServerManager({
+        spawnServer: spawnWithRef as never,
+      });
+
+      const first = yield* manager.ensureServer({ binaryPath: "opencode" });
+      assert.strictEqual(spawn.spawnCount, 1);
+
+      // Simulate the server process exiting externally.
+      currentProcess?.emit("exit", 1, null);
+
+      const second = yield* manager.ensureServer({ binaryPath: "opencode" });
+      assert.strictEqual(spawn.spawnCount, 2);
+      assert.notStrictEqual(first.url, second.url);
+
+      yield* manager.stop;
+    }),
+  );
+
+  it.effect("fails with OpencodeServerManagerError when the server spawn throws", () =>
+    Effect.gen(function* () {
+      const manager = yield* makeOpencodeServerManager({
+        spawnServer: () => {
+          throw Object.assign(new Error("spawn opencode ENOENT"), { code: "ENOENT" });
+        },
+        startTimeoutMs: 200,
+        healthCheckIntervalMs: 20,
+      });
+
+      const result = yield* manager.ensureServer({ binaryPath: "opencode" }).pipe(Effect.result);
+      assert.strictEqual(result._tag, "Failure");
+      if (result._tag === "Failure") {
+        assert.ok(result.failure instanceof OpencodeServerManagerError);
+        assert.strictEqual(result.failure.operation, "ensureServer");
+      }
+    }),
+  );
+
+  it.effect("fails with OpencodeServerManagerError when the server exits before becoming healthy", () =>
+    Effect.gen(function* () {
+      const manager = yield* makeOpencodeServerManager({
+        spawnServer: () => {
+          const proc = new FakeOpencodeProcess(() => {});
+          // Emit exit immediately to simulate a crash before the first health-check.
+          setTimeout(() => proc.emit("exit", 1, null), 0);
+          return proc;
+        },
+        startTimeoutMs: 200,
+        healthCheckIntervalMs: 20,
+      });
+
+      const result = yield* manager.ensureServer({ binaryPath: "opencode" }).pipe(Effect.result);
+      assert.strictEqual(result._tag, "Failure");
+      if (result._tag === "Failure") {
+        assert.ok(result.failure instanceof OpencodeServerManagerError);
+      }
+    }),
+  );
+
+  it.effect("streamEvents reconnects when the SSE stream ends normally", () =>
+    Effect.gen(function* () {
+      let connectionCount = 0;
+
+      const makeClient = () =>
+        ({
+          global: {
+            health: () =>
+              Promise.resolve({ data: { healthy: true, version: "1.0.0" } }),
+            event: async () => {
+              connectionCount += 1;
+              // First connection ends immediately after one event.
+              // Second connection emits a second event then holds open.
+              const eventToEmit =
+                connectionCount === 1
+                  ? { type: "server.connected" as const }
+                  : { type: "session.idle" as const };
+              const open = connectionCount >= 2;
+              return {
+                stream: (async function* () {
+                  yield eventToEmit;
+                  if (open) {
+                    // Hold open for a brief window so the consumer can collect the event.
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                  }
+                  // First connection: end normally → manager reconnects immediately.
+                })(),
+              };
+            },
+          },
+        }) as never;
+
+      const spawn = createSpawnServer();
+      const manager = yield* makeOpencodeServerManager({
+        spawnServer: spawn.spawnServer as never,
+        createClient: makeClient,
+      });
+
+      // Collect exactly 2 events; the second must arrive from a reconnected stream.
+      const collected = yield* Effect.scoped(
+        Stream.runCollect(
+          manager.streamEvents({ binaryPath: "opencode" }).pipe(Stream.take(2)),
+        ),
+      );
+
+      assert.strictEqual(collected.length, 2);
+      assert.ok(connectionCount >= 2, `Expected at least 2 SSE connections, got ${connectionCount}`);
 
       yield* manager.stop;
     }),

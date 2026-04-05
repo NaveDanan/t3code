@@ -1,24 +1,16 @@
 /**
  * RoutingTextGeneration – Dispatches text generation requests to either the
- * Codex CLI or Claude CLI implementation based on the provider in each
- * request input.
- *
- * `opencode` is wired into the shared model-selection contracts before its git
- * text-generation layer exists, so requests for that provider fail explicitly
- * instead of silently falling back to another harness.
+ * Codex CLI, Claude CLI, or OpenCode server implementation based on the
+ * provider in each request input.
  *
  * @module RoutingTextGeneration
  */
 import { Effect, Layer, ServiceMap } from "effect";
-import { TextGenerationError } from "@t3tools/contracts";
 
-import {
-  TextGeneration,
-  type TextGenerationProvider,
-  type TextGenerationShape,
-} from "../Services/TextGeneration.ts";
+import { TextGeneration, type TextGenerationShape } from "../Services/TextGeneration.ts";
 import { CodexTextGenerationLive } from "./CodexTextGeneration.ts";
 import { ClaudeTextGenerationLive } from "./ClaudeTextGeneration.ts";
+import { OpencodeTextGenerationLive } from "./OpencodeTextGeneration.ts";
 
 // ---------------------------------------------------------------------------
 // Internal service tags so both concrete layers can coexist.
@@ -32,6 +24,10 @@ class ClaudeTextGen extends ServiceMap.Service<ClaudeTextGen, TextGenerationShap
   "t3/git/Layers/RoutingTextGeneration/ClaudeTextGen",
 ) {}
 
+class OpencodeTextGen extends ServiceMap.Service<OpencodeTextGen, TextGenerationShape>()(
+  "t3/git/Layers/RoutingTextGeneration/OpencodeTextGen",
+) {}
+
 // ---------------------------------------------------------------------------
 // Routing implementation
 // ---------------------------------------------------------------------------
@@ -39,13 +35,7 @@ class ClaudeTextGen extends ServiceMap.Service<ClaudeTextGen, TextGenerationShap
 const makeRoutingTextGeneration = Effect.gen(function* () {
   const codex = yield* CodexTextGen;
   const claude = yield* ClaudeTextGen;
-  const unsupportedProvider = <T>(operation: string, provider: TextGenerationProvider) =>
-    Effect.fail(
-      new TextGenerationError({
-        operation,
-        detail: `Provider '${provider}' does not support git text generation yet.`,
-      }),
-    ) as Effect.Effect<T, TextGenerationError>;
+  const opencode = yield* OpencodeTextGen;
 
   return {
     generateCommitMessage: (input) => {
@@ -55,10 +45,7 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
         case "claudeAgent":
           return claude.generateCommitMessage(input);
         case "opencode":
-          return unsupportedProvider(
-            "RoutingTextGeneration.generateCommitMessage",
-            input.modelSelection.provider,
-          );
+          return opencode.generateCommitMessage(input);
       }
     },
     generatePrContent: (input) => {
@@ -68,10 +55,7 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
         case "claudeAgent":
           return claude.generatePrContent(input);
         case "opencode":
-          return unsupportedProvider(
-            "RoutingTextGeneration.generatePrContent",
-            input.modelSelection.provider,
-          );
+          return opencode.generatePrContent(input);
       }
     },
     generateBranchName: (input) => {
@@ -81,10 +65,7 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
         case "claudeAgent":
           return claude.generateBranchName(input);
         case "opencode":
-          return unsupportedProvider(
-            "RoutingTextGeneration.generateBranchName",
-            input.modelSelection.provider,
-          );
+          return opencode.generateBranchName(input);
       }
     },
     generateThreadTitle: (input) => {
@@ -94,10 +75,7 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
         case "claudeAgent":
           return claude.generateThreadTitle(input);
         case "opencode":
-          return unsupportedProvider(
-            "RoutingTextGeneration.generateThreadTitle",
-            input.modelSelection.provider,
-          );
+          return opencode.generateThreadTitle(input);
       }
     },
   } satisfies TextGenerationShape;
@@ -119,7 +97,19 @@ const InternalClaudeLayer = Layer.effect(
   }),
 ).pipe(Layer.provide(ClaudeTextGenerationLive));
 
+const InternalOpencodeLayer = Layer.effect(
+  OpencodeTextGen,
+  Effect.gen(function* () {
+    const svc = yield* TextGeneration;
+    return svc;
+  }),
+).pipe(Layer.provide(OpencodeTextGenerationLive));
+
 export const RoutingTextGenerationLive = Layer.effect(
   TextGeneration,
   makeRoutingTextGeneration,
-).pipe(Layer.provide(InternalCodexLayer), Layer.provide(InternalClaudeLayer));
+).pipe(
+  Layer.provide(InternalCodexLayer),
+  Layer.provide(InternalClaudeLayer),
+  Layer.provide(InternalOpencodeLayer),
+);

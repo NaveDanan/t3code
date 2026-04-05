@@ -10,6 +10,7 @@ import {
   isClaudeUltrathinkPrompt,
   normalizeClaudeModelOptionsWithCapabilities,
   normalizeCodexModelOptionsWithCapabilities,
+  normalizeOpencodeModelOptionsWithCapabilities,
   normalizeModelSlug,
   resolveApiModelId,
   resolveContextWindow,
@@ -44,6 +45,18 @@ const claudeCaps: ModelCapabilities = {
     { value: "1m", label: "1M", isDefault: true },
   ],
   promptInjectedEffortLevels: ["ultrathink"],
+};
+
+const opencodeCaps: ModelCapabilities = {
+  reasoningEffortLevels: [
+    { value: "low", label: "Low" },
+    { value: "medium", label: "Medium", isDefault: true },
+    { value: "high", label: "High" },
+  ],
+  supportsFastMode: false,
+  supportsThinkingToggle: false,
+  contextWindowOptions: [],
+  promptInjectedEffortLevels: [],
 };
 
 describe("normalizeModelSlug", () => {
@@ -90,6 +103,7 @@ describe("capability helpers", () => {
   it("reads default efforts", () => {
     expect(getDefaultEffort(codexCaps)).toBe("high");
     expect(getDefaultEffort(claudeCaps)).toBe("high");
+    expect(getDefaultEffort(opencodeCaps)).toBe("medium");
   });
 
   it("checks effort support", () => {
@@ -103,11 +117,13 @@ describe("resolveEffort", () => {
     expect(resolveEffort(codexCaps, "xhigh")).toBe("xhigh");
     expect(resolveEffort(codexCaps, "high")).toBe("high");
     expect(resolveEffort(claudeCaps, "medium")).toBe("medium");
+    expect(resolveEffort(opencodeCaps, "low")).toBe("low");
   });
 
   it("falls back to default when value is unsupported", () => {
     expect(resolveEffort(codexCaps, "bogus")).toBe("high");
     expect(resolveEffort(claudeCaps, "bogus")).toBe("high");
+    expect(resolveEffort(opencodeCaps, "bogus")).toBe("medium");
   });
 
   it("returns the default when no value is provided", () => {
@@ -115,6 +131,7 @@ describe("resolveEffort", () => {
     expect(resolveEffort(codexCaps, null)).toBe("high");
     expect(resolveEffort(codexCaps, "")).toBe("high");
     expect(resolveEffort(codexCaps, "  ")).toBe("high");
+    expect(resolveEffort(opencodeCaps, undefined)).toBe("medium");
   });
 
   it("excludes prompt-injected efforts and falls back to default", () => {
@@ -279,6 +296,24 @@ describe("normalize*ModelOptionsWithCapabilities", () => {
       ),
     ).toEqual({
       thinking: true,
+    });
+  });
+
+  it("normalizes OpenCode effort options against capabilities", () => {
+    expect(
+      normalizeOpencodeModelOptionsWithCapabilities(opencodeCaps, {
+        effort: "high",
+      }),
+    ).toEqual({
+      effort: "high",
+    });
+
+    expect(
+      normalizeOpencodeModelOptionsWithCapabilities(opencodeCaps, {
+        effort: "bogus" as never,
+      }),
+    ).toEqual({
+      effort: "medium",
     });
   });
 });

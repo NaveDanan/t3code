@@ -113,6 +113,45 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
       },
     ],
   },
+  {
+    provider: "opencode",
+    enabled: true,
+    installed: true,
+    version: "0.1.0",
+    status: "ready",
+    auth: { status: "authenticated" },
+    checkedAt: "2026-01-01T00:00:00.000Z",
+    models: [
+      {
+        slug: "openai/gpt-5",
+        name: "OpenAI GPT-5",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium", isDefault: true },
+            { value: "high", label: "High" },
+          ],
+          supportsFastMode: false,
+          supportsThinkingToggle: false,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+      {
+        slug: "anthropic/claude-sonnet-4-5",
+        name: "Anthropic Claude Sonnet 4.5",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [],
+          supportsFastMode: false,
+          supportsThinkingToggle: false,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+    ],
+  },
 ];
 
 function ClaudeTraitsPickerHarness(props: {
@@ -489,5 +528,104 @@ describe("TraitsPicker (Codex)", () => {
       provider: "codex",
       options: { fastMode: true },
     });
+  });
+});
+
+// ── OpenCode TraitsPicker tests ───────────────────────────────────────
+
+async function mountOpencodePicker(props: {
+  model?: string;
+  options?: { effort?: "low" | "medium" | "high" };
+}) {
+  const threadId = ThreadId.makeUnsafe("thread-opencode-traits");
+  const model = props.model ?? DEFAULT_MODEL_BY_PROVIDER.opencode;
+  const draftsByThreadId: Record<ThreadId, ComposerThreadDraftState> = {
+    [threadId]: {
+      prompt: "",
+      images: [],
+      nonPersistedImageIds: [],
+      persistedAttachments: [],
+      terminalContexts: [],
+      modelSelectionByProvider: {
+        opencode: {
+          provider: "opencode",
+          model,
+          ...(props.options ? { options: props.options } : {}),
+        },
+      },
+      activeProvider: "opencode",
+      runtimeMode: null,
+      interactionMode: null,
+    },
+  };
+
+  useComposerDraftStore.setState({
+    draftsByThreadId,
+    draftThreadsByThreadId: {},
+    projectDraftThreadIdByProjectId: {},
+  });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const screen = await render(
+    <TraitsPicker
+      provider="opencode"
+      models={TEST_PROVIDERS[2]!.models}
+      threadId={threadId}
+      model={model}
+      prompt=""
+      modelOptions={props.options}
+      onPromptChange={() => {}}
+    />,
+    { container: host },
+  );
+
+  const cleanup = async () => {
+    await screen.unmount();
+    host.remove();
+  };
+
+  return {
+    [Symbol.asyncDispose]: cleanup,
+    cleanup,
+  };
+}
+
+describe("TraitsPicker (OpenCode)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    localStorage.removeItem(COMPOSER_DRAFT_STORAGE_KEY);
+    useComposerDraftStore.setState({
+      draftsByThreadId: {},
+      draftThreadsByThreadId: {},
+      projectDraftThreadIdByProjectId: {},
+      stickyModelSelectionByProvider: {},
+    });
+  });
+
+  it("shows OpenCode effort controls for reasoning-capable models", async () => {
+    await using _ = await mountOpencodePicker({
+      options: { effort: "medium" },
+    });
+
+    await vi.waitFor(() => {
+      expect(document.body.textContent ?? "").toContain("Medium");
+    });
+    await page.getByRole("button").click();
+
+    await vi.waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("Effort");
+      expect(text).toContain("Low");
+      expect(text).toContain("Medium");
+      expect(text).toContain("High");
+    });
+  });
+
+  it("hides OpenCode traits when the selected model has no effort controls", async () => {
+    await using _ = await mountOpencodePicker({
+      model: "anthropic/claude-sonnet-4-5",
+    });
+
+    expect(document.querySelector("button")).toBeNull();
   });
 });

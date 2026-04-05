@@ -11,6 +11,7 @@ import { TraitsMenuContent, TraitsPicker } from "./TraitsPicker";
 import {
   normalizeClaudeModelOptionsWithCapabilities,
   normalizeCodexModelOptionsWithCapabilities,
+  normalizeOpencodeModelOptionsWithCapabilities,
 } from "@t3tools/shared/model";
 
 export type ComposerProviderStateInput = {
@@ -55,41 +56,57 @@ function getProviderStateFromCapabilities(
 ): ComposerProviderState {
   const { provider, model, models, prompt, modelOptions } = input;
   const caps = getProviderModelCapabilities(models, model, provider);
-  const providerOptions = modelOptions?.[provider];
-
-  // Resolve effort
-  const rawEffort = providerOptions
-    ? "effort" in providerOptions
-      ? providerOptions.effort
-      : "reasoningEffort" in providerOptions
-        ? providerOptions.reasoningEffort
-        : null
-    : null;
-
-  const promptEffort = resolveEffort(caps, rawEffort) ?? null;
-
-  // Normalize options for dispatch
-  const normalizedOptions =
-    provider === "codex"
-      ? normalizeCodexModelOptionsWithCapabilities(caps, providerOptions)
-      : provider === "claudeAgent"
-        ? normalizeClaudeModelOptionsWithCapabilities(caps, providerOptions)
-        : undefined;
-
   // Ultrathink styling (driven by capabilities data, not provider identity)
   const ultrathinkActive =
     caps.promptInjectedEffortLevels.length > 0 && isClaudeUltrathinkPrompt(prompt);
 
-  return {
-    provider,
-    promptEffort,
-    modelOptionsForDispatch: normalizedOptions,
-    ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
-    ...(ultrathinkActive
-      ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
-      : {}),
-    ...(ultrathinkActive ? { modelPickerIconClassName: "ultrathink-chroma" } : {}),
-  };
+  switch (provider) {
+    case "codex": {
+      const providerOptions = modelOptions?.codex;
+      const promptEffort = resolveEffort(caps, providerOptions?.reasoningEffort ?? null) ?? null;
+      return {
+        provider,
+        promptEffort,
+        modelOptionsForDispatch: normalizeCodexModelOptionsWithCapabilities(caps, providerOptions),
+        ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
+        ...(ultrathinkActive
+          ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
+          : {}),
+        ...(ultrathinkActive ? { modelPickerIconClassName: "ultrathink-chroma" } : {}),
+      };
+    }
+    case "claudeAgent": {
+      const providerOptions = modelOptions?.claudeAgent;
+      const promptEffort = resolveEffort(caps, providerOptions?.effort ?? null) ?? null;
+      return {
+        provider,
+        promptEffort,
+        modelOptionsForDispatch: normalizeClaudeModelOptionsWithCapabilities(caps, providerOptions),
+        ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
+        ...(ultrathinkActive
+          ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
+          : {}),
+        ...(ultrathinkActive ? { modelPickerIconClassName: "ultrathink-chroma" } : {}),
+      };
+    }
+    case "opencode": {
+      const providerOptions = modelOptions?.opencode;
+      const promptEffort = resolveEffort(caps, providerOptions?.effort ?? null) ?? null;
+      return {
+        provider,
+        promptEffort,
+        modelOptionsForDispatch: normalizeOpencodeModelOptionsWithCapabilities(
+          caps,
+          providerOptions,
+        ),
+        ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
+        ...(ultrathinkActive
+          ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
+          : {}),
+        ...(ultrathinkActive ? { modelPickerIconClassName: "ultrathink-chroma" } : {}),
+      };
+    }
+  }
 }
 
 const composerProviderRegistry: Record<ProviderKind, ProviderRegistryEntry> = {
@@ -159,8 +176,35 @@ const composerProviderRegistry: Record<ProviderKind, ProviderRegistryEntry> = {
   },
   opencode: {
     getState: (input) => getProviderStateFromCapabilities(input),
-    renderTraitsMenuContent: () => null,
-    renderTraitsPicker: () => null,
+    renderTraitsMenuContent: ({
+      threadId,
+      model,
+      models,
+      modelOptions,
+      prompt,
+      onPromptChange,
+    }) => (
+      <TraitsMenuContent
+        provider="opencode"
+        models={models}
+        threadId={threadId}
+        model={model}
+        modelOptions={modelOptions}
+        prompt={prompt}
+        onPromptChange={onPromptChange}
+      />
+    ),
+    renderTraitsPicker: ({ threadId, model, models, modelOptions, prompt, onPromptChange }) => (
+      <TraitsPicker
+        provider="opencode"
+        models={models}
+        threadId={threadId}
+        model={model}
+        modelOptions={modelOptions}
+        prompt={prompt}
+        onPromptChange={onPromptChange}
+      />
+    ),
   },
 };
 

@@ -27,6 +27,10 @@ This work must still reuse the existing provider-neutral orchestration path and 
 
 ## Current State
 
+Read '.docs/opencode-implementation-MEMORY.md' before relying on this section.
+
+Historical baseline preserved from the original plan. This section describes the old stub-era integration and does not match the current repository state; use the merged audit status below for current truth.
+
 The existing OpenCode integration is scaffolded but intentionally non-functional:
 
 1. `apps/server/src/provider/Layers/OpencodeProvider.ts` probes `opencode --version` and then still returns an error status with the message that the sidecar bridge is not implemented yet.
@@ -35,7 +39,72 @@ The existing OpenCode integration is scaffolded but intentionally non-functional
 4. `apps/server/src/git/Layers/RoutingTextGeneration.ts` explicitly rejects OpenCode for commit messages, PR content, branch names, and thread titles.
 5. Most provider contracts already include OpenCode, but a few web and store seams still assume only Codex or Claude.
 
+## Audit Status
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing any remaining OpenCode work.
+
+This section merges the former standalone OpenCode TODO into the plan so the implementation status and the working plan live in one place.
+
+Status after audit on 2026-04-05: not finished. The core OpenCode harness is implemented and the focused server and non-browser web suites currently pass, but the remaining items are still real in coverage, contract cleanup, and manual verification.
+
+### Implemented
+
+- [x] Phase 1: OpenCode uses the official SDK and a T3-managed `opencode serve` runtime boundary.
+- [x] Phase 2: Provider readiness uses real bridge health, auth, and model probing.
+- [x] Phase 3: OpenCode has a real provider adapter with session, turn, approval, user-input, read, rollback, and event-stream support.
+- [x] Phase 5 baseline: OpenCode is enabled in the web provider flow and model normalization paths.
+- [x] Phase 6: OpenCode git text generation is implemented and routed through the shared text-generation service.
+- [x] Shared OpenCode SDK helpers were extracted for request decoding and model resolution.
+- [x] Focused OpenCode git text-generation tests exist.
+- [x] Focused OpenCode adapter tests cover model resolution, resume-cursor startup, interrupt, read-thread, rollback, approval replies, and user-input replies.
+- [x] OpenCode-specific ProviderService recovery tests cover stale-session recovery for send-turn and rollback paths.
+- [x] OpenCode-specific reactor coverage verifies session restart when OpenCode effort changes.
+- [x] OpenCode provider probe coverage includes disabled, ready, and missing-install states.
+- [x] Existing web coverage includes OpenCode session availability, store sync, composer model normalization, disabled-provider picker behavior, and traits browser coverage.
+- [x] Focused OpenCode server suites and focused non-browser web suites pass in the current repository state.
+
+### Remaining Server And Runtime Work
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this section.
+
+- [ ] Add OpenCode-specific `ProviderService` restart and rehydration tests using persisted runtime state across service restart boundaries.
+- [ ] Add OpenCode-specific `ProviderCommandReactor` tests for runtime-mode restart behavior, not just model-option restart behavior.
+- [ ] Add `OpencodeServerManager` tests for SSE disconnect and retry, unhealthy-server replacement, and shutdown edge cases.
+- [ ] Add provider-probe tests for non-ENOENT runtime failures and unauthenticated or unknown OpenCode auth states.
+- [ ] Decide whether OpenCode rollback remains fully exposed or becomes capability-limited when turn parity cannot be exact.
+- [ ] If rollback parity is not exact, encode that decision explicitly in provider capability or UX error handling.
+- [ ] Decide whether optional attach-to-existing OpenCode server support is in or out of scope. If in scope, add manager and settings support for it.
+
+### Remaining Web And Contract Work
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this section.
+
+- [ ] Expand UI tests to cover live OpenCode provider status rendering and richer enable or disable behavior in the provider picker.
+- [ ] Add OpenCode settings tests for ready, disabled, missing-install, and auth-summary rendering.
+- [ ] Add persisted draft restoration coverage for OpenCode model and effort options.
+- [ ] Remove remaining test-helper narrowing that still assumes only Codex or Claude in draft restoration coverage.
+- [ ] Reconcile hardcoded OpenCode defaults and aliases with the runtime-discovered provider catalog.
+- [ ] Reconcile the slug-based OpenCode model-selection contract with the runtime `{ providerID, modelID }` translation path.
+- [ ] Add contracts-level tests if the OpenCode model-selection or provider-session contract changes.
+
+### Verification Still Required
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this section.
+
+- [x] Run focused server suites for probe states, manager behavior, orchestration recovery, provider-service recovery, and rollback semantics.
+- [ ] Finish the targeted web verification for provider picker status rendering, settings readiness and status rendering, and draft restoration.
+- [x] Verify repository formatting state with `bun run fmt:check`.
+- [x] Run `bun run lint`.
+- [x] Run package-level typecheck for `apps/server` and `apps/web`.
+- [ ] Capture or confirm a clean monorepo-root `bun run typecheck` result in this environment.
+- [ ] Run broader `bun run test` coverage for the affected packages or repo-wide scope if release confidence is required.
+- [ ] Install Playwright browsers and rerun the browser UI suites.
+- [ ] Perform manual end-to-end OpenCode verification for ready state, streamed turns, approval flow, structured user-input flow, interrupt, restart and resume, read-thread or rollback behavior, and all four git text-generation flows.
+
 ## Phase 0: Runtime Contract Findings
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this phase.
+Update '.docs/opencode-implementation-MEMORY.md' after completing this phase.
 
 The main go or no-go questions are now materially answered.
 
@@ -60,11 +129,16 @@ Validated live observations from a local `opencode serve` instance:
 
 Open questions that still need implementation-time validation:
 
+Read '.docs/opencode-implementation-MEMORY.md' before resolving these struggles.
+
 1. How reliably `POST /session/:id/abort` maps to T3's current turn interruption semantics under active load.
 2. How OpenCode's message-level revert model should map to T3's `rollbackThread(threadId, numTurns)` contract.
 3. Whether T3 should persist raw OpenCode session IDs directly as resume state or wrap them in an adapter-owned cursor shape.
 
 ## Phase 1: Server or SDK Boundary and Dependency Strategy
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this phase.
+Update '.docs/opencode-implementation-MEMORY.md' after completing this phase.
 
 Define how T3 Code will talk to OpenCode using the documented external integration path.
 
@@ -89,6 +163,9 @@ Reference implementations and comparisons:
 
 ## Phase 2: Real Provider Readiness
 
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this phase.
+Update '.docs/opencode-implementation-MEMORY.md' after completing this phase.
+
 Replace the placeholder OpenCode provider status with a real readiness probe in `apps/server/src/provider/Layers/OpencodeProvider.ts`.
 
 Expected behavior:
@@ -107,6 +184,9 @@ Implementation notes:
 4. Update `apps/server/src/provider/Layers/ProviderRegistry.test.ts` so it no longer asserts that OpenCode must stay unavailable until a bridge exists.
 
 ## Phase 3: Canonical OpenCode Adapter
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this phase.
+Update '.docs/opencode-implementation-MEMORY.md' after completing this phase.
 
 Replace the stub in `apps/server/src/provider/Layers/OpencodeAdapter.ts` with a real provider adapter built on top of the new session manager.
 
@@ -134,6 +214,8 @@ Adapter requirements:
 
 Important contract mismatch to resolve:
 
+Read '.docs/opencode-implementation-MEMORY.md' before resolving this struggle.
+
 1. T3's current OpenCode contracts assume a model slug like `openai/gpt-5` under provider `opencode`.
 2. The validated OpenCode server contract expects model selection as `{ providerID, modelID }`, where those IDs come from OpenCode's own provider catalog.
 3. Phase 3 must therefore either redesign T3's OpenCode model-selection contract or add a translation layer from T3's persisted selection into an OpenCode-native provider or model pair.
@@ -144,6 +226,9 @@ Primary reference contracts:
 2. `packages/contracts/src/provider.ts`
 
 ## Phase 4: Orchestration, Persistence, and Recovery
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this phase.
+Update '.docs/opencode-implementation-MEMORY.md' after completing this phase.
 
 Harden the existing orchestration path against OpenCode-specific runtime behavior.
 
@@ -157,6 +242,8 @@ Key areas:
 
 Implementation note:
 
+Read '.docs/opencode-implementation-MEMORY.md' before changing restart, recovery, or rollback semantics in this phase.
+
 1. OpenCode appears to be session-centric and message-part-centric rather than turn-centric. T3 will need explicit adapter logic to derive turn lifecycle from OpenCode session status, assistant messages, and part events.
 2. OpenCode exposes `session.diff`, `session.revert`, and message history APIs, but they are message-oriented. T3's turn rollback semantics should not assume a one-to-one match.
 
@@ -167,6 +254,9 @@ Relevant files:
 3. `apps/server/src/provider/Layers/ProviderSessionDirectory.ts`
 
 ## Phase 5: Web Enablement Without Provider-Specific Drift
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this phase.
+Update '.docs/opencode-implementation-MEMORY.md' after completing this phase.
 
 Enable OpenCode in the web app using the existing generic provider flow.
 
@@ -179,6 +269,8 @@ Required changes:
 
 Known seam to fix:
 
+Read '.docs/opencode-implementation-MEMORY.md' before resolving this struggle.
+
 1. `apps/web/src/store.ts` still narrows model-selection normalization to Codex or Claude only.
 
 Relevant files:
@@ -190,9 +282,14 @@ Relevant files:
 
 Additional contract work:
 
+Read '.docs/opencode-implementation-MEMORY.md' before changing this contract assumption.
+
 1. Revisit `packages/contracts/src/model.ts` and related OpenCode model defaults. The current built-in OpenCode model list is likely wrong for the validated server path because OpenCode models come from `/config/providers` and are keyed by OpenCode provider or model IDs, not T3's hardcoded `openai/*` slugs.
 
 ## Phase 6: OpenCode Git Text Generation
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this phase.
+Update '.docs/opencode-implementation-MEMORY.md' after completing this phase.
 
 Add OpenCode support to git text generation instead of leaving it explicitly unsupported.
 
@@ -214,6 +311,9 @@ Reference implementations:
 2. `apps/server/src/git/Layers/ClaudeTextGeneration.ts`
 
 ## Phase 7: Tests, Type Seams, and Rollout Hardening
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing this phase.
+Update '.docs/opencode-implementation-MEMORY.md' after completing this phase.
 
 Add or update tests across server and web.
 
@@ -239,6 +339,8 @@ Type and source cleanup:
 2. Close the remaining source-level type narrowing in the web store and any other compile-time assumptions discovered during implementation.
 
 ## Verification
+
+Read '.docs/opencode-implementation-MEMORY.md' before continuing verification work.
 
 Targeted verification:
 
@@ -306,6 +408,8 @@ Likely new files:
 4. Focused tests covering all three additions.
 
 ## Further Considerations
+
+Read '.docs/opencode-implementation-MEMORY.md' before changing scope, transport, rollback parity, or model UX assumptions.
 
 1. If OpenCode does not expose a stable machine-readable streaming contract for approvals, resume, and history management, stop and revise the implementation shape before coding instead of forcing brittle parsing into the provider stack.
 2. Phase 0 now suggests the opposite of the original assumption: the documented server or SDK contract is probably the right primary integration, and a raw custom subprocess protocol should be avoided unless the server path proves insufficient during implementation.

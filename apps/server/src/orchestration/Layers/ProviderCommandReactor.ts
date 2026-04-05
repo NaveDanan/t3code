@@ -119,6 +119,12 @@ function stalePendingRequestDetail(
   return `Stale pending ${requestKind} request: ${requestId}. Provider callback state does not survive app restarts or recovered sessions. Restart the turn to continue.`;
 }
 
+function requiresSessionRestartForModelSelectionChange(
+  provider: ProviderKind | undefined,
+): boolean {
+  return provider === "claudeAgent" || provider === "opencode";
+}
+
 function isTemporaryWorktreeBranch(branch: string): boolean {
   return TEMP_WORKTREE_BRANCH_PATTERN.test(branch.trim().toLowerCase());
 }
@@ -308,7 +314,7 @@ const make = Effect.gen(function* () {
       const shouldRestartForModelChange = modelChanged && sessionModelSwitch === "restart-session";
       const previousModelSelection = threadModelSelections.get(threadId);
       const shouldRestartForModelSelectionChange =
-        currentProvider === "claudeAgent" &&
+        requiresSessionRestartForModelSelectionChange(currentProvider) &&
         requestedModelSelection !== undefined &&
         !Equal.equals(previousModelSelection, requestedModelSelection);
 

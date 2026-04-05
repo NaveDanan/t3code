@@ -1,6 +1,7 @@
 import {
   type ClaudeModelOptions,
   type CodexModelOptions,
+  type OpencodeModelOptions,
   type ProviderKind,
   type ProviderModelOptions,
   type ServerProviderModel,
@@ -55,6 +56,9 @@ function getRawEffort(
   if (provider === "claudeAgent") {
     return trimOrNull((modelOptions as ClaudeModelOptions | undefined)?.effort);
   }
+  if (provider === "opencode") {
+    return trimOrNull((modelOptions as OpencodeModelOptions | undefined)?.effort);
+  }
   return null;
 }
 
@@ -79,6 +83,12 @@ function buildNextOptions(
   if (provider === "claudeAgent") {
     return { ...(modelOptions as ClaudeModelOptions | undefined), ...patch } as ClaudeModelOptions;
   }
+  if (provider === "opencode") {
+    return {
+      ...(modelOptions as OpencodeModelOptions | undefined),
+      ...patch,
+    } as OpencodeModelOptions;
+  }
   return (modelOptions ? { ...modelOptions, ...patch } : { ...patch }) as ProviderOptions;
 }
 
@@ -91,20 +101,6 @@ function getSelectedTraits(
   allowPromptInjectedEffort: boolean,
 ) {
   const caps = getProviderModelCapabilities(models, model, provider);
-  if (provider === "opencode") {
-    return {
-      caps,
-      effort: null,
-      effortLevels: [],
-      thinkingEnabled: null,
-      fastModeEnabled: false,
-      contextWindowOptions: [],
-      contextWindow: null,
-      defaultContextWindow: null,
-      ultrathinkPromptControlled: false,
-      ultrathinkInBodyText: false,
-    };
-  }
   const effortLevels = allowPromptInjectedEffort
     ? caps.reasoningEffortLevels
     : caps.reasoningEffortLevels.filter(
@@ -224,7 +220,11 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
         onPromptChange(stripped);
       }
       const effortKey =
-        provider === "codex" ? "reasoningEffort" : provider === "claudeAgent" ? "effort" : null;
+        provider === "codex"
+          ? "reasoningEffort"
+          : provider === "claudeAgent" || provider === "opencode"
+            ? "effort"
+            : null;
       if (!effortKey) {
         return;
       }

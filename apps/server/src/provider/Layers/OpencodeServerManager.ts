@@ -24,6 +24,7 @@ import {
   type OpencodeServerHandle,
   type OpencodeServerManagerShape,
 } from "../Services/OpencodeServerManager";
+import { readOpencodeSdkData } from "../opencode.ts";
 
 const HOSTNAME = "127.0.0.1" as const;
 const SERVER_START_TIMEOUT_MS = 5_000;
@@ -160,33 +161,6 @@ function createLiveClient(input: { readonly url: string }): OpencodeClient {
   return createOpencodeClient({ baseUrl: input.url });
 }
 
-async function readSdkData<T>(request: Promise<unknown>, operation: string): Promise<T> {
-  const result = (await request) as {
-    data?: T;
-    error?: unknown;
-    response?: Response;
-  };
-
-  if (result.data !== undefined) {
-    return result.data;
-  }
-
-  if (result.error instanceof Error) {
-    throw result.error;
-  }
-
-  if (result.error !== undefined) {
-    throw new Error(
-      `${operation} failed: ${typeof result.error === "string" ? result.error : JSON.stringify(result.error)}`,
-    );
-  }
-
-  const status = result.response?.status;
-  throw new Error(
-    status ? `${operation} failed with HTTP ${status}.` : `${operation} returned no data.`,
-  );
-}
-
 async function createEventStream(client: OpencodeClient): Promise<AsyncGenerator<GlobalEvent>> {
   const result = await client.global.event();
   return result.stream;
@@ -291,7 +265,7 @@ async function startManagedServer(input: {
   };
 
   const requestHealth = async (): Promise<GlobalHealthResponse> => {
-    const health = await readSdkData<GlobalHealthResponse>(
+    const health = await readOpencodeSdkData<GlobalHealthResponse>(
       client.global.health({ signal: AbortSignal.timeout(input.healthCheckTimeoutMs) }),
       "global.health",
     );
@@ -312,9 +286,9 @@ async function startManagedServer(input: {
     refreshHealth: requestHealth,
     probeMetadata: async () => {
       const [configuredProviders, knownProviders, authMethodsByProviderId] = await Promise.all([
-        readSdkData<ConfigProvidersResponse>(client.config.providers(), "config.providers"),
-        readSdkData<ProviderListResponse>(client.provider.list(), "provider.list"),
-        readSdkData<ProviderAuthResponse>(client.provider.auth(), "provider.auth"),
+        readOpencodeSdkData<ConfigProvidersResponse>(client.config.providers(), "config.providers"),
+        readOpencodeSdkData<ProviderListResponse>(client.provider.list(), "provider.list"),
+        readOpencodeSdkData<ProviderAuthResponse>(client.provider.auth(), "provider.auth"),
       ]);
 
       return {

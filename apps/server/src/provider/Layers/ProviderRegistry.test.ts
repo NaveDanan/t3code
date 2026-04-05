@@ -596,6 +596,12 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             status.models.map((model) => model.slug),
             ["openai/gpt-5", "anthropic/claude-sonnet-4-5"],
           );
+          assert.deepStrictEqual(status.models[0]?.capabilities?.reasoningEffortLevels, [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium", isDefault: true },
+            { value: "high", label: "High" },
+          ]);
+          assert.strictEqual(status.models[1]?.capabilities, null);
         }).pipe(
           Effect.provide(
             Layer.mergeAll(
@@ -725,6 +731,188 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
                       detail: "spawn opencode ENOENT",
                     }),
                   ),
+              }),
+            ),
+          ),
+        ),
+      );
+
+      it.effect("reports OpenCode as error when the bridge fails with a non-ENOENT error", () =>
+        Effect.gen(function* () {
+          const status = yield* checkOpencodeProviderStatus;
+          assert.strictEqual(status.provider, "opencode");
+          assert.strictEqual(status.enabled, true);
+          assert.strictEqual(status.status, "error");
+          // Installed is true because the error is not an ENOENT (binary is present).
+          assert.strictEqual(status.installed, true);
+          assert.ok(
+            status.message.includes("Failed to execute OpenCode CLI health check"),
+            `Expected health check failure message, got: ${status.message}`,
+          );
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              ServerSettingsService.layerTest({
+                providers: {
+                  opencode: {
+                    enabled: true,
+                  },
+                },
+              }),
+              fakeOpencodeServerManagerLayer({
+                probe: () =>
+                  Effect.fail(
+                    new OpencodeServerManagerError({
+                      operation: "global.health",
+                      detail: "connection refused",
+                    }),
+                  ),
+              }),
+            ),
+          ),
+        ),
+      );
+
+      it.effect("reports OpenCode as unauthenticated when no upstream providers are connected", () =>
+        Effect.gen(function* () {
+          const status = yield* checkOpencodeProviderStatus;
+          assert.strictEqual(status.provider, "opencode");
+          assert.strictEqual(status.enabled, true);
+          assert.strictEqual(status.status, "ready");
+          assert.strictEqual(status.installed, true);
+          assert.strictEqual(status.auth.status, "unauthenticated");
+          assert.ok(
+            status.message.includes("no upstream providers are authenticated"),
+            `Expected unauthenticated message, got: ${status.message}`,
+          );
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              ServerSettingsService.layerTest({
+                providers: {
+                  opencode: {
+                    enabled: true,
+                  },
+                },
+              }),
+              fakeOpencodeServerManagerLayer({
+                probe: () =>
+                  Effect.succeed({
+                    server: {
+                      binaryPath: "opencode",
+                      url: "http://127.0.0.1:4196",
+                      client: {} as never,
+                      version: "1.3.15",
+                    },
+                    configuredProviders: [],
+                    knownProviders: [
+                      {
+                        id: "openai",
+                        name: "OpenAI",
+                        env: [],
+                        models: {
+                          "gpt-5": opencodeProviderListModel,
+                        },
+                      },
+                    ],
+                    connectedProviderIds: [],
+                    authMethodsByProviderId: {
+                      openai: [{ type: "api", label: "API Key" }],
+                    },
+                    defaultModelByProviderId: {},
+                  }),
+              }),
+            ),
+          ),
+        ),
+      );
+
+      it.effect("reports OpenCode auth as unknown when no providers and no auth methods exist", () =>
+        Effect.gen(function* () {
+          const status = yield* checkOpencodeProviderStatus;
+          assert.strictEqual(status.provider, "opencode");
+          assert.strictEqual(status.enabled, true);
+          assert.strictEqual(status.status, "ready");
+          assert.strictEqual(status.installed, true);
+          assert.strictEqual(status.auth.status, "unknown");
+          assert.ok(
+            status.message.includes("provider authentication could not be verified"),
+            `Expected unknown auth message, got: ${status.message}`,
+          );
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              ServerSettingsService.layerTest({
+                providers: {
+                  opencode: {
+                    enabled: true,
+                  },
+                },
+              }),
+              fakeOpencodeServerManagerLayer({
+                probe: () =>
+                  Effect.succeed({
+                    server: {
+                      binaryPath: "opencode",
+                      url: "http://127.0.0.1:4196",
+                      client: {} as never,
+                      version: "1.3.15",
+                    },
+                    configuredProviders: [],
+                    knownProviders: [],
+                    connectedProviderIds: [],
+                    authMethodsByProviderId: {},
+                    defaultModelByProviderId: {},
+                  }),
+              }),
+            ),
+          ),
+        ),
+      );
+
+      it.effect("reports connected label for multiple connected OpenCode providers", () =>
+        Effect.gen(function* () {
+          const status = yield* checkOpencodeProviderStatus;
+          assert.strictEqual(status.auth.status, "authenticated");
+          assert.ok(
+            status.auth.label === "2 providers connected",
+            `Expected multi-provider label, got: ${status.auth.label ?? "undefined"}`,
+          );
+          assert.ok(
+            status.message.includes("2 providers connected"),
+            `Expected multi-provider message, got: ${status.message}`,
+          );
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              ServerSettingsService.layerTest({
+                providers: {
+                  opencode: {
+                    enabled: true,
+                  },
+                },
+              }),
+              fakeOpencodeServerManagerLayer({
+                probe: () =>
+                  Effect.succeed({
+                    server: {
+                      binaryPath: "opencode",
+                      url: "http://127.0.0.1:4196",
+                      client: {} as never,
+                      version: "1.3.15",
+                    },
+                    configuredProviders: [],
+                    knownProviders: [
+                      { id: "openai", name: "OpenAI", env: [], models: {} },
+                      { id: "anthropic", name: "Anthropic", env: [], models: {} },
+                    ],
+                    connectedProviderIds: ["openai", "anthropic"],
+                    authMethodsByProviderId: {
+                      openai: [{ type: "api", label: "API Key" }],
+                      anthropic: [{ type: "api", label: "API Key" }],
+                    },
+                    defaultModelByProviderId: {},
+                  }),
               }),
             ),
           ),

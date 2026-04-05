@@ -45,6 +45,7 @@ import {
   getCustomModelOptionsByProvider,
   resolveAppModelSelectionState,
 } from "../../modelSelection";
+import { buildModelSelection } from "../../modelSelectionUtils";
 import { ensureNativeApi, readNativeApi } from "../../nativeApi";
 import { useStore } from "../../store";
 import { formatRelativeTime, formatRelativeTimeLabel } from "../../timestampFormat";
@@ -1042,7 +1043,7 @@ export function GeneralSettingsPanel() {
                     textGenerationModelSelection: resolveAppModelSelectionState(
                       {
                         ...settings,
-                        textGenerationModelSelection: { provider, model },
+                        textGenerationModelSelection: buildModelSelection(provider, model),
                       },
                       serverProviders,
                     ),
@@ -1067,11 +1068,11 @@ export function GeneralSettingsPanel() {
                     textGenerationModelSelection: resolveAppModelSelectionState(
                       {
                         ...settings,
-                        textGenerationModelSelection: {
-                          provider: textGenProvider,
-                          model: textGenModel,
-                          ...(nextOptions ? { options: nextOptions } : {}),
-                        },
+                        textGenerationModelSelection: buildModelSelection(
+                          textGenProvider,
+                          textGenModel,
+                          nextOptions,
+                        ),
                       },
                       serverProviders,
                     ),

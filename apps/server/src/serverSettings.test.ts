@@ -1,5 +1,9 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { DEFAULT_SERVER_SETTINGS, ServerSettingsPatch } from "@t3tools/contracts";
+import {
+  DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
+  DEFAULT_SERVER_SETTINGS,
+  ServerSettingsPatch,
+} from "@t3tools/contracts";
 import { assert, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Schema } from "effect";
 import { ServerConfig } from "./config";
@@ -139,6 +143,37 @@ it.layer(NodeServices.layer)("server settings", (it) => {
         },
       });
     }).pipe(Effect.provide(makeServerSettingsLayer())),
+  );
+
+  it.effect(
+    "falls back to the conservative OpenCode git model when OpenCode is the only enabled provider",
+    () =>
+      Effect.gen(function* () {
+        const serverSettings = yield* ServerSettingsService;
+
+        const next = yield* serverSettings.updateSettings({
+          providers: {
+            codex: {
+              enabled: false,
+            },
+            claudeAgent: {
+              enabled: false,
+            },
+            opencode: {
+              enabled: true,
+            },
+          },
+          textGenerationModelSelection: {
+            provider: "codex",
+            model: "gpt-5.4",
+          },
+        });
+
+        assert.deepEqual(next.textGenerationModelSelection, {
+          provider: "opencode",
+          model: DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER.opencode,
+        });
+      }).pipe(Effect.provide(makeServerSettingsLayer())),
   );
 
   it.effect("trims provider path settings when updates are applied", () =>

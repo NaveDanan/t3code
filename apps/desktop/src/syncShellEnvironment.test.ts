@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { syncShellEnvironment } from "./syncShellEnvironment";
@@ -82,7 +86,37 @@ describe("syncShellEnvironment", () => {
     expect(env.SSH_AUTH_SOCK).toBe("/tmp/secretive.sock");
   });
 
-  it("does nothing outside macOS and linux", () => {
+  it("prepends a common per-user Git install location on windows", () => {
+    const localAppData = fs.mkdtempSync(path.join(os.tmpdir(), "t3-sync-shell-win-"));
+    const gitDir = path.join(localAppData, "Programs", "Git", "cmd");
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.writeFileSync(path.join(gitDir, "git.exe"), "");
+
+    const env: NodeJS.ProcessEnv = {
+      LOCALAPPDATA: localAppData,
+      PATH: "C:\\Windows\\System32",
+      SSH_AUTH_SOCK: "/tmp/inherited.sock",
+    };
+    const readEnvironment = vi.fn(() => ({
+      PATH: "/usr/local/bin:/usr/bin",
+      SSH_AUTH_SOCK: "/tmp/secretive.sock",
+    }));
+
+    try {
+      syncShellEnvironment(env, {
+        platform: "win32",
+        readEnvironment,
+      });
+
+      expect(readEnvironment).not.toHaveBeenCalled();
+      expect(env.PATH).toBe(`${gitDir};C:\\Windows\\System32`);
+      expect(env.SSH_AUTH_SOCK).toBe("/tmp/inherited.sock");
+    } finally {
+      fs.rmSync(localAppData, { recursive: true, force: true });
+    }
+  });
+
+  it("does nothing on windows when no Git candidate exists", () => {
     const env: NodeJS.ProcessEnv = {
       SHELL: "C:/Program Files/Git/bin/bash.exe",
       PATH: "C:\\Windows\\System32",

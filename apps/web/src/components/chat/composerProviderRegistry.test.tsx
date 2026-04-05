@@ -106,6 +106,37 @@ const CLAUDE_MODELS_WITH_CONTEXT_WINDOW: ReadonlyArray<ServerProviderModel> = [
   },
 ];
 
+const OPENCODE_MODELS: ReadonlyArray<ServerProviderModel> = [
+  {
+    slug: "openai/gpt-5",
+    name: "OpenAI GPT-5",
+    isCustom: false,
+    capabilities: {
+      reasoningEffortLevels: [
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium", isDefault: true },
+        { value: "high", label: "High" },
+      ],
+      supportsFastMode: false,
+      supportsThinkingToggle: false,
+      contextWindowOptions: [],
+      promptInjectedEffortLevels: [],
+    },
+  },
+  {
+    slug: "anthropic/claude-sonnet-4-5",
+    name: "Anthropic Claude Sonnet 4.5",
+    isCustom: false,
+    capabilities: {
+      reasoningEffortLevels: [],
+      supportsFastMode: false,
+      supportsThinkingToggle: false,
+      contextWindowOptions: [],
+      promptInjectedEffortLevels: [],
+    },
+  },
+];
+
 describe("getComposerProviderState", () => {
   it("returns codex defaults when no codex draft options exist", () => {
     const state = getComposerProviderState({
@@ -415,5 +446,65 @@ describe("getComposerProviderState", () => {
     });
 
     expect(state.modelOptionsForDispatch).not.toHaveProperty("fastMode");
+  });
+
+  it("returns OpenCode defaults for effort-capable models", () => {
+    const state = getComposerProviderState({
+      provider: "opencode",
+      model: "openai/gpt-5",
+      models: OPENCODE_MODELS,
+      prompt: "",
+      modelOptions: undefined,
+    });
+
+    expect(state).toEqual({
+      provider: "opencode",
+      promptEffort: "medium",
+      modelOptionsForDispatch: {
+        effort: "medium",
+      },
+    });
+  });
+
+  it("normalizes OpenCode dispatch options while preserving the selected effort", () => {
+    const state = getComposerProviderState({
+      provider: "opencode",
+      model: "openai/gpt-5",
+      models: OPENCODE_MODELS,
+      prompt: "",
+      modelOptions: {
+        opencode: {
+          effort: "high",
+        },
+      },
+    });
+
+    expect(state).toEqual({
+      provider: "opencode",
+      promptEffort: "high",
+      modelOptionsForDispatch: {
+        effort: "high",
+      },
+    });
+  });
+
+  it("drops OpenCode effort options for models without effort controls", () => {
+    const state = getComposerProviderState({
+      provider: "opencode",
+      model: "anthropic/claude-sonnet-4-5",
+      models: OPENCODE_MODELS,
+      prompt: "",
+      modelOptions: {
+        opencode: {
+          effort: "high",
+        },
+      },
+    });
+
+    expect(state).toEqual({
+      provider: "opencode",
+      promptEffort: null,
+      modelOptionsForDispatch: undefined,
+    });
   });
 });

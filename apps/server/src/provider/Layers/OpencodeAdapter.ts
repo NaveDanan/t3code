@@ -43,9 +43,9 @@ import { OpencodeAdapter, type OpencodeAdapterShape } from "../Services/Opencode
 import {
   OpencodeServerManager,
   type OpencodeServerEvent,
-  type OpencodeServerProbe,
 } from "../Services/OpencodeServerManager.ts";
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
+import { resolveOpencodeModel } from "../opencode.ts";
 
 const PROVIDER = "opencode" as const;
 
@@ -87,7 +87,48 @@ function toMessage(cause: unknown, fallback: string): string {
   if (cause instanceof Error && cause.message.length > 0) {
     return cause.message;
   }
+  if (typeof cause === "string" && cause.trim().length > 0) {
+    return cause.trim();
+  }
+  if (cause && typeof cause === "object") {
+    try {
+      const serialized = JSON.stringify(cause);
+      if (serialized.length > 0 && serialized !== "{}") {
+        return serialized;
+      }
+    } catch {
+      // Fall through to the fallback string.
+    }
+  }
   return fallback;
+}
+
+function createOpencodeMessageId(): string {
+  return `msg-${crypto.randomUUID()}`;
+}
+
+function turnIdFromOpencodeMessageId(messageId: string): TurnId {
+  return TurnId.makeUnsafe(`opencode-turn:${messageId}`);
+}
+
+function resolveTurnIdForAssistantMessage(
+  context: OpencodeSessionContext,
+  assistantMessage: AssistantMessage,
+): TurnId {
+  if (context.activeTurn && !context.activeTurn.completed) {
+    const parentMessageId = trimString(assistantMessage.parentID);
+    if (
+      !parentMessageId ||
+      context.activeTurn.userMessageId === undefined ||
+      context.activeTurn.userMessageId === parentMessageId ||
+      context.activeTurn.assistantMessageId === assistantMessage.id
+    ) {
+      return context.activeTurn.turnId;
+    }
+  }
+
+  const parentMessageId = trimString(assistantMessage.parentID) ?? assistantMessage.id;
+  return turnIdFromOpencodeMessageId(parentMessageId);
 }
 
 function toIsoDateFromMillis(
@@ -356,51 +397,32 @@ function answersToQuestionReply(
   return questions.map((question) => {
     const value = answers[question.id];
     if (typeof value === "string") {
-      return [value];
+      const normalized = value.trim();
+      return normalized.length > 0 ? [normalized] : [];
     }
     if (Array.isArray(value)) {
-      return value.filter((entry): entry is string => typeof entry === "string");
+      return value.flatMap((entry) => {
+        if (typeof entry !== "string") {
+          return [];
+        }
+        const normalized = entry.trim();
+        return normalized.length > 0 ? [normalized] : [];
+      });
     }
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const nestedAnswers = (value as { answers?: unknown }).answers;
       if (Array.isArray(nestedAnswers)) {
-        return nestedAnswers.filter((entry): entry is string => typeof entry === "string");
+        return nestedAnswers.flatMap((entry) => {
+          if (typeof entry !== "string") {
+            return [];
+          }
+          const normalized = entry.trim();
+          return normalized.length > 0 ? [normalized] : [];
+        });
       }
     }
     return [];
   });
-}
-
-function resolveOpenCodeModel(
-  model: string,
-  probe: OpencodeServerProbe,
-): { providerID: string; modelID: string } | undefined {
-  const trimmed = model.trim();
-  const separatorIndex = trimmed.indexOf("/");
-  if (separatorIndex > 0 && separatorIndex < trimmed.length - 1) {
-    const providerID = trimmed.slice(0, separatorIndex);
-    const modelID = trimmed.slice(separatorIndex + 1);
-    const configuredProvider = probe.configuredProviders.find(
-      (provider) => provider.id === providerID,
-    );
-    if (configuredProvider && modelID in configuredProvider.models) {
-      return { providerID, modelID };
-    }
-  }
-
-  const matches = probe.configuredProviders.flatMap((provider) =>
-    Object.keys(provider.models)
-      .filter((modelID) => modelID === trimmed)
-      .map((modelID) => ({ providerID: provider.id, modelID })),
-  );
-  if (matches.length === 1) {
-    return matches[0];
-  }
-
-  const defaultMatches = Object.entries(probe.defaultModelByProviderId)
-    .filter(([, modelID]) => modelID === trimmed)
-    .map(([providerID, modelID]) => ({ providerID, modelID }));
-  return defaultMatches.length === 1 ? defaultMatches[0] : undefined;
 }
 
 function renderUnifiedDiff(diffs: ReadonlyArray<FileDiff>): string {
@@ -433,7 +455,7 @@ function messagesToThreadSnapshot(
   for (const entry of ordered) {
     if (entry.info.role === "user") {
       const turn = {
-        id: TurnId.makeUnsafe(entry.info.id),
+        id: turnIdFromOpencodeMessageId(entry.info.id),
         items: [entry],
       };
       turns.push(turn);
@@ -449,7 +471,7 @@ function messagesToThreadSnapshot(
     }
 
     turns.push({
-      id: TurnId.makeUnsafe(assistantMessage.parentID || assistantMessage.id),
+      id: turnIdFromOpencodeMessageId(assistantMessage.parentID || assistantMessage.id),
       items: [entry],
     });
   }
@@ -619,7 +641,6 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
 
     context.activeTurn = {
       turnId,
-      userMessageId: String(turnId),
       completed: false,
     };
     updateSession(context, {
@@ -1161,19 +1182,47 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
 
       case "message.updated": {
         if (serverEvent.payload.properties.info.role === "user") {
-          const turn = yield* ensureActiveTurn(
-            context,
-            context.activeTurn?.turnId ?? TurnId.makeUnsafe(serverEvent.payload.properties.info.id),
-            serverEvent.payload,
-          );
-          turn.userMessageId = serverEvent.payload.properties.info.id;
+          const userMessageId = serverEvent.payload.properties.info.id;
+          // OpenCode broadcasts message.updated for ALL messages in the session
+          // history when processing a new prompt. Only update the active turn's
+          // user message ID if it matches what sendTurn registered. Mismatched IDs
+          // are from previous turns and must be ignored to prevent overwriting the
+          // current turn state and triggering premature completeTurn calls.
+          if (!context.activeTurn || context.activeTurn.completed) {
+            return;
+          }
+          if (
+            context.activeTurn.userMessageId !== undefined &&
+            context.activeTurn.userMessageId !== userMessageId
+          ) {
+            return;
+          }
+          context.activeTurn.userMessageId = userMessageId;
           return;
         }
 
+        // Assistant message: only process events that belong to the current active
+        // turn. OpenCode replays completed assistant messages from prior turns as
+        // history; accepting them would overwrite turn.userMessageId and trigger
+        // completeTurn on the live turn, corrupting the turn lifecycle.
+        if (!context.activeTurn || context.activeTurn.completed) {
+          return;
+        }
         const assistantMessage = serverEvent.payload.properties.info as AssistantMessage;
-        const turnId = TurnId.makeUnsafe(assistantMessage.parentID);
-        const turn = yield* ensureActiveTurn(context, turnId, serverEvent.payload);
-        turn.assistantMessageId = assistantMessage.id;
+        const parentMessageId = trimString(assistantMessage.parentID);
+        const belongsToCurrentTurn =
+          !parentMessageId ||
+          context.activeTurn.userMessageId === undefined ||
+          context.activeTurn.userMessageId === parentMessageId ||
+          context.activeTurn.assistantMessageId === assistantMessage.id;
+        if (!belongsToCurrentTurn) {
+          return;
+        }
+        if (parentMessageId && context.activeTurn.userMessageId === undefined) {
+          context.activeTurn.userMessageId = parentMessageId;
+        }
+        context.activeTurn.assistantMessageId = assistantMessage.id;
+        const activeTurnId = context.activeTurn.turnId;
 
         yield* ensureAssistantItemStarted(context, assistantMessage.id, serverEvent.payload);
 
@@ -1189,10 +1238,10 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
               provider: PROVIDER,
               threadId,
               createdAt: itemStamp.createdAt,
-              turnId,
+              turnId: activeTurnId,
               itemId: asRuntimeItemId(assistantMessage.id),
               providerRefs: {
-                providerTurnId: String(turnId),
+                providerTurnId: String(activeTurnId),
                 providerItemId: asProviderItemId(assistantMessage.id),
               },
               raw: rawEvent(serverEvent.payload),
@@ -1768,6 +1817,10 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       input.modelSelection?.provider === PROVIDER
         ? input.modelSelection.model
         : context.session.model;
+    const selectedVariant =
+      input.modelSelection?.provider === PROVIDER
+        ? input.modelSelection.options?.effort
+        : undefined;
     const model =
       resolvedModelSlug !== undefined
         ? yield* opencodeServerManager
@@ -1777,7 +1830,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
             .pipe(
               Effect.mapError((error) => toProcessError(input.threadId, error.message, error)),
               Effect.flatMap((probe) => {
-                const resolvedModel = resolveOpenCodeModel(resolvedModelSlug, probe);
+                const resolvedModel = resolveOpencodeModel(resolvedModelSlug, probe);
                 if (!resolvedModel) {
                   return Effect.fail(
                     toValidationError(
@@ -1792,8 +1845,10 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         : undefined;
 
     const turnId = TurnId.makeUnsafe(crypto.randomUUID());
+    const providerUserMessageId = createOpencodeMessageId();
     context.activeTurn = {
       turnId,
+      userMessageId: providerUserMessageId,
       completed: false,
     };
     updateSession(context, {
@@ -1824,8 +1879,10 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
           server.client.session.promptAsync({
             sessionID: context.providerSessionId,
             directory: context.cwd,
+            messageID: providerUserMessageId,
             ...(model ? { model } : {}),
             ...(input.interactionMode === "plan" ? { agent: "plan" } : {}),
+            ...(selectedVariant ? { variant: selectedVariant } : {}),
             parts: promptParts,
           }),
           "session.promptAsync",
