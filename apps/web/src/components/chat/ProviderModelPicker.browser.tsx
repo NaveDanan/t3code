@@ -24,6 +24,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
     status: "ready",
     auth: { status: "authenticated" },
     checkedAt: new Date().toISOString(),
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
     models: [
       {
         slug: "gpt-5-codex",
@@ -59,6 +60,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
     status: "ready",
     auth: { status: "authenticated" },
     checkedAt: new Date().toISOString(),
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
     models: [
       {
         slug: "claude-opus-4-6",
@@ -116,6 +118,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
     status: "disabled",
     auth: { status: "unknown" },
     checkedAt: new Date().toISOString(),
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
     models: [
       {
         slug: "openai/gpt-5",
@@ -142,6 +145,7 @@ function buildCodexProvider(models: ServerProvider["models"]): ServerProvider {
     status: "ready",
     auth: { status: "authenticated" },
     checkedAt: new Date().toISOString(),
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
     models,
   };
 }

@@ -132,6 +132,7 @@ function createBaseServerConfig(): ServerConfig {
         status: "ready",
         auth: { status: "authenticated" },
         checkedAt: NOW_ISO,
+        runtimeCapabilities: { busyFollowupMode: "queue-only" },
         models: [],
       },
     ],
@@ -173,12 +174,17 @@ function createUserMessage(options: {
   };
 }
 
-function createAssistantMessage(options: { id: MessageId; text: string; offsetSeconds: number }) {
+function createAssistantMessage(options: {
+  id: MessageId;
+  text: string;
+  offsetSeconds: number;
+  turnId?: TurnId | null;
+}) {
   return {
     id: options.id,
     role: "assistant" as const,
     text: options.text,
-    turnId: null,
+    turnId: options.turnId ?? null,
     streaming: false,
     createdAt: isoAt(options.offsetSeconds),
     updatedAt: isoAt(options.offsetSeconds + 1),
@@ -282,6 +288,7 @@ function createSnapshotForTargetUser(options: {
         messages,
         activities: [],
         proposedPlans: [],
+        queuedFollowups: [],
         checkpoints: [],
         session: {
           threadId: THREAD_ID,
@@ -340,6 +347,7 @@ function addThreadToSnapshot(
         messages: [],
         activities: [],
         proposedPlans: [],
+        queuedFollowups: [],
         checkpoints: [],
         session: {
           threadId,
@@ -585,6 +593,7 @@ function createSnapshotWithPlanFollowUpPrompt(): OrchestrationReadModel {
     targetMessageId: "msg-user-plan-follow-up-target" as MessageId,
     targetText: "plan follow-up thread",
   });
+  const turnId = "turn-plan-follow-up" as TurnId;
 
   return {
     ...snapshot,
@@ -593,17 +602,26 @@ function createSnapshotWithPlanFollowUpPrompt(): OrchestrationReadModel {
         ? Object.assign({}, thread, {
             interactionMode: "plan",
             latestTurn: {
-              turnId: "turn-plan-follow-up" as TurnId,
+              turnId,
               state: "completed",
               requestedAt: isoAt(1_000),
               startedAt: isoAt(1_001),
               completedAt: isoAt(1_010),
               assistantMessageId: null,
             },
+            messages: [
+              ...thread.messages,
+              createAssistantMessage({
+                id: "msg-assistant-plan-follow-up" as MessageId,
+                text: "Here is the finalized plan follow-up response.",
+                offsetSeconds: 1_005,
+                turnId,
+              }),
+            ],
             proposedPlans: [
               {
                 id: "plan-follow-up-browser-test",
-                turnId: "turn-plan-follow-up" as TurnId,
+                turnId,
                 planMarkdown: "# Follow-up plan\n\n- Keep the composer footer stable on resize.",
                 implementedAt: null,
                 implementationThreadId: null,
@@ -614,6 +632,52 @@ function createSnapshotWithPlanFollowUpPrompt(): OrchestrationReadModel {
             session: {
               ...thread.session,
               status: "ready",
+              updatedAt: isoAt(1_010),
+            },
+            updatedAt: isoAt(1_010),
+          })
+        : thread,
+    ),
+  };
+}
+
+function createSnapshotWithOpenCodeCompletionSummary(): OrchestrationReadModel {
+  const snapshot = createSnapshotForTargetUser({
+    targetMessageId: "msg-user-opencode-summary-target" as MessageId,
+    targetText: "opencode summary thread",
+  });
+  const turnId = "turn-opencode-summary" as TurnId;
+
+  return {
+    ...snapshot,
+    threads: snapshot.threads.map((thread) =>
+      thread.id === THREAD_ID
+        ? Object.assign({}, thread, {
+            modelSelection: {
+              provider: "opencode",
+              model: "openai/gpt-5",
+            },
+            latestTurn: {
+              turnId,
+              state: "completed",
+              requestedAt: isoAt(1_000),
+              startedAt: isoAt(1_001),
+              completedAt: isoAt(1_010),
+              assistantMessageId: null,
+            },
+            messages: [
+              ...thread.messages,
+              createAssistantMessage({
+                id: "msg-assistant-opencode-summary" as MessageId,
+                text: "OpenCode finished the response.",
+                offsetSeconds: 1_005,
+                turnId,
+              }),
+            ],
+            session: {
+              ...thread.session,
+              status: "ready",
+              providerName: "opencode",
               updatedAt: isoAt(1_010),
             },
             updatedAt: isoAt(1_010),
@@ -2329,6 +2393,135 @@ describe("ChatView timeline estimator parity (full app)", () => {
     }
   });
 
+  it("shows a queued follow-up bubble after sending on a running thread", async () => {
+    const snapshot = createSnapshotForTargetUser({
+      targetMessageId: "msg-user-queued-default" as MessageId,
+      targetText: "queued default target",
+      sessionStatus: "running",
+    });
+    const runningThread = snapshot.threads.find((thread) => thread.id === THREAD_ID);
+    if (!runningThread?.session) {
+      throw new Error("Expected running thread session in test snapshot.");
+    }
+    Object.assign(runningThread.session, {
+      status: "running" as const,
+      activeTurnId: "turn-running" as TurnId,
+    });
+
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot,
+    });
+
+    try {
+      useComposerDraftStore.getState().setPrompt(THREAD_ID, "queue this after the run");
+      await waitForLayout();
+
+      await vi.waitFor(
+        () => {
+          expect(document.body.textContent).not.toContain("message queued");
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      const sendButton = await waitForSendButton();
+      sendButton.click();
+
+      await vi.waitFor(
+        () => {
+          const enqueueRequest = wsRequests.find(
+            (request) =>
+              request._tag === ORCHESTRATION_WS_METHODS.dispatchCommand &&
+              request.type === "thread.queued-followup.enqueue",
+          ) as
+            | {
+                _tag: string;
+                type?: string;
+                followup?: { text?: string };
+              }
+            | undefined;
+          expect(enqueueRequest).toMatchObject({
+            _tag: ORCHESTRATION_WS_METHODS.dispatchCommand,
+            type: "thread.queued-followup.enqueue",
+            followup: {
+              text: "queue this after the run",
+            },
+          });
+          expect(document.body.textContent).toContain("1 message queued");
+          expect(document.body.textContent).toContain("queue this after the run");
+          expect(document.body.textContent).toContain("Steer");
+          expect(document.body.textContent).toContain("Clear");
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("dispatches a queued follow-up immediately when clicking Steer", async () => {
+    const snapshot = createSnapshotForTargetUser({
+      targetMessageId: "msg-user-queued-steer" as MessageId,
+      targetText: "queued steer target",
+      sessionStatus: "running",
+    });
+    const runningThread = snapshot.threads.find((thread) => thread.id === THREAD_ID);
+    if (!runningThread?.session) {
+      throw new Error("Expected running thread session in test snapshot.");
+    }
+    Object.assign(runningThread.session, {
+      status: "running" as const,
+      activeTurnId: "turn-running" as TurnId,
+    });
+    Object.assign(runningThread, {
+      queuedFollowups: [
+        {
+          id: "queued-followup-steer-test",
+          messageId: "msg-queued-followup-steer" as MessageId,
+          text: "Queued follow-up awaiting steer",
+          attachments: [],
+          interactionMode: "default",
+          createdAt: NOW_ISO,
+        },
+      ],
+    });
+
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot,
+    });
+
+    try {
+      const steerButton = page.getByRole("button", { name: "Steer" });
+      await expect.element(steerButton).toBeInTheDocument();
+      await steerButton.click();
+
+      await vi.waitFor(
+        () => {
+          const dispatchNowRequest = wsRequests.find(
+            (request) =>
+              request._tag === ORCHESTRATION_WS_METHODS.dispatchCommand &&
+              request.type === "thread.queued-followup.dispatch-now",
+          ) as
+            | {
+                _tag: string;
+                type?: string;
+                queuedFollowupId?: string;
+              }
+            | undefined;
+          expect(dispatchNowRequest).toMatchObject({
+            _tag: ORCHESTRATION_WS_METHODS.dispatchCommand,
+            type: "thread.queued-followup.dispatch-now",
+            queuedFollowupId: "queued-followup-steer-test",
+          });
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
   it("hides the archive action when the pointer leaves a thread row", async () => {
     const mounted = await mountChatView({
       viewport: DEFAULT_VIEWPORT,
@@ -2891,6 +3084,57 @@ describe("ChatView timeline estimator parity (full app)", () => {
           expect(Math.abs(compactModelPickerOffset - initialModelPickerOffset)).toBeLessThanOrEqual(
             1,
           );
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("shows the elapsed summary for settled opencode responses", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotWithOpenCodeCompletionSummary(),
+      configureFixture: (nextFixture) => {
+        nextFixture.serverConfig = {
+          ...nextFixture.serverConfig,
+          providers: [
+            ...nextFixture.serverConfig.providers,
+            {
+              provider: "opencode",
+              enabled: true,
+              installed: true,
+              version: "0.1.0",
+              status: "ready",
+              auth: { status: "unknown" },
+              checkedAt: NOW_ISO,
+              runtimeCapabilities: { busyFollowupMode: "queue-only" },
+              models: [
+                {
+                  slug: "openai/gpt-5",
+                  name: "OpenAI GPT-5",
+                  isCustom: false,
+                  capabilities: {
+                    reasoningEffortLevels: [],
+                    supportsFastMode: false,
+                    supportsThinkingToggle: false,
+                    contextWindowOptions: [],
+                    promptInjectedEffortLevels: [],
+                  },
+                },
+              ],
+            },
+          ],
+        };
+      },
+    });
+
+    try {
+      await vi.waitFor(
+        () => {
+          expect(document.body.textContent).toContain("OpenCode finished the response.");
+          expect(document.body.textContent).toContain("Worked for 9.0s");
         },
         { timeout: 8_000, interval: 16 },
       );

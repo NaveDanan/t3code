@@ -2,6 +2,7 @@ import {
   type OrchestrationEvent,
   type OrchestrationMessage,
   type OrchestrationProposedPlan,
+  type OrchestrationQueuedFollowup,
   type ProjectId,
   type ProviderKind,
   ThreadId,
@@ -139,6 +140,30 @@ function mapProposedPlan(proposedPlan: OrchestrationProposedPlan): Thread["propo
   };
 }
 
+function mapQueuedFollowup(
+  followup: OrchestrationQueuedFollowup,
+): Thread["queuedFollowups"][number] {
+  return {
+    id: followup.id,
+    messageId: followup.messageId,
+    text: followup.text,
+    attachments: followup.attachments.map((attachment) => ({
+      type: "image" as const,
+      id: attachment.id,
+      name: attachment.name,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      previewUrl: toAttachmentPreviewUrl(attachmentPreviewRoutePath(attachment.id)),
+    })),
+    ...(followup.modelSelection !== undefined
+      ? { modelSelection: normalizeModelSelection(followup.modelSelection) }
+      : {}),
+    interactionMode: followup.interactionMode,
+    createdAt: followup.createdAt,
+    updatedAt: followup.updatedAt,
+  };
+}
+
 function mapTurnDiffSummary(
   checkpoint: OrchestrationCheckpointSummary,
 ): Thread["turnDiffSummaries"][number] {
@@ -165,6 +190,7 @@ function mapThread(thread: OrchestrationThread): Thread {
     session: thread.session ? mapSession(thread.session) : null,
     messages: thread.messages.map(mapMessage),
     proposedPlans: thread.proposedPlans.map(mapProposedPlan),
+    queuedFollowups: thread.queuedFollowups.map(mapQueuedFollowup),
     error: thread.session?.lastError ?? null,
     createdAt: thread.createdAt,
     archivedAt: thread.archivedAt,
@@ -223,6 +249,7 @@ function buildSidebarThreadSummary(thread: Thread): SidebarThreadSummary {
     branch: thread.branch,
     worktreePath: thread.worktreePath,
     latestUserMessageAt: getLatestUserMessageAt(thread.messages),
+    queuedFollowupCount: thread.queuedFollowups.length,
     hasPendingApprovals: derivePendingApprovals(thread.activities).length > 0,
     hasPendingUserInput: derivePendingUserInputs(thread.activities).length > 0,
     hasActionableProposedPlan: hasActionableProposedPlan(
@@ -249,6 +276,7 @@ function sidebarThreadSummariesEqual(
     left.branch === right.branch &&
     left.worktreePath === right.worktreePath &&
     left.latestUserMessageAt === right.latestUserMessageAt &&
+    left.queuedFollowupCount === right.queuedFollowupCount &&
     left.hasPendingApprovals === right.hasPendingApprovals &&
     left.hasPendingUserInput === right.hasPendingUserInput &&
     left.hasActionableProposedPlan === right.hasActionableProposedPlan
@@ -664,6 +692,7 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
         deletedAt: null,
         messages: [],
         proposedPlans: [],
+        queuedFollowups: [],
         activities: [],
         checkpoints: [],
         session: null,
@@ -895,6 +924,47 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
       });
     }
 
+    case "thread.queued-followup-enqueued": {
+      return updateThreadState(state, event.payload.threadId, (thread) => {
+        const queuedFollowup = mapQueuedFollowup(event.payload.followup);
+        const queuedFollowups = [
+          ...thread.queuedFollowups.filter((entry) => entry.id !== queuedFollowup.id),
+          queuedFollowup,
+        ].toSorted(
+          (left, right) =>
+            left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
+        );
+        return {
+          ...thread,
+          queuedFollowups,
+          updatedAt: event.occurredAt,
+        };
+      });
+    }
+
+    case "thread.queued-followup-removed": {
+      return updateThreadState(state, event.payload.threadId, (thread) => ({
+        ...thread,
+        queuedFollowups: thread.queuedFollowups.filter(
+          (entry) => entry.id !== event.payload.queuedFollowupId,
+        ),
+        updatedAt: event.occurredAt,
+      }));
+    }
+
+    case "thread.turn-dispatched": {
+      if (event.payload.queuedFollowupId === undefined) {
+        return state;
+      }
+      return updateThreadState(state, event.payload.threadId, (thread) => ({
+        ...thread,
+        queuedFollowups: thread.queuedFollowups.filter(
+          (entry) => entry.id !== event.payload.queuedFollowupId,
+        ),
+        updatedAt: event.occurredAt,
+      }));
+    }
+
     case "thread.session-set": {
       return updateThreadState(state, event.payload.threadId, (thread) => ({
         ...thread,
@@ -1045,6 +1115,7 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
           turnDiffSummaries,
           messages,
           proposedPlans,
+          queuedFollowups: [],
           activities,
           pendingSourceProposedPlan: undefined,
           latestTurn:

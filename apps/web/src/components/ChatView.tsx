@@ -56,6 +56,7 @@ import {
   hasToolActivityForTurn,
   isLatestTurnSettled,
   formatElapsed,
+  shouldShowCompletionSummary,
 } from "../session-logic";
 import { isScrollContainerNearBottom } from "../chat-scroll";
 import {
@@ -208,7 +209,6 @@ const EMPTY_ACTIVITIES: OrchestrationThreadActivity[] = [];
 const EMPTY_PROJECT_ENTRIES: ProjectEntry[] = [];
 const EMPTY_PROVIDERS: ServerProvider[] = [];
 const EMPTY_PENDING_USER_INPUT_ANSWERS: Record<string, PendingUserInputDraftAnswer> = {};
-
 type ThreadPlanCatalogEntry = Pick<Thread, "id" | "proposedPlans">;
 
 const MAX_THREAD_PLAN_CATALOG_CACHE_ENTRIES = 500;
@@ -284,6 +284,22 @@ function useThreadPlanCatalog(threadIds: readonly ThreadId[]): ThreadPlanCatalog
   return useStore(selector);
 }
 
+function getQueuedFollowupPreview(queuedFollowup: Thread["queuedFollowups"][number]): string {
+  const visibleText =
+    queuedFollowup.attachments.length > 0 && queuedFollowup.text === IMAGE_ONLY_BOOTSTRAP_PROMPT
+      ? ""
+      : queuedFollowup.text.trim();
+  if (visibleText.length > 0) {
+    return visibleText;
+  }
+  if (queuedFollowup.attachments.length > 0) {
+    return `${queuedFollowup.attachments.length} image${
+      queuedFollowup.attachments.length === 1 ? "" : "s"
+    }`;
+  }
+  return "Queued follow-up";
+}
+
 function formatOutgoingPrompt(params: {
   provider: ProviderKind;
   model: string | null;
@@ -297,6 +313,7 @@ function formatOutgoingPrompt(params: {
   }
   return params.text;
 }
+
 const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
 const SCRIPT_TERMINAL_COLS = 120;
 const SCRIPT_TERMINAL_ROWS = 30;
@@ -1043,6 +1060,8 @@ export default function ChatView({ threadId }: ChatViewProps) {
     () => hasToolActivityForTurn(threadActivities, activeLatestTurn?.turnId),
     [activeLatestTurn?.turnId, threadActivities],
   );
+  const latestTurnProvider =
+    activeThread?.session?.provider ?? activeThread?.modelSelection.provider;
   const pendingApprovals = useMemo(
     () => derivePendingApprovals(threadActivities),
     [threadActivities],
@@ -1369,18 +1388,33 @@ export default function ChatView({ threadId }: ChatViewProps) {
   }, [inferredCheckpointTurnCountByTurnId, timelineEntries, turnDiffSummaryByAssistantMessageId]);
 
   const completionSummary = useMemo(() => {
-    if (!latestTurnSettled) return null;
-    if (!activeLatestTurn?.startedAt) return null;
-    if (!activeLatestTurn.completedAt) return null;
-    if (!latestTurnHasToolActivity) return null;
+    const completionDividerEntryId = deriveCompletionDividerBeforeEntryId(
+      timelineEntries,
+      activeLatestTurn,
+    );
+    if (!activeLatestTurn?.startedAt || !activeLatestTurn.completedAt) {
+      return null;
+    }
+    if (
+      !shouldShowCompletionSummary({
+        latestTurnSettled,
+        latestTurn: activeLatestTurn,
+        hasToolActivity: latestTurnHasToolActivity,
+        hasAssistantResponse: completionDividerEntryId !== null,
+        provider: latestTurnProvider,
+      })
+    ) {
+      return null;
+    }
 
     const elapsed = formatElapsed(activeLatestTurn.startedAt, activeLatestTurn.completedAt);
     return elapsed ? `Worked for ${elapsed}` : null;
   }, [
-    activeLatestTurn?.completedAt,
-    activeLatestTurn?.startedAt,
+    activeLatestTurn,
     latestTurnHasToolActivity,
+    latestTurnProvider,
     latestTurnSettled,
+    timelineEntries,
   ]);
   const completionDividerBeforeEntryId = useMemo(() => {
     if (!latestTurnSettled) return null;
@@ -1536,6 +1570,14 @@ export default function ChatView({ threadId }: ChatViewProps) {
     () => providerStatuses.find((status) => status.provider === selectedProvider) ?? null,
     [selectedProvider, providerStatuses],
   );
+  const isBusyThread =
+    activeThread?.session?.status === "running" && activeThread.session.activeTurnId != null;
+  const queuedFollowupCount = activeThread?.queuedFollowups.length ?? 0;
+  const firstQueuedFollowup =
+    queuedFollowupCount > 0 ? (activeThread?.queuedFollowups[0] ?? null) : null;
+  const queuedFollowupPreview = firstQueuedFollowup
+    ? getQueuedFollowupPreview(firstQueuedFollowup)
+    : null;
   const activeProjectCwd = activeProject?.cwd ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const activeTerminalLaunchContext =
@@ -2938,9 +2980,6 @@ export default function ChatView({ threadId }: ChatViewProps) {
       return;
     }
 
-    sendInFlightRef.current = true;
-    beginLocalDispatch({ preparingWorktree: Boolean(baseBranchForWorktree) });
-
     const composerImagesSnapshot = [...composerImages];
     const composerTerminalContextsSnapshot = [...sendableComposerTerminalContexts];
     const messageTextForSend = appendTerminalContextsToPrompt(
@@ -2973,6 +3012,56 @@ export default function ChatView({ threadId }: ChatViewProps) {
       sizeBytes: image.sizeBytes,
       previewUrl: image.previewUrl,
     }));
+
+    if (isBusyThread && isServerThread) {
+      const turnAttachments = await turnAttachmentsPromise;
+      await api.orchestration
+        .dispatchCommand({
+          type: "thread.queued-followup.enqueue",
+          commandId: newCommandId(),
+          threadId: threadIdForSend,
+          followup: {
+            id: randomUUID(),
+            messageId: messageIdForSend,
+            text: outgoingMessageText,
+            attachments: turnAttachments,
+            modelSelection: selectedModelSelection,
+            interactionMode,
+            createdAt: messageCreatedAt,
+          },
+          createdAt: messageCreatedAt,
+        })
+        .then(() => {
+          setThreadError(threadIdForSend, null);
+          if (expiredTerminalContextCount > 0) {
+            const toastCopy = buildExpiredTerminalContextToastCopy(
+              expiredTerminalContextCount,
+              "omitted",
+            );
+            toastManager.add({
+              type: "warning",
+              title: toastCopy.title,
+              description: toastCopy.description,
+            });
+          }
+          promptRef.current = "";
+          clearComposerDraftContent(threadIdForSend);
+          setComposerHighlightedItemId(null);
+          setComposerCursor(0);
+          setComposerTrigger(null);
+        })
+        .catch((err: unknown) => {
+          setThreadError(
+            threadIdForSend,
+            err instanceof Error ? err.message : "Failed to queue follow-up.",
+          );
+        });
+      return;
+    }
+
+    sendInFlightRef.current = true;
+    beginLocalDispatch({ preparingWorktree: Boolean(baseBranchForWorktree) });
+
     setOptimisticUserMessages((existing) => [
       ...existing,
       {
@@ -3135,6 +3224,56 @@ export default function ChatView({ threadId }: ChatViewProps) {
       resetLocalDispatch();
     }
   };
+
+  const onRemoveQueuedFollowup = useCallback(
+    async (queuedFollowupId: string) => {
+      const api = readNativeApi();
+      if (!api || !activeThreadId) {
+        return;
+      }
+
+      await api.orchestration
+        .dispatchCommand({
+          type: "thread.queued-followup.remove",
+          commandId: newCommandId(),
+          threadId: activeThreadId,
+          queuedFollowupId,
+          createdAt: new Date().toISOString(),
+        })
+        .catch((err: unknown) => {
+          setStoreThreadError(
+            activeThreadId,
+            err instanceof Error ? err.message : "Failed to remove queued follow-up.",
+          );
+        });
+    },
+    [activeThreadId, setStoreThreadError],
+  );
+
+  const onSteerQueuedFollowup = useCallback(
+    async (queuedFollowupId: string) => {
+      const api = readNativeApi();
+      if (!api || !activeThreadId) {
+        return;
+      }
+
+      await api.orchestration
+        .dispatchCommand({
+          type: "thread.queued-followup.dispatch-now",
+          commandId: newCommandId(),
+          threadId: activeThreadId,
+          queuedFollowupId,
+          createdAt: new Date().toISOString(),
+        })
+        .catch((err: unknown) => {
+          setStoreThreadError(
+            activeThreadId,
+            err instanceof Error ? err.message : "Failed to steer queued follow-up.",
+          );
+        });
+    },
+    [activeThreadId, setStoreThreadError],
+  );
 
   const onInterrupt = async () => {
     const api = readNativeApi();
@@ -4038,6 +4177,39 @@ export default function ChatView({ threadId }: ChatViewProps) {
               className="mx-auto w-full min-w-0 max-w-[52rem]"
               data-chat-composer-form="true"
             >
+              {!isComposerApprovalState &&
+                pendingUserInputs.length === 0 &&
+                queuedFollowupCount > 0 &&
+                firstQueuedFollowup && (
+                  <div className="mb-2 rounded-full border border-border/70 bg-background/96 px-3 py-1.5 shadow-xs">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-none">
+                      <span className="font-medium text-foreground/80">
+                        {queuedFollowupCount} message{queuedFollowupCount === 1 ? "" : "s"} queued
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                        {queuedFollowupPreview}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 rounded-full px-2 text-[11px] text-muted-foreground"
+                        onClick={() => void onSteerQueuedFollowup(firstQueuedFollowup.id)}
+                      >
+                        Steer
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 rounded-full px-2 text-[11px] text-muted-foreground"
+                        onClick={() => void onRemoveQueuedFollowup(firstQueuedFollowup.id)}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                )}
               <div
                 className={cn(
                   "group rounded-[22px] p-px transition-colors duration-200",

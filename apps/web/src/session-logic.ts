@@ -657,11 +657,17 @@ function extractToolCommand(payload: Record<string, unknown> | null): string | n
   const item = asRecord(data?.item);
   const itemResult = asRecord(item?.result);
   const itemInput = asRecord(item?.input);
+  const dataInput = asRecord(data?.input);
+  const dataArgs = asRecord(data?.args);
   const candidates = [
     normalizeCommandValue(item?.command),
     normalizeCommandValue(itemInput?.command),
     normalizeCommandValue(itemResult?.command),
     normalizeCommandValue(data?.command),
+    normalizeCommandValue(dataInput?.command),
+    normalizeCommandValue(dataInput?.cmd),
+    normalizeCommandValue(dataArgs?.command),
+    normalizeCommandValue(dataArgs?.cmd),
   ];
   return candidates.find((candidate) => candidate !== null) ?? null;
 }
@@ -752,6 +758,7 @@ function collectChangedFiles(value: unknown, target: string[], seen: Set<string>
     "item",
     "result",
     "input",
+    "args",
     "data",
     "changes",
     "files",
@@ -824,6 +831,30 @@ export function hasToolActivityForTurn(
 ): boolean {
   if (!turnId) return false;
   return activities.some((activity) => activity.turnId === turnId && activity.tone === "tool");
+}
+
+export function shouldShowCompletionSummary(input: {
+  latestTurnSettled: boolean;
+  latestTurn: Pick<
+    OrchestrationLatestTurn,
+    "startedAt" | "completedAt" | "assistantMessageId"
+  > | null;
+  hasToolActivity: boolean;
+  hasAssistantResponse: boolean;
+  provider: ProviderKind | null | undefined;
+}): boolean {
+  if (!input.latestTurnSettled) {
+    return false;
+  }
+  if (!input.latestTurn?.startedAt || !input.latestTurn.completedAt) {
+    return false;
+  }
+  if (input.hasToolActivity) {
+    return true;
+  }
+  return (
+    (input.provider === "opencode" || input.provider === "forgecode") && input.hasAssistantResponse
+  );
 }
 
 export function deriveTimelineEntries(

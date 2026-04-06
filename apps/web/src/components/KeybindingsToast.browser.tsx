@@ -53,6 +53,7 @@ function createBaseServerConfig(): ServerConfig {
         status: "ready",
         auth: { status: "authenticated" },
         checkedAt: NOW_ISO,
+        runtimeCapabilities: { busyFollowupMode: "queue-only" },
         models: [],
       },
     ],
@@ -133,6 +134,7 @@ function createMinimalSnapshot(): OrchestrationReadModel {
         ],
         activities: [],
         proposedPlans: [],
+        queuedFollowups: [],
         checkpoints: [],
         session: {
           threadId: THREAD_ID,

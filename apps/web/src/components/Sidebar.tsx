@@ -295,8 +295,7 @@ function SidebarThreadRow(props: SidebarThreadRowProps) {
   const isActive = props.routeThreadId === thread.id;
   const isSelected = props.selectedThreadIds.has(thread.id);
   const isHighlighted = isActive || isSelected;
-  const isThreadRunning =
-    thread.session?.status === "running" && thread.session.activeTurnId != null;
+  const isThreadRunning = thread.session?.status === "running";
   const threadStatus = resolveThreadStatusPill({
     thread: {
       ...thread,
@@ -421,6 +420,16 @@ function SidebarThreadRow(props: SidebarThreadRowProps) {
           )}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {thread.queuedFollowupCount > 0 ? (
+            <span
+              className="inline-flex min-w-5 items-center justify-center rounded-full border border-border/70 bg-background px-1.5 text-[10px] font-medium text-muted-foreground"
+              title={`${thread.queuedFollowupCount} queued follow-up${
+                thread.queuedFollowupCount === 1 ? "" : "s"
+              }`}
+            >
+              {thread.queuedFollowupCount}
+            </span>
+          ) : null}
           {terminalStatus && (
             <span
               role="img"

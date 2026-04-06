@@ -38,6 +38,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
     status: "ready",
     auth: { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
     models: [
       {
         slug: "gpt-5.4",
@@ -64,6 +65,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
     status: "ready",
     auth: { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
     models: [
       {
         slug: "claude-opus-4-6",
@@ -122,6 +124,7 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
     status: "ready",
     auth: { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
     models: [
       {
         slug: "openai/gpt-5",

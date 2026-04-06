@@ -21,6 +21,7 @@ import {
   hasActionableProposedPlan,
   hasToolActivityForTurn,
   isLatestTurnSettled,
+  shouldShowCompletionSummary,
 } from "./session-logic";
 
 function makeActivity(overrides: {
@@ -709,6 +710,29 @@ describe("deriveWorkLogEntries", () => {
     expect(entry?.command).toBe("bun run lint");
   });
 
+  it("extracts Forge-style command input payloads", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "forge-command-tool",
+        kind: "tool.completed",
+        summary: "Command run",
+        payload: {
+          itemType: "command_execution",
+          title: "Command run",
+          detail: "bun run lint",
+          data: {
+            input: {
+              command: ["bun", "run", "lint"],
+            },
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.command).toBe("bun run lint");
+  });
+
   it("keeps compact Codex tool metadata used for icons and labels", () => {
     const activities: OrchestrationThreadActivity[] = [
       makeActivity({
@@ -767,6 +791,29 @@ describe("deriveWorkLogEntries", () => {
       "apps/web/src/components/ChatView.tsx",
       "apps/web/src/session-logic.ts",
     ]);
+  });
+
+  it("extracts Forge-style changed file paths from tool args", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "forge-file-tool",
+        kind: "tool.completed",
+        summary: "File change",
+        payload: {
+          itemType: "file_change",
+          title: "File change",
+          detail: "apps/web/src/components/ChatView.tsx",
+          data: {
+            input: {
+              filePath: "apps/web/src/components/ChatView.tsx",
+            },
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.changedFiles).toEqual(["apps/web/src/components/ChatView.tsx"]);
   });
 
   it("collapses repeated lifecycle updates for the same tool call into one entry", () => {
@@ -1061,6 +1108,107 @@ describe("hasToolActivityForTurn", () => {
 
     expect(hasToolActivityForTurn(activities, TurnId.makeUnsafe("turn-1"))).toBe(true);
     expect(hasToolActivityForTurn(activities, TurnId.makeUnsafe("turn-2"))).toBe(false);
+  });
+});
+
+describe("shouldShowCompletionSummary", () => {
+  const completedTurn = {
+    startedAt: "2026-02-27T21:10:00.000Z",
+    completedAt: "2026-02-27T21:10:06.000Z",
+    assistantMessageId: MessageId.makeUnsafe("assistant:turn-1"),
+  } as const;
+
+  it("shows the summary for settled turns with tool activity", () => {
+    expect(
+      shouldShowCompletionSummary({
+        latestTurnSettled: true,
+        latestTurn: completedTurn,
+        hasToolActivity: true,
+        hasAssistantResponse: false,
+        provider: "codex",
+      }),
+    ).toBe(true);
+  });
+
+  it("shows the summary for settled opencode turns once an assistant response completes", () => {
+    expect(
+      shouldShowCompletionSummary({
+        latestTurnSettled: true,
+        latestTurn: completedTurn,
+        hasToolActivity: false,
+        hasAssistantResponse: true,
+        provider: "opencode",
+      }),
+    ).toBe(true);
+  });
+
+  it("shows the summary for settled forgecode turns once an assistant response completes", () => {
+    expect(
+      shouldShowCompletionSummary({
+        latestTurnSettled: true,
+        latestTurn: completedTurn,
+        hasToolActivity: false,
+        hasAssistantResponse: true,
+        provider: "forgecode",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps the summary hidden for other providers without tool activity", () => {
+    expect(
+      shouldShowCompletionSummary({
+        latestTurnSettled: true,
+        latestTurn: completedTurn,
+        hasToolActivity: false,
+        hasAssistantResponse: true,
+        provider: "codex",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps the summary hidden for opencode before an assistant response exists", () => {
+    expect(
+      shouldShowCompletionSummary({
+        latestTurnSettled: true,
+        latestTurn: {
+          ...completedTurn,
+          assistantMessageId: null,
+        },
+        hasToolActivity: false,
+        hasAssistantResponse: false,
+        provider: "opencode",
+      }),
+    ).toBe(false);
+  });
+
+  it("shows the summary for opencode when the response exists but the assistant message id is missing", () => {
+    expect(
+      shouldShowCompletionSummary({
+        latestTurnSettled: true,
+        latestTurn: {
+          ...completedTurn,
+          assistantMessageId: null,
+        },
+        hasToolActivity: false,
+        hasAssistantResponse: true,
+        provider: "opencode",
+      }),
+    ).toBe(true);
+  });
+
+  it("shows the summary for forgecode when the response exists but the assistant message id is missing", () => {
+    expect(
+      shouldShowCompletionSummary({
+        latestTurnSettled: true,
+        latestTurn: {
+          ...completedTurn,
+          assistantMessageId: null,
+        },
+        hasToolActivity: false,
+        hasAssistantResponse: true,
+        provider: "forgecode",
+      }),
+    ).toBe(true);
   });
 });
 

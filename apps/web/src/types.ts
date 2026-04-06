@@ -61,6 +61,17 @@ export interface ProposedPlan {
   updatedAt: string;
 }
 
+export interface QueuedFollowup {
+  id: string;
+  messageId: MessageId;
+  text: string;
+  attachments: ChatAttachment[];
+  modelSelection?: ModelSelection | undefined;
+  interactionMode: ProviderInteractionMode;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TurnDiffFileChange {
   path: string;
   kind?: string | undefined;
@@ -99,6 +110,7 @@ export interface Thread {
   session: ThreadSession | null;
   messages: ChatMessage[];
   proposedPlans: ProposedPlan[];
+  queuedFollowups: QueuedFollowup[];
   error: string | null;
   createdAt: string;
   archivedAt: string | null;
@@ -124,6 +136,7 @@ export interface SidebarThreadSummary {
   branch: string | null;
   worktreePath: string | null;
   latestUserMessageAt: string | null;
+  queuedFollowupCount: number;
   hasPendingApprovals: boolean;
   hasPendingUserInput: boolean;
   hasActionableProposedPlan: boolean;

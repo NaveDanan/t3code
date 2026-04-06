@@ -148,6 +148,7 @@ const defaultProviders: ReadonlyArray<ServerProvider> = [
     status: "ready",
     auth: { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
     models: [],
   },
 ];
