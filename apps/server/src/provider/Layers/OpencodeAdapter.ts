@@ -60,10 +60,12 @@ interface OpencodeTurnState {
   readonly turnId: TurnId;
   userMessageId?: string;
   assistantMessageId?: string;
+  started: boolean;
   completed: boolean;
   hasCurrentTurnActivity: boolean;
   readonly planMode: boolean;
   readonly planTextParts: Array<string>;
+  readonly requestedModelSlug?: string;
   aggregatedUsage: ThreadTokenUsageSnapshot | undefined;
   accumulatedTotalCostUsd: number | undefined;
   latestStopReason: string | null | undefined;
@@ -76,6 +78,7 @@ interface OpencodeSessionContext {
   readonly binaryPath: string;
   cwd: string;
   activeTurn: OpencodeTurnState | undefined;
+  readonly acceptedFollowupTurns: Array<OpencodeTurnState>;
   pendingAbortTurnId: TurnId | undefined;
   readonly pendingRequests: Map<string, CanonicalRequestType>;
   readonly pendingUserInputs: Map<string, ReadonlyArray<UserInputQuestion>>;
@@ -99,6 +102,23 @@ export interface OpencodeAdapterLiveOptions {
   readonly nativeEventLogger?: EventNdjsonLogger;
 }
 
+function resetTurnTracking(context: OpencodeSessionContext) {
+  context.partsById.clear();
+  context.startedItemIds.clear();
+  context.completedItemIds.clear();
+  context.partsWithDelta.clear();
+  context.lastTodoFingerprint = undefined;
+}
+
+function removeAcceptedFollowupTurn(context: OpencodeSessionContext, turnId: TurnId) {
+  const index = context.acceptedFollowupTurns.findIndex((entry) => entry.turnId === turnId);
+  if (index === -1) {
+    return undefined;
+  }
+  const [turn] = context.acceptedFollowupTurns.splice(index, 1);
+  return turn;
+}
+
 function opencodeDebugContext(context: OpencodeSessionContext | undefined) {
   const activeTurn = context?.activeTurn;
   return {
@@ -110,6 +130,8 @@ function opencodeDebugContext(context: OpencodeSessionContext | undefined) {
     activeTurnHasActivity: activeTurn?.hasCurrentTurnActivity,
     userMessageId: activeTurn?.userMessageId,
     assistantMessageId: activeTurn?.assistantMessageId,
+    acceptedFollowupTurnIds: context?.acceptedFollowupTurns.map((turn) => String(turn.turnId)),
+    acceptedFollowupTurnCount: context?.acceptedFollowupTurns.length,
     pendingAbortTurnId: context?.pendingAbortTurnId
       ? String(context.pendingAbortTurnId)
       : undefined,
@@ -840,6 +862,98 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
     });
   });
 
+  const emitTurnStarted = Effect.fn("emitTurnStarted")(function* (
+    context: OpencodeSessionContext,
+    turn: OpencodeTurnState,
+    raw?: OpencodeEvent,
+  ) {
+    if (turn.started) {
+      return;
+    }
+
+    turn.started = true;
+    const stamp = makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "turn.started",
+      eventId: stamp.eventId,
+      provider: PROVIDER,
+      threadId: context.session.threadId,
+      createdAt: stamp.createdAt,
+      turnId: turn.turnId,
+      providerRefs: {
+        providerTurnId: String(turn.turnId),
+      },
+      ...(raw ? { raw: rawEvent(raw) } : {}),
+      payload: turn.requestedModelSlug ? { model: turn.requestedModelSlug } : {},
+    });
+  });
+
+  const activateTurn = Effect.fn("activateTurn")(function* (
+    context: OpencodeSessionContext,
+    turn: OpencodeTurnState,
+    raw?: OpencodeEvent,
+  ) {
+    resetTurnTracking(context);
+    context.activeTurn = turn;
+    updateSession(context, {
+      status: "running",
+      activeTurnId: turn.turnId,
+      ...(turn.requestedModelSlug ? { model: turn.requestedModelSlug } : {}),
+      ...(context.session.lastError ? { lastError: undefined } : {}),
+    });
+    yield* emitTurnStarted(context, turn, raw);
+    yield* emitSessionStateChanged(context, "running");
+    return turn;
+  });
+
+  const promoteAcceptedFollowupTurn = Effect.fn("promoteAcceptedFollowupTurn")(function* (
+    context: OpencodeSessionContext,
+    input: {
+      readonly raw?: OpencodeEvent;
+      readonly parentMessageId?: string;
+      readonly fallbackToOldest?: boolean;
+    },
+  ) {
+    if (context.activeTurn && !context.activeTurn.completed) {
+      return context.activeTurn;
+    }
+
+    if (context.acceptedFollowupTurns.length === 0) {
+      return undefined;
+    }
+
+    let nextTurn: OpencodeTurnState | undefined;
+    const parentMessageId = trimString(input.parentMessageId);
+    if (parentMessageId) {
+      const directMatchIndex = context.acceptedFollowupTurns.findIndex(
+        (entry) => entry.userMessageId === parentMessageId,
+      );
+      if (directMatchIndex !== -1) {
+        [nextTurn] = context.acceptedFollowupTurns.splice(directMatchIndex, 1);
+      } else {
+        const latestUserMessageId = yield* fetchMessages(context).pipe(
+          Effect.map(latestUserMessageIdFromMessages),
+          Effect.catch(() => Effect.void),
+        );
+        if (latestUserMessageId === parentMessageId) {
+          nextTurn = context.acceptedFollowupTurns.shift();
+        }
+      }
+    } else if (input.fallbackToOldest) {
+      nextTurn = context.acceptedFollowupTurns.shift();
+    }
+
+    if (!nextTurn) {
+      return undefined;
+    }
+
+    if (parentMessageId) {
+      nextTurn.userMessageId = parentMessageId;
+    }
+
+    return yield* activateTurn(context, nextTurn, input.raw);
+  });
+
   const ensureAssistantItemStarted = Effect.fn("ensureAssistantItemStarted")(function* (
     context: OpencodeSessionContext,
     assistantMessageId: string,
@@ -899,8 +1013,14 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       ...opencodeDebugContext(context),
     });
     activeTurn.completed = true;
+    const hasAcceptedFollowups = context.acceptedFollowupTurns.length > 0;
+    const nextState = hasAcceptedFollowups
+      ? "running"
+      : input.state === "failed"
+        ? "error"
+        : "ready";
     updateSession(context, {
-      status: input.state === "failed" ? "error" : "ready",
+      status: nextState,
       activeTurnId: undefined,
       ...(input.errorMessage ? { lastError: input.errorMessage } : {}),
     });
@@ -965,9 +1085,11 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
       },
     });
-
-    const nextState = input.state === "failed" ? "error" : "ready";
-    yield* emitSessionStateChanged(context, nextState, input.errorMessage);
+    yield* emitSessionStateChanged(
+      context,
+      nextState,
+      nextState === "error" ? input.errorMessage : undefined,
+    );
     context.activeTurn = undefined;
     context.pendingAbortTurnId = undefined;
     logOpencodeAdapter("turn.complete.end", {
@@ -995,8 +1117,9 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       ...opencodeDebugContext(context),
     });
     activeTurn.completed = true;
+    const nextState = context.acceptedFollowupTurns.length > 0 ? "running" : "ready";
     updateSession(context, {
-      status: "ready",
+      status: nextState,
       activeTurnId: undefined,
     });
     const stamp = makeEventStamp();
@@ -1015,10 +1138,49 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         reason,
       },
     });
-    yield* emitSessionStateChanged(context, "ready");
+    yield* emitSessionStateChanged(context, nextState);
     context.activeTurn = undefined;
     context.pendingAbortTurnId = undefined;
     logOpencodeAdapter("turn.abort.end", opencodeDebugContext(context));
+  });
+
+  const abortAcceptedFollowupTurn = Effect.fn("abortAcceptedFollowupTurn")(function* (
+    context: OpencodeSessionContext,
+    turnId: TurnId,
+    reason: string,
+    raw?: OpencodeEvent,
+  ) {
+    const turn = removeAcceptedFollowupTurn(context, turnId);
+    if (!turn) {
+      return;
+    }
+
+    turn.completed = true;
+    updateSession(context, {
+      status: context.acceptedFollowupTurns.length > 0 ? "running" : "ready",
+      activeTurnId: undefined,
+    });
+    const stamp = makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "turn.aborted",
+      eventId: stamp.eventId,
+      provider: PROVIDER,
+      threadId: context.session.threadId,
+      createdAt: stamp.createdAt,
+      turnId: turn.turnId,
+      providerRefs: {
+        providerTurnId: String(turn.turnId),
+      },
+      ...(raw ? { raw: rawEvent(raw) } : {}),
+      payload: {
+        reason,
+      },
+    });
+    yield* emitSessionStateChanged(
+      context,
+      context.acceptedFollowupTurns.length > 0 ? "running" : "ready",
+    );
+    context.pendingAbortTurnId = undefined;
   });
 
   const buildAttachmentPart = Effect.fn("buildAttachmentPart")(function* (
@@ -1073,18 +1235,19 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
 
   const resolveAssistantParentMessageId = Effect.fn("resolveAssistantParentMessageId")(function* (
     context: OpencodeSessionContext,
+    turn: OpencodeTurnState,
     parentMessageId: string | undefined,
   ) {
-    if (!context.activeTurn || !parentMessageId) {
+    if (!parentMessageId) {
       logOpencodeAdapter("assistant.parent.resolve.skipped", {
         parentMessageId,
-        reason: !context.activeTurn ? "no-active-turn" : "missing-parent-message-id",
+        reason: "missing-parent-message-id",
         ...opencodeDebugContext(context),
       });
       return undefined;
     }
 
-    if (context.activeTurn.userMessageId === parentMessageId) {
+    if (turn.userMessageId === parentMessageId) {
       logOpencodeAdapter("assistant.parent.resolve.direct-hit", {
         parentMessageId,
         ...opencodeDebugContext(context),
@@ -1207,7 +1370,10 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
           ...opencodeDebugContext(context),
         });
         if (serverEvent.payload.properties.status.type === "busy") {
-          if (context.activeTurn && !context.activeTurn.completed) {
+          if (
+            (context.activeTurn && !context.activeTurn.completed) ||
+            context.acceptedFollowupTurns.length > 0
+          ) {
             updateSession(context, { status: "running" });
             yield* emitSessionStateChanged(context, "running");
           }
@@ -1238,7 +1404,16 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         logOpencodeAdapter("event.session.idle", opencodeDebugContext(context));
         if (context.pendingAbortTurnId) {
           logOpencodeAdapter("event.session.idle.abort-pending", opencodeDebugContext(context));
-          yield* abortTurn(context, "OpenCode runtime interrupted.", serverEvent.payload);
+          if (context.activeTurn && !context.activeTurn.completed) {
+            yield* abortTurn(context, "OpenCode runtime interrupted.", serverEvent.payload);
+          } else {
+            yield* abortAcceptedFollowupTurn(
+              context,
+              context.pendingAbortTurnId,
+              "OpenCode runtime interrupted.",
+              serverEvent.payload,
+            );
+          }
         } else if (context.activeTurn && !context.activeTurn.completed) {
           if (!context.activeTurn.hasCurrentTurnActivity) {
             logOpencodeAdapter("event.session.idle.ignored.no-current-turn-activity", {
@@ -1265,6 +1440,12 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
             raw: serverEvent.payload,
           });
         } else if (context.session.status === "running") {
+          if (context.acceptedFollowupTurns.length > 0) {
+            logOpencodeAdapter("event.session.idle.ignored.accepted-followup-pending", {
+              ...opencodeDebugContext(context),
+            });
+            return;
+          }
           logOpencodeAdapter("event.session.idle.reset-ready-without-active-turn", {
             ...opencodeDebugContext(context),
           });
@@ -1296,6 +1477,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "session.diff": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            fallbackToOldest: true,
+          });
+        }
         if (!context.activeTurn) {
           logOpencodeAdapter(
             "event.session.diff.ignored.no-active-turn",
@@ -1328,6 +1518,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "session.error": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            fallbackToOldest: true,
+          });
+        }
         logOpencodeAdapter("event.session.error", {
           ...opencodeDebugContext(context),
           errorMessage:
@@ -1366,6 +1565,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "permission.asked": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            fallbackToOldest: true,
+          });
+        }
         const turnId = context.activeTurn?.turnId;
         logOpencodeAdapter("event.permission.asked", {
           requestId: serverEvent.payload.properties.id,
@@ -1410,6 +1618,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "permission.replied": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            fallbackToOldest: true,
+          });
+        }
         logOpencodeAdapter("event.permission.replied", {
           requestId: serverEvent.payload.properties.requestID,
           reply: serverEvent.payload.properties.reply,
@@ -1442,6 +1659,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "question.asked": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            fallbackToOldest: true,
+          });
+        }
         logOpencodeAdapter("event.question.asked", {
           requestId: serverEvent.payload.properties.id,
           questionCount: serverEvent.payload.properties.questions.length,
@@ -1472,6 +1698,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "question.replied": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            fallbackToOldest: true,
+          });
+        }
         logOpencodeAdapter("event.question.replied", {
           requestId: serverEvent.payload.properties.requestID,
           ...opencodeDebugContext(context),
@@ -1502,6 +1737,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "question.rejected": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            fallbackToOldest: true,
+          });
+        }
         logOpencodeAdapter("event.question.rejected", {
           requestId: serverEvent.payload.properties.requestID,
           ...opencodeDebugContext(context),
@@ -1530,6 +1774,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "todo.updated": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            fallbackToOldest: true,
+          });
+        }
         if (!context.activeTurn) {
           logOpencodeAdapter(
             "event.todo.updated.ignored.no-active-turn",
@@ -1598,6 +1851,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
           // are from previous turns and must be ignored to prevent overwriting the
           // current turn state and triggering premature completeTurn calls.
           if (!context.activeTurn || context.activeTurn.completed) {
+            if (
+              context.acceptedFollowupTurns.some((entry) => entry.userMessageId === userMessageId)
+            ) {
+              logOpencodeAdapter("event.message.updated.user.accepted-followup-buffered", {
+                messageId: userMessageId,
+                ...opencodeDebugContext(context),
+              });
+              return;
+            }
             logOpencodeAdapter("event.message.updated.user.ignored.no-active-turn", {
               messageId: userMessageId,
               ...opencodeDebugContext(context),
@@ -1628,6 +1890,17 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         // turn. OpenCode replays completed assistant messages from prior turns as
         // history; accepting them would overwrite turn.userMessageId and trigger
         // completeTurn on the live turn, corrupting the turn lifecycle.
+        const assistantMessage = serverEvent.payload.properties.info as AssistantMessage;
+        const parentMessageId = trimString(assistantMessage.parentID);
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            ...(parentMessageId ? { parentMessageId } : {}),
+          });
+        }
         if (!context.activeTurn || context.activeTurn.completed) {
           logOpencodeAdapter("event.message.updated.assistant.ignored.no-active-turn", {
             messageId: serverEvent.payload.properties.info.id,
@@ -1635,14 +1908,12 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
           });
           return;
         }
-        const assistantMessage = serverEvent.payload.properties.info as AssistantMessage;
-        const parentMessageId = trimString(assistantMessage.parentID);
         const reboundUserMessageId =
           parentMessageId !== undefined &&
           context.activeTurn.userMessageId !== parentMessageId &&
           (context.activeTurn.assistantMessageId === undefined ||
             context.activeTurn.assistantMessageId === assistantMessage.id)
-            ? yield* resolveAssistantParentMessageId(context, parentMessageId)
+            ? yield* resolveAssistantParentMessageId(context, context.activeTurn, parentMessageId)
             : undefined;
         const belongsToCurrentTurn =
           !parentMessageId ||
@@ -1723,6 +1994,20 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       case "message.part.delta": {
+        if (
+          (!context.activeTurn || context.activeTurn.completed) &&
+          context.acceptedFollowupTurns.length > 0
+        ) {
+          const messageId = trimString(serverEvent.payload.properties.messageID);
+          const parentMessageId = messageId
+            ? context.messageInfoById.get(messageId)?.parentMessageId
+            : undefined;
+          yield* promoteAcceptedFollowupTurn(context, {
+            raw: serverEvent.payload,
+            ...(parentMessageId ? { parentMessageId } : {}),
+            fallbackToOldest: true,
+          });
+        }
         const assistantMessageId = bindAssistantMessageId(
           context,
           trimString(serverEvent.payload.properties.messageID),
@@ -1819,6 +2104,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
           ...opencodeDebugContext(context),
         });
         if (part.type === "reasoning") {
+          if (
+            (!context.activeTurn || context.activeTurn.completed) &&
+            context.acceptedFollowupTurns.length > 0
+          ) {
+            yield* promoteAcceptedFollowupTurn(context, {
+              raw: serverEvent.payload,
+              fallbackToOldest: true,
+            });
+          }
           markCurrentTurnActivity(context);
           if (!context.startedItemIds.has(part.id)) {
             context.startedItemIds.add(part.id);
@@ -1899,6 +2193,20 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         }
 
         if (part.type === "text") {
+          if (
+            (!context.activeTurn || context.activeTurn.completed) &&
+            context.acceptedFollowupTurns.length > 0
+          ) {
+            const partMessageId = trimString(part.messageID);
+            const parentMessageId = partMessageId
+              ? context.messageInfoById.get(partMessageId)?.parentMessageId
+              : undefined;
+            yield* promoteAcceptedFollowupTurn(context, {
+              raw: serverEvent.payload,
+              ...(parentMessageId ? { parentMessageId } : {}),
+              fallbackToOldest: true,
+            });
+          }
           const assistantMessageId = bindAssistantMessageId(context, trimString(part.messageID));
           if (!assistantMessageId) {
             logOpencodeAdapter("event.message.part.updated.text.ignored.unbound", {
@@ -1964,6 +2272,15 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         }
 
         if (part.type === "tool") {
+          if (
+            (!context.activeTurn || context.activeTurn.completed) &&
+            context.acceptedFollowupTurns.length > 0
+          ) {
+            yield* promoteAcceptedFollowupTurn(context, {
+              raw: serverEvent.payload,
+              fallbackToOldest: true,
+            });
+          }
           markCurrentTurnActivity(context);
           logOpencodeAdapter("event.message.part.updated.tool.accepted", {
             partId: part.id,
@@ -2119,23 +2436,24 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       return;
     }
 
-    const server = context.activeTurn
-      ? yield* opencodeServerManager
-          .ensureServer({
-            binaryPath: context.binaryPath,
-          })
-          .pipe(
-            Effect.mapError((error) =>
-              toProcessError(context.session.threadId, error.message, error),
-            ),
-            Effect.matchEffect({
-              onFailure: () => Effect.void.pipe(Effect.as(undefined)),
-              onSuccess: (server) => Effect.succeed(server),
-            }),
-          )
-      : undefined;
+    const server =
+      context.activeTurn || context.acceptedFollowupTurns.length > 0
+        ? yield* opencodeServerManager
+            .ensureServer({
+              binaryPath: context.binaryPath,
+            })
+            .pipe(
+              Effect.mapError((error) =>
+                toProcessError(context.session.threadId, error.message, error),
+              ),
+              Effect.matchEffect({
+                onFailure: () => Effect.void.pipe(Effect.as(undefined)),
+                onSuccess: (server) => Effect.succeed(server),
+              }),
+            )
+        : undefined;
 
-    if (server && context.activeTurn) {
+    if (server && (context.activeTurn || context.acceptedFollowupTurns.length > 0)) {
       yield* Effect.tryPromise({
         try: () =>
           readSdkData<boolean>(
@@ -2297,6 +2615,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         binaryPath,
         cwd: sdkSession.directory,
         activeTurn: undefined,
+        acceptedFollowupTurns: [],
         pendingAbortTurnId: undefined,
         pendingRequests: new Map(),
         pendingUserInputs: new Map(),
@@ -2375,16 +2694,10 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
     }
 
     const context = yield* requireSession(input.threadId);
-    if (context.activeTurn && !context.activeTurn.completed) {
-      logOpencodeAdapter(
-        "sendTurn.rejected.active-turn-already-running",
-        opencodeDebugContext(context),
-      );
-      return yield* toRequestError(
-        "session.promptAsync",
-        new Error("OpenCode already has an active turn for this thread."),
-      );
-    }
+    const providerIsBusy =
+      (context.activeTurn !== undefined && !context.activeTurn.completed) ||
+      context.acceptedFollowupTurns.length > 0 ||
+      context.session.status === "running";
 
     const server = yield* opencodeServerManager
       .ensureServer({
@@ -2448,51 +2761,35 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
 
     const turnId = TurnId.makeUnsafe(crypto.randomUUID());
     const providerUserMessageId = createOpencodeMessageId();
-    context.partsById.clear();
-    context.startedItemIds.clear();
-    context.completedItemIds.clear();
-    context.partsWithDelta.clear();
-    context.lastTodoFingerprint = undefined;
-    context.activeTurn = {
+    const turnState: OpencodeTurnState = {
       turnId,
       userMessageId: providerUserMessageId,
+      started: false,
       completed: false,
       hasCurrentTurnActivity: false,
       planMode: input.interactionMode === "plan",
       planTextParts: [],
+      ...(resolvedModelSlug ? { requestedModelSlug: resolvedModelSlug } : {}),
       aggregatedUsage: undefined,
       accumulatedTotalCostUsd: undefined,
       latestStopReason: undefined,
       latestErrorMessage: undefined,
     };
-    logOpencodeAdapter("sendTurn.active-turn-created", {
-      turnId: String(turnId),
-      providerUserMessageId,
-      resolvedModelSlug,
-      selectedVariant,
-      ...opencodeDebugContext(context),
-    });
-    updateSession(context, {
-      status: "running",
-      activeTurnId: turnId,
-      ...(resolvedModelSlug ? { model: resolvedModelSlug } : {}),
-      ...(context.session.lastError ? { lastError: undefined } : {}),
-    });
-
-    const turnStartedStamp = makeEventStamp();
-    yield* offerRuntimeEvent({
-      type: "turn.started",
-      eventId: turnStartedStamp.eventId,
-      provider: PROVIDER,
-      threadId: context.session.threadId,
-      createdAt: turnStartedStamp.createdAt,
-      turnId,
-      providerRefs: {
-        providerTurnId: String(turnId),
+    logOpencodeAdapter(
+      providerIsBusy ? "sendTurn.followup-accepted" : "sendTurn.active-turn-created",
+      {
+        turnId: String(turnId),
+        providerUserMessageId,
+        resolvedModelSlug,
+        selectedVariant,
+        ...opencodeDebugContext(context),
       },
-      payload: resolvedModelSlug ? { model: resolvedModelSlug } : {},
-    });
-    yield* emitSessionStateChanged(context, "running");
+    );
+    if (providerIsBusy) {
+      context.acceptedFollowupTurns.push(turnState);
+    } else {
+      yield* activateTurn(context, turnState);
+    }
     logOpencodeAdapter("sendTurn.promptAsync.dispatch", {
       turnId: String(turnId),
       providerUserMessageId,
@@ -2527,10 +2824,14 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
             }),
           ).pipe(
             Effect.andThen(
-              completeTurn(context, {
-                state: "failed",
-                errorMessage: error.message,
-              }),
+              context.activeTurn?.turnId === turnId
+                ? completeTurn(context, {
+                    state: "failed",
+                    errorMessage: error.message,
+                  })
+                : Effect.sync(() => {
+                    removeAcceptedFollowupTurn(context, turnId);
+                  }),
             ),
             Effect.andThen(Effect.fail(error)),
           ),
@@ -2569,7 +2870,8 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         })
         .pipe(Effect.mapError((error) => toProcessError(threadId, error.message, error)));
 
-      context.pendingAbortTurnId = turnId ?? context.activeTurn?.turnId;
+      context.pendingAbortTurnId =
+        turnId ?? context.activeTurn?.turnId ?? context.acceptedFollowupTurns[0]?.turnId;
       logOpencodeAdapter("interruptTurn.abort-dispatched", opencodeDebugContext(context));
       yield* Effect.tryPromise({
         try: () =>
@@ -2609,7 +2911,10 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       }
 
       const context = yield* requireSession(threadId);
-      if (context.activeTurn && !context.activeTurn.completed) {
+      if (
+        (context.activeTurn && !context.activeTurn.completed) ||
+        context.acceptedFollowupTurns.length > 0
+      ) {
         return yield* toRequestError(
           "session.revert",
           new Error("Cannot rollback an OpenCode thread while a turn is still running."),
@@ -2803,6 +3108,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
     provider: PROVIDER,
     capabilities: {
       sessionModelSwitch: "in-session",
+      busyFollowupMode: "native-steer",
     },
     startSession,
     sendTurn,

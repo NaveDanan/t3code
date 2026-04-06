@@ -19,11 +19,14 @@ import {
   ThreadDeletedPayload,
   ThreadInteractionModeSetPayload,
   ThreadMetaUpdatedPayload,
+  ThreadQueuedFollowupEnqueuedPayload,
+  ThreadQueuedFollowupRemovedPayload,
   ThreadProposedPlanUpsertedPayload,
   ThreadRuntimeModeSetPayload,
   ThreadUnarchivedPayload,
   ThreadRevertedPayload,
   ThreadSessionSetPayload,
+  ThreadTurnDispatchedPayload,
   ThreadTurnDiffCompletedPayload,
 } from "./Schemas.ts";
 
@@ -265,6 +268,8 @@ export function projectEvent(
             archivedAt: null,
             deletedAt: null,
             messages: [],
+            proposedPlans: [],
+            queuedFollowups: [],
             activities: [],
             checkpoints: [],
             session: null,
@@ -417,6 +422,73 @@ export function projectEvent(
           }),
         };
       });
+
+    case "thread.queued-followup-enqueued":
+      return decodeForEvent(
+        ThreadQueuedFollowupEnqueuedPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => {
+          const thread = nextBase.threads.find((entry) => entry.id === payload.threadId);
+          if (!thread) {
+            return nextBase;
+          }
+
+          const queuedFollowups = [
+            ...thread.queuedFollowups.filter((entry) => entry.id !== payload.followup.id),
+            payload.followup,
+          ].toSorted(
+            (left, right) =>
+              left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
+          );
+
+          return {
+            ...nextBase,
+            threads: updateThread(nextBase.threads, payload.threadId, {
+              queuedFollowups,
+              updatedAt: event.occurredAt,
+            }),
+          };
+        }),
+      );
+
+    case "thread.queued-followup-removed":
+      return decodeForEvent(
+        ThreadQueuedFollowupRemovedPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => ({
+          ...nextBase,
+          threads: updateThread(nextBase.threads, payload.threadId, {
+            queuedFollowups: (
+              nextBase.threads.find((entry) => entry.id === payload.threadId)?.queuedFollowups ?? []
+            ).filter((entry) => entry.id !== payload.queuedFollowupId),
+            updatedAt: event.occurredAt,
+          }),
+        })),
+      );
+
+    case "thread.turn-dispatched":
+      return decodeForEvent(ThreadTurnDispatchedPayload, event.payload, event.type, "payload").pipe(
+        Effect.map((payload) =>
+          payload.queuedFollowupId === undefined
+            ? nextBase
+            : {
+                ...nextBase,
+                threads: updateThread(nextBase.threads, payload.threadId, {
+                  queuedFollowups: (
+                    nextBase.threads.find((entry) => entry.id === payload.threadId)
+                      ?.queuedFollowups ?? []
+                  ).filter((entry) => entry.id !== payload.queuedFollowupId),
+                  updatedAt: event.occurredAt,
+                }),
+              },
+        ),
+      );
 
     case "thread.session-set":
       return Effect.gen(function* () {
@@ -610,6 +682,7 @@ export function projectEvent(
               checkpoints,
               messages,
               proposedPlans,
+              queuedFollowups: [],
               activities,
               latestTurn,
               updatedAt: event.occurredAt,

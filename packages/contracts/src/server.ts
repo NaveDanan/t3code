@@ -73,6 +73,16 @@ export const ServerProviderExecutionBackend = Schema.Struct({
 });
 export type ServerProviderExecutionBackend = typeof ServerProviderExecutionBackend.Type;
 
+export const ServerProviderBusyFollowupMode = Schema.Literals(["native-steer", "queue-only"]);
+export type ServerProviderBusyFollowupMode = typeof ServerProviderBusyFollowupMode.Type;
+
+export const ServerProviderRuntimeCapabilities = Schema.Struct({
+  busyFollowupMode: ServerProviderBusyFollowupMode.pipe(
+    Schema.withDecodingDefault(() => "queue-only" as const),
+  ),
+});
+export type ServerProviderRuntimeCapabilities = typeof ServerProviderRuntimeCapabilities.Type;
+
 export const ServerProvider = Schema.Struct({
   provider: ProviderKind,
   enabled: Schema.Boolean,
@@ -85,6 +95,11 @@ export const ServerProvider = Schema.Struct({
   models: Schema.Array(ServerProviderModel),
   upstreamProviders: Schema.optional(Schema.Array(UpstreamProvider)),
   executionBackends: Schema.optional(Schema.Array(ServerProviderExecutionBackend)),
+  runtimeCapabilities: ServerProviderRuntimeCapabilities.pipe(
+    Schema.withDecodingDefault(() => ({
+      busyFollowupMode: "queue-only" as const,
+    })),
+  ),
 });
 export type ServerProvider = typeof ServerProvider.Type;
 

@@ -565,6 +565,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             auth: { status: "authenticated" },
             checkedAt: "2026-03-25T00:00:00.000Z",
             version: "1.0.0",
+            runtimeCapabilities: { busyFollowupMode: "queue-only" },
             models: [],
           },
           {
@@ -575,6 +576,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             auth: { status: "unknown" },
             checkedAt: "2026-03-25T00:00:00.000Z",
             version: "1.0.0",
+            runtimeCapabilities: { busyFollowupMode: "queue-only" },
             models: [],
           },
           {
@@ -585,6 +587,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             auth: { status: "unknown" },
             checkedAt: "2026-03-25T00:00:00.000Z",
             version: null,
+            runtimeCapabilities: { busyFollowupMode: "queue-only" },
             models: [],
           },
         ] as const satisfies ReadonlyArray<ServerProvider>;
@@ -994,8 +997,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
                 if (command === "wsl.exe" && joined === "--status") {
                   return { stdout: "", stderr: "wsl unavailable", code: 1 };
                 }
-                if (command.toLowerCase().endsWith("bash.exe") && joined === "-lc command -v zsh") {
-                  return { stdout: "", stderr: "zsh unavailable", code: 1 };
+                if (command.toLowerCase().endsWith("bash.exe") && joined === "--version") {
+                  return { stdout: "GNU bash, version 5.2.37(1)-release\n", stderr: "", code: 0 };
                 }
                 if (joined === "--version") {
                   if (command === "codex") {
@@ -1497,9 +1500,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             setForgeProviderProcessRunnerForTests(async (command, args) => {
               const joined = args.join(" ");
               if (command.toLowerCase().endsWith("bash.exe")) {
-                if (joined === "-lc command -v zsh") {
+                if (joined === "--version") {
                   return {
-                    stdout: "/usr/bin/zsh\n",
+                    stdout: "GNU bash, version 5.2.37(1)-release\n",
                     stderr: "",
                     code: 0,
                   };

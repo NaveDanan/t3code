@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildForgeSpawnSpec,
   buildForgeAdapterKey,
   buildForgeModelSlug,
   buildForgeWslSpawnSpec,
@@ -10,7 +11,9 @@ import {
   parseForgeAdapterKey,
   parseForgeModelCatalogRows,
   parseForgeProviderCatalogRows,
+  resolveForgeBinaryPathForGitBash,
   resolveForgeModel,
+  toGitBashPath,
 } from "./forgecode.ts";
 
 function formatPorcelainRow(values: ReadonlyArray<string>, widths: ReadonlyArray<number>): string {
@@ -173,6 +176,48 @@ describe("buildForgeWslSpawnSpec", () => {
     expect(spec.command).toBe("wsl.exe");
     expect(spec.args).toEqual(["zsh", "-i", "-l", "-c", "'forge' '--version'"]);
     expect(spec.shell).toBe(false);
+  });
+});
+
+describe("buildForgeSpawnSpec", () => {
+  it("uses an interactive login Git Bash shell so forge resolves from the user shell setup", () => {
+    const spec = buildForgeSpawnSpec({
+      binaryPath: "custom-forge",
+      forgeArgs: ["--version"],
+      executionTarget: {
+        executionBackend: "gitbash",
+        gitBashPath: "C:\\Program Files\\Git\\bin\\bash.exe",
+      },
+    });
+
+    expect(spec.command).toBe("C:\\Program Files\\Git\\bin\\bash.exe");
+    expect(spec.args).toEqual(["-i", "-l", "-c", "'custom-forge' '--version'"]);
+    expect(spec.shell).toBe(false);
+  });
+});
+
+describe("resolveForgeBinaryPathForGitBash", () => {
+  it("converts Windows absolute paths into Git Bash paths", () => {
+    expect(
+      resolveForgeBinaryPathForGitBash(
+        "C:\\Users\\test\\AppData\\Local\\Programs\\Forge\\forge.exe",
+      ),
+    ).toBe("/c/Users/test/AppData/Local/Programs/Forge/forge.exe");
+  });
+
+  it("uses the discovered Windows Forge install when the configured path is the default command", () => {
+    expect(
+      resolveForgeBinaryPathForGitBash(
+        "forge",
+        "C:\\Users\\test\\AppData\\Local\\Programs\\Forge\\forge.exe",
+      ),
+    ).toBe("/c/Users/test/AppData/Local/Programs/Forge/forge.exe");
+  });
+});
+
+describe("toGitBashPath", () => {
+  it("rewrites Windows drive paths to Git Bash mount paths", () => {
+    expect(toGitBashPath("D:\\Projects\\t3code")).toBe("/d/Projects/t3code");
   });
 });
 

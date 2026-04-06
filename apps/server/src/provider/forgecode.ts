@@ -86,6 +86,17 @@ export function toWslPath(windowsPath: string): string {
   return `/mnt/${normalizeWindowsDriveLetter(driveLetter!)}/${remainder}`;
 }
 
+export function toGitBashPath(windowsPath: string): string {
+  const normalized = windowsPath.replace(/\\/g, "/").trim();
+  const driveMatch = normalized.match(/^([A-Za-z]):\/(.*)$/);
+  if (!driveMatch) {
+    return normalized;
+  }
+
+  const [, driveLetter, remainder] = driveMatch;
+  return `/${normalizeWindowsDriveLetter(driveLetter!)}/${remainder}`;
+}
+
 export function shellQuoteForPosix(value: string): string {
   if (value.length === 0) {
     return "''";
@@ -229,6 +240,25 @@ function pathEntriesFromEnv(): ReadonlyArray<string> {
     .filter((entry) => entry.length > 0);
 }
 
+function userLocalAppDataDirFromEnv(): string | undefined {
+  const localAppData = process.env.LOCALAPPDATA?.trim();
+  if (localAppData) {
+    return localAppData;
+  }
+
+  const appData = process.env.APPDATA?.trim();
+  if (appData) {
+    return path.join(path.dirname(appData), "Local");
+  }
+
+  const userProfile = process.env.USERPROFILE?.trim();
+  if (userProfile) {
+    return path.join(userProfile, "AppData", "Local");
+  }
+
+  return undefined;
+}
+
 function discoverGitInstallRoots(): ReadonlyArray<string> {
   const candidates = new Set<string>();
   for (const entry of pathEntriesFromEnv()) {
@@ -256,6 +286,50 @@ function discoverGitInstallRoots(): ReadonlyArray<string> {
   }
 
   return [...candidates];
+}
+
+function discoverForgeWindowsBinaryPath(): string | undefined {
+  if (process.platform !== "win32") {
+    return undefined;
+  }
+
+  const localAppData = userLocalAppDataDirFromEnv();
+  const candidates = [
+    localAppData ? path.join(localAppData, "Programs", "Forge", "forge.exe") : undefined,
+    process.env.ProgramFiles
+      ? path.join(process.env.ProgramFiles, "Forge", "forge.exe")
+      : undefined,
+    process.env["ProgramFiles(x86)"]
+      ? path.join(process.env["ProgramFiles(x86)"], "Forge", "forge.exe")
+      : undefined,
+  ];
+
+  return candidates.find((candidate) => candidate && existsSync(candidate));
+}
+
+function isWindowsAbsolutePath(value: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(value.trim());
+}
+
+export function resolveForgeBinaryPathForGitBash(
+  binaryPath: string,
+  discoveredWindowsBinaryPath: string | undefined = discoverForgeWindowsBinaryPath(),
+): string {
+  const normalized = normalizeForgeBinaryPath(binaryPath);
+  if (isWindowsAbsolutePath(normalized)) {
+    return toGitBashPath(normalized);
+  }
+
+  const lowered = normalized.toLowerCase();
+  if (
+    (lowered === DEFAULT_FORGECODE_BINARY_PATH ||
+      lowered === `${DEFAULT_FORGECODE_BINARY_PATH}.exe`) &&
+    discoveredWindowsBinaryPath
+  ) {
+    return toGitBashPath(discoveredWindowsBinaryPath);
+  }
+
+  return normalized;
 }
 
 export function discoverGitBashPath(): string | undefined {
@@ -493,10 +567,10 @@ function buildForgeGitBashSpawnSpec(input: {
   readonly env?: Readonly<Record<string, string | undefined>>;
   readonly gitBashPath: string;
 }): ForgeSpawnSpec {
-  const command = `exec zsh -ilc ${shellQuoteForPosix(buildForgeCommandLine(input))}`;
+  const binaryPath = resolveForgeBinaryPathForGitBash(input.binaryPath);
   return {
     command: input.gitBashPath,
-    args: ["-lc", command],
+    args: ["-i", "-l", "-c", buildForgeCommandLine({ ...input, binaryPath })],
     env: process.env,
     shell: false,
     cwd: input.cwd,
@@ -569,7 +643,7 @@ export function buildForgeBackendTerminalSpawnSpec(input: {
       }
       return {
         command: gitBashPath,
-        args: ["-lc", "exec zsh -il"],
+        args: ["-il"],
         env: process.env,
         shell: false,
         cwd: input.cwd,
@@ -617,7 +691,7 @@ export function buildForgeBackendShellCommandSpec(input: {
       }
       return {
         command: gitBashPath,
-        args: ["-lc", `exec zsh -ilc ${shellQuoteForPosix(input.command)}`],
+        args: ["-i", "-l", "-c", input.command],
         env: process.env,
         shell: false,
         cwd: input.cwd,
@@ -720,14 +794,6 @@ export async function resolveForgeExecutionTarget(input: {
         throw new Error(
           "Git Bash could not be discovered from the installed Git for Windows paths.",
         );
-      }
-      const result = await runProcess(gitBashPath, ["-lc", "command -v zsh"], {
-        env: process.env,
-        shell: false,
-        allowNonZeroExit: true,
-      });
-      if (result.code !== 0 || result.stdout.trim().length === 0) {
-        throw new Error("zsh is not installed in Git Bash.");
       }
       return {
         executionBackend: "gitbash",

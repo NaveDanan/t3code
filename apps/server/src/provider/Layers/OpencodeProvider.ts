@@ -18,6 +18,9 @@ import { OpencodeServerManagerLive } from "./OpencodeServerManager";
 import { ServerSettingsService } from "../../serverSettings";
 
 const PROVIDER = "opencode" as const;
+const OPENCODE_RUNTIME_CAPABILITIES = {
+  busyFollowupMode: "native-steer" as const,
+};
 
 const DEFAULT_OPENCODE_REASONING_VARIANTS = ["low", "medium", "high"] as const;
 
@@ -224,6 +227,7 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
       enabled: false,
       checkedAt,
       models: fallbackModels,
+      runtimeCapabilities: OPENCODE_RUNTIME_CAPABILITIES,
       probe: {
         installed: false,
         version: null,
@@ -247,6 +251,7 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
       enabled: true,
       checkedAt,
       models: fallbackModels,
+      runtimeCapabilities: OPENCODE_RUNTIME_CAPABILITIES,
       probe: {
         installed: !isCommandMissingCause(error),
         version: null,
@@ -288,6 +293,7 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
     checkedAt,
     models,
     upstreamProviders,
+    runtimeCapabilities: OPENCODE_RUNTIME_CAPABILITIES,
     probe: {
       installed: true,
       version: probe.server.version,

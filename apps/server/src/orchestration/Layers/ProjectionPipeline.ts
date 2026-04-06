@@ -10,6 +10,7 @@ import { toPersistenceSqlError, type ProjectionRepositoryError } from "../../per
 import { OrchestrationEventStore } from "../../persistence/Services/OrchestrationEventStore.ts";
 import { ProjectionPendingApprovalRepository } from "../../persistence/Services/ProjectionPendingApprovals.ts";
 import { ProjectionProjectRepository } from "../../persistence/Services/ProjectionProjects.ts";
+import { ProjectionQueuedFollowupRepository } from "../../persistence/Services/ProjectionQueuedFollowups.ts";
 import { ProjectionStateRepository } from "../../persistence/Services/ProjectionState.ts";
 import { ProjectionThreadActivityRepository } from "../../persistence/Services/ProjectionThreadActivities.ts";
 import { type ProjectionThreadActivity } from "../../persistence/Services/ProjectionThreadActivities.ts";
@@ -29,6 +30,7 @@ import {
 import { ProjectionThreadRepository } from "../../persistence/Services/ProjectionThreads.ts";
 import { ProjectionPendingApprovalRepositoryLive } from "../../persistence/Layers/ProjectionPendingApprovals.ts";
 import { ProjectionProjectRepositoryLive } from "../../persistence/Layers/ProjectionProjects.ts";
+import { ProjectionQueuedFollowupRepositoryLive } from "../../persistence/Layers/ProjectionQueuedFollowups.ts";
 import { ProjectionStateRepositoryLive } from "../../persistence/Layers/ProjectionState.ts";
 import { ProjectionThreadActivityRepositoryLive } from "../../persistence/Layers/ProjectionThreadActivities.ts";
 import { ProjectionThreadMessageRepositoryLive } from "../../persistence/Layers/ProjectionThreadMessages.ts";
@@ -53,6 +55,7 @@ export const ORCHESTRATION_PROJECTOR_NAMES = {
   threads: "projection.threads",
   threadMessages: "projection.thread-messages",
   threadProposedPlans: "projection.thread-proposed-plans",
+  threadQueuedFollowups: "projection.thread-queued-followups",
   threadActivities: "projection.thread-activities",
   threadSessions: "projection.thread-sessions",
   threadTurns: "projection.thread-turns",
@@ -364,6 +367,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
     const projectionThreadRepository = yield* ProjectionThreadRepository;
     const projectionThreadMessageRepository = yield* ProjectionThreadMessageRepository;
     const projectionThreadProposedPlanRepository = yield* ProjectionThreadProposedPlanRepository;
+    const projectionQueuedFollowupRepository = yield* ProjectionQueuedFollowupRepository;
     const projectionThreadActivityRepository = yield* ProjectionThreadActivityRepository;
     const projectionThreadSessionRepository = yield* ProjectionThreadSessionRepository;
     const projectionTurnRepository = yield* ProjectionTurnRepository;
@@ -553,7 +557,10 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         }
 
         case "thread.message-sent":
+        case "thread.queued-followup-enqueued":
+        case "thread.queued-followup-removed":
         case "thread.proposed-plan-upserted":
+        case "thread.turn-dispatched":
         case "thread.activity-appended": {
           const existingRow = yield* projectionThreadRepository.getById({
             threadId: event.payload.threadId,
@@ -748,6 +755,57 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
       }
     });
 
+    const applyThreadQueuedFollowupsProjection: ProjectorDefinition["apply"] = Effect.fn(
+      "applyThreadQueuedFollowupsProjection",
+    )(function* (event, _attachmentSideEffects) {
+      switch (event.type) {
+        case "thread.queued-followup-enqueued":
+          yield* projectionQueuedFollowupRepository.upsert({
+            id: event.payload.followup.id,
+            threadId: event.payload.threadId,
+            messageId: event.payload.followup.messageId,
+            text: event.payload.followup.text,
+            attachments: event.payload.followup.attachments,
+            ...(event.payload.followup.modelSelection !== undefined
+              ? { modelSelection: event.payload.followup.modelSelection }
+              : {}),
+            interactionMode: event.payload.followup.interactionMode,
+            sourceProposedPlanThreadId: event.payload.followup.sourceProposedPlan?.threadId ?? null,
+            sourceProposedPlanId: event.payload.followup.sourceProposedPlan?.planId ?? null,
+            createdAt: event.payload.followup.createdAt,
+            updatedAt: event.payload.followup.updatedAt,
+          });
+          return;
+
+        case "thread.queued-followup-removed":
+          yield* projectionQueuedFollowupRepository.deleteById({
+            threadId: event.payload.threadId,
+            queuedFollowupId: event.payload.queuedFollowupId,
+          });
+          return;
+
+        case "thread.turn-dispatched":
+          if (event.payload.queuedFollowupId === undefined) {
+            return;
+          }
+          yield* projectionQueuedFollowupRepository.deleteById({
+            threadId: event.payload.threadId,
+            queuedFollowupId: event.payload.queuedFollowupId,
+          });
+          return;
+
+        case "thread.reverted":
+        case "thread.deleted":
+          yield* projectionQueuedFollowupRepository.deleteByThreadId({
+            threadId: event.payload.threadId,
+          });
+          return;
+
+        default:
+          return;
+      }
+    });
+
     const applyThreadActivitiesProjection: ProjectorDefinition["apply"] = Effect.fn(
       "applyThreadActivitiesProjection",
     )(function* (event, _attachmentSideEffects) {
@@ -821,13 +879,52 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
       "applyThreadTurnsProjection",
     )(function* (event, _attachmentSideEffects) {
       switch (event.type) {
-        case "thread.turn-start-requested": {
-          yield* projectionTurnRepository.replacePendingTurnStart({
+        case "thread.turn-start-requested":
+          return;
+
+        case "thread.turn-dispatched": {
+          const existingTurn = yield* projectionTurnRepository.getByTurnId({
             threadId: event.payload.threadId,
-            messageId: event.payload.messageId,
+            turnId: event.payload.turnId,
+          });
+          if (Option.isSome(existingTurn)) {
+            yield* projectionTurnRepository.upsertByTurnId({
+              ...existingTurn.value,
+              pendingMessageId: existingTurn.value.pendingMessageId ?? event.payload.messageId,
+              sourceProposedPlanThreadId:
+                existingTurn.value.sourceProposedPlanThreadId ??
+                event.payload.sourceProposedPlan?.threadId ??
+                null,
+              sourceProposedPlanId:
+                existingTurn.value.sourceProposedPlanId ??
+                event.payload.sourceProposedPlan?.planId ??
+                null,
+              requestedAt: existingTurn.value.requestedAt ?? event.payload.requestedAt,
+              state:
+                existingTurn.value.state === "running" ||
+                existingTurn.value.state === "completed" ||
+                existingTurn.value.state === "error" ||
+                existingTurn.value.state === "interrupted"
+                  ? existingTurn.value.state
+                  : "pending",
+            });
+            return;
+          }
+          yield* projectionTurnRepository.upsertByTurnId({
+            threadId: event.payload.threadId,
+            turnId: event.payload.turnId,
+            pendingMessageId: event.payload.messageId,
             sourceProposedPlanThreadId: event.payload.sourceProposedPlan?.threadId ?? null,
             sourceProposedPlanId: event.payload.sourceProposedPlan?.planId ?? null,
-            requestedAt: event.payload.createdAt,
+            assistantMessageId: null,
+            state: "pending",
+            requestedAt: event.payload.requestedAt,
+            startedAt: null,
+            completedAt: null,
+            checkpointTurnCount: null,
+            checkpointRef: null,
+            checkpointStatus: null,
+            checkpointFiles: [],
           });
           return;
         }
@@ -842,9 +939,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             threadId: event.payload.threadId,
             turnId,
           });
-          const pendingTurnStart = yield* projectionTurnRepository.getPendingTurnStartByThreadId({
-            threadId: event.payload.threadId,
-          });
           if (Option.isSome(existingTurn)) {
             const nextState =
               existingTurn.value.state === "completed" || existingTurn.value.state === "error"
@@ -853,51 +947,20 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             yield* projectionTurnRepository.upsertByTurnId({
               ...existingTurn.value,
               state: nextState,
-              pendingMessageId:
-                existingTurn.value.pendingMessageId ??
-                (Option.isSome(pendingTurnStart) ? pendingTurnStart.value.messageId : null),
-              sourceProposedPlanThreadId:
-                existingTurn.value.sourceProposedPlanThreadId ??
-                (Option.isSome(pendingTurnStart)
-                  ? pendingTurnStart.value.sourceProposedPlanThreadId
-                  : null),
-              sourceProposedPlanId:
-                existingTurn.value.sourceProposedPlanId ??
-                (Option.isSome(pendingTurnStart)
-                  ? pendingTurnStart.value.sourceProposedPlanId
-                  : null),
-              startedAt:
-                existingTurn.value.startedAt ??
-                (Option.isSome(pendingTurnStart)
-                  ? pendingTurnStart.value.requestedAt
-                  : event.occurredAt),
-              requestedAt:
-                existingTurn.value.requestedAt ??
-                (Option.isSome(pendingTurnStart)
-                  ? pendingTurnStart.value.requestedAt
-                  : event.occurredAt),
+              startedAt: existingTurn.value.startedAt ?? event.occurredAt,
+              requestedAt: existingTurn.value.requestedAt ?? event.occurredAt,
             });
           } else {
             yield* projectionTurnRepository.upsertByTurnId({
               turnId,
               threadId: event.payload.threadId,
-              pendingMessageId: Option.isSome(pendingTurnStart)
-                ? pendingTurnStart.value.messageId
-                : null,
-              sourceProposedPlanThreadId: Option.isSome(pendingTurnStart)
-                ? pendingTurnStart.value.sourceProposedPlanThreadId
-                : null,
-              sourceProposedPlanId: Option.isSome(pendingTurnStart)
-                ? pendingTurnStart.value.sourceProposedPlanId
-                : null,
+              pendingMessageId: null,
+              sourceProposedPlanThreadId: null,
+              sourceProposedPlanId: null,
               assistantMessageId: null,
               state: "running",
-              requestedAt: Option.isSome(pendingTurnStart)
-                ? pendingTurnStart.value.requestedAt
-                : event.occurredAt,
-              startedAt: Option.isSome(pendingTurnStart)
-                ? pendingTurnStart.value.requestedAt
-                : event.occurredAt,
+              requestedAt: event.occurredAt,
+              startedAt: event.occurredAt,
               completedAt: null,
               checkpointTurnCount: null,
               checkpointRef: null,
@@ -905,10 +968,6 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
               checkpointFiles: [],
             });
           }
-
-          yield* projectionTurnRepository.deletePendingTurnStartByThreadId({
-            threadId: event.payload.threadId,
-          });
           return;
         }
 
@@ -1177,6 +1236,10 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         apply: applyThreadProposedPlansProjection,
       },
       {
+        name: ORCHESTRATION_PROJECTOR_NAMES.threadQueuedFollowups,
+        apply: applyThreadQueuedFollowupsProjection,
+      },
+      {
         name: ORCHESTRATION_PROJECTOR_NAMES.threadActivities,
         apply: applyThreadActivitiesProjection,
       },
@@ -1298,6 +1361,7 @@ export const OrchestrationProjectionPipelineLive = Layer.effect(
   Layer.provideMerge(ProjectionThreadRepositoryLive),
   Layer.provideMerge(ProjectionThreadMessageRepositoryLive),
   Layer.provideMerge(ProjectionThreadProposedPlanRepositoryLive),
+  Layer.provideMerge(ProjectionQueuedFollowupRepositoryLive),
   Layer.provideMerge(ProjectionThreadActivityRepositoryLive),
   Layer.provideMerge(ProjectionThreadSessionRepositoryLive),
   Layer.provideMerge(ProjectionTurnRepositoryLive),

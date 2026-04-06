@@ -179,6 +179,7 @@ function makeFakeCodexAdapter(provider: ProviderKind = "codex") {
     provider,
     capabilities: {
       sessionModelSwitch: "in-session",
+      busyFollowupMode: "queue-only",
     },
     startSession,
     sendTurn,

@@ -4,6 +4,7 @@ import {
   MessageId,
   NonNegativeInt,
   OrchestrationCheckpointFile,
+  type OrchestrationQueuedFollowup,
   OrchestrationProposedPlanId,
   OrchestrationReadModel,
   ProjectScript,
@@ -35,6 +36,10 @@ import { ProjectionProject } from "../../persistence/Services/ProjectionProjects
 import { ProjectionState } from "../../persistence/Services/ProjectionState.ts";
 import { ProjectionThreadActivity } from "../../persistence/Services/ProjectionThreadActivities.ts";
 import { ProjectionThreadMessage } from "../../persistence/Services/ProjectionThreadMessages.ts";
+import {
+  projectionQueuedFollowupToReadModel,
+  ProjectionQueuedFollowup,
+} from "../../persistence/Services/ProjectionQueuedFollowups.ts";
 import { ProjectionThreadProposedPlan } from "../../persistence/Services/ProjectionThreadProposedPlans.ts";
 import { ProjectionThreadSession } from "../../persistence/Services/ProjectionThreadSessions.ts";
 import { ProjectionThread } from "../../persistence/Services/ProjectionThreads.ts";
@@ -57,6 +62,12 @@ const ProjectionThreadMessageDbRowSchema = ProjectionThreadMessage.mapFields(
   Struct.assign({
     isStreaming: Schema.Number,
     attachments: Schema.NullOr(Schema.fromJsonString(Schema.Array(ChatAttachment))),
+  }),
+);
+const ProjectionQueuedFollowupDbRowSchema = ProjectionQueuedFollowup.mapFields(
+  Struct.assign({
+    attachments: Schema.fromJsonString(Schema.Array(ChatAttachment)),
+    modelSelection: Schema.NullOr(Schema.fromJsonString(ModelSelection)),
   }),
 );
 const ProjectionThreadProposedPlanDbRowSchema = ProjectionThreadProposedPlan;
@@ -118,6 +129,7 @@ const REQUIRED_SNAPSHOT_PROJECTORS = [
   ORCHESTRATION_PROJECTOR_NAMES.threads,
   ORCHESTRATION_PROJECTOR_NAMES.threadMessages,
   ORCHESTRATION_PROJECTOR_NAMES.threadProposedPlans,
+  ORCHESTRATION_PROJECTOR_NAMES.threadQueuedFollowups,
   ORCHESTRATION_PROJECTOR_NAMES.threadActivities,
   ORCHESTRATION_PROJECTOR_NAMES.threadSessions,
   ORCHESTRATION_PROJECTOR_NAMES.checkpoints,
@@ -246,6 +258,28 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
       `,
   });
 
+  const listQueuedFollowupRows = SqlSchema.findAll({
+    Request: Schema.Void,
+    Result: ProjectionQueuedFollowupDbRowSchema,
+    execute: () =>
+      sql`
+        SELECT
+          queued_followup_id AS "id",
+          thread_id AS "threadId",
+          message_id AS "messageId",
+          text,
+          attachments_json AS "attachments",
+          model_selection_json AS "modelSelection",
+          interaction_mode AS "interactionMode",
+          source_proposed_plan_thread_id AS "sourceProposedPlanThreadId",
+          source_proposed_plan_id AS "sourceProposedPlanId",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+        FROM projection_thread_queued_followups
+        ORDER BY thread_id ASC, created_at ASC, queued_followup_id ASC
+      `,
+  });
+
   const listThreadActivityRows = SqlSchema.findAll({
     Request: Schema.Void,
     Result: ProjectionThreadActivityDbRowSchema,
@@ -328,6 +362,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
           source_proposed_plan_id AS "sourceProposedPlanId"
         FROM projection_turns
         WHERE turn_id IS NOT NULL
+          AND state <> 'pending'
         ORDER BY thread_id ASC, requested_at DESC, turn_id DESC
       `,
   });
@@ -442,6 +477,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
             threadRows,
             messageRows,
             proposedPlanRows,
+            queuedFollowupRows,
             activityRows,
             sessionRows,
             checkpointRows,
@@ -477,6 +513,14 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
                 toPersistenceSqlOrDecodeError(
                   "ProjectionSnapshotQuery.getSnapshot:listThreadProposedPlans:query",
                   "ProjectionSnapshotQuery.getSnapshot:listThreadProposedPlans:decodeRows",
+                ),
+              ),
+            ),
+            listQueuedFollowupRows(undefined).pipe(
+              Effect.mapError(
+                toPersistenceSqlOrDecodeError(
+                  "ProjectionSnapshotQuery.getSnapshot:listQueuedFollowups:query",
+                  "ProjectionSnapshotQuery.getSnapshot:listQueuedFollowups:decodeRows",
                 ),
               ),
             ),
@@ -524,6 +568,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
 
           const messagesByThread = new Map<string, Array<OrchestrationMessage>>();
           const proposedPlansByThread = new Map<string, Array<OrchestrationProposedPlan>>();
+          const queuedFollowupsByThread = new Map<string, Array<OrchestrationQueuedFollowup>>();
           const activitiesByThread = new Map<string, Array<OrchestrationThreadActivity>>();
           const checkpointsByThread = new Map<string, Array<OrchestrationCheckpointSummary>>();
           const sessionsByThread = new Map<string, OrchestrationSession>();
@@ -570,6 +615,19 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
               updatedAt: row.updatedAt,
             });
             proposedPlansByThread.set(row.threadId, threadProposedPlans);
+          }
+
+          for (const row of queuedFollowupRows) {
+            updatedAt = maxIso(updatedAt, row.updatedAt);
+            const threadQueuedFollowups = queuedFollowupsByThread.get(row.threadId) ?? [];
+            const { modelSelection, ...restRow } = row;
+            threadQueuedFollowups.push(
+              projectionQueuedFollowupToReadModel({
+                ...restRow,
+                ...(modelSelection !== null ? { modelSelection } : {}),
+              }),
+            );
+            queuedFollowupsByThread.set(row.threadId, threadQueuedFollowups);
           }
 
           for (const row of activityRows) {
@@ -679,6 +737,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
             deletedAt: row.deletedAt,
             messages: messagesByThread.get(row.threadId) ?? [],
             proposedPlans: proposedPlansByThread.get(row.threadId) ?? [],
+            queuedFollowups: queuedFollowupsByThread.get(row.threadId) ?? [],
             activities: activitiesByThread.get(row.threadId) ?? [],
             checkpoints: checkpointsByThread.get(row.threadId) ?? [],
             session: sessionsByThread.get(row.threadId) ?? null,

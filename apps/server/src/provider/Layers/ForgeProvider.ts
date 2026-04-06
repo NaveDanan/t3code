@@ -295,7 +295,7 @@ const probeGitBashBackend = Effect.fn("probeGitBashBackend")(function* (): Effec
     label: gitBashPath,
     spec: {
       command: gitBashPath,
-      args: ["-lc", "command -v zsh"],
+      args: ["--version"],
       env: process.env,
       cwd: undefined,
       shell: false,
@@ -307,7 +307,7 @@ const probeGitBashBackend = Effect.fn("probeGitBashBackend")(function* (): Effec
       status: buildBackendStatus({
         id: "gitbash",
         available: false,
-        reason: `Failed to verify zsh for Git Bash: ${result.failure instanceof Error ? result.failure.message : String(result.failure)}.`,
+        reason: `Failed to verify Git Bash: ${result.failure instanceof Error ? result.failure.message : String(result.failure)}.`,
       }),
     };
   }
@@ -316,17 +316,17 @@ const probeGitBashBackend = Effect.fn("probeGitBashBackend")(function* (): Effec
       status: buildBackendStatus({
         id: "gitbash",
         available: false,
-        reason: "Timed out while verifying zsh for Git Bash.",
+        reason: "Timed out while verifying Git Bash.",
       }),
     };
   }
 
-  if (result.success.value.code !== 0 || result.success.value.stdout.trim().length === 0) {
+  if (result.success.value.code !== 0) {
     return {
       status: buildBackendStatus({
         id: "gitbash",
         available: false,
-        reason: "zsh is not installed in Git Bash.",
+        reason: "Git Bash is installed but could not be started successfully.",
       }),
     };
   }
@@ -614,7 +614,7 @@ export const checkForgeProviderStatus = Effect.gen(function* () {
         status: "error",
         auth: { status: "unknown" },
         message: isCommandMissingCause(error)
-          ? `ForgeCode CLI is not available on the selected ${selectedBackend.status.label} backend. Confirm zsh is installed and the Forge binary path is correct.`
+          ? `ForgeCode CLI is not available on the selected ${selectedBackend.status.label} backend. Confirm the backend is installed and the Forge binary path is correct.`
           : `Failed to execute the ForgeCode CLI on ${selectedBackend.status.label}: ${error instanceof Error ? error.message : String(error)}.`,
       },
     });

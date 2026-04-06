@@ -10,7 +10,11 @@ import type {
 } from "@t3tools/contracts";
 
 import type { ForgeCliApi } from "./forgecode.ts";
-import { parseForgeConversationDump, type ForgeParsedConversationDump } from "./forgecodeDump.ts";
+import {
+  normalizeForgeConversationText,
+  parseForgeConversationDump,
+  type ForgeParsedConversationDump,
+} from "./forgecodeDump.ts";
 
 export const DEFAULT_FORGE_DUMP_ROOT_PATH = join(tmpdir(), "t3code-forge-dumps");
 
@@ -72,9 +76,7 @@ export async function dumpForgeConversation(input: {
 }
 
 export function normalizeForgeConversationShowText(raw: string): string | undefined {
-  const normalized = raw.replace(/\r\n/g, "\n");
-  const withoutTerminalNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
-  return withoutTerminalNewline.length > 0 ? withoutTerminalNewline : undefined;
+  return normalizeForgeConversationText(raw);
 }
 
 export async function showForgeConversationMessage(input: {
@@ -106,15 +108,111 @@ export async function deleteForgeConversation(input: {
   });
 }
 
-export function forgeToolLifecycleItemType(toolName: string): ToolLifecycleItemType {
-  switch (toolName.trim().toLowerCase()) {
-    case "shell":
-      return "command_execution";
-    case "sage":
-      return "collab_agent_tool_call";
+function normalizeForgeToolName(toolName: string): string {
+  return toolName.trim().toLowerCase();
+}
+
+function titleForForgeItemType(itemType: ToolLifecycleItemType): string {
+  switch (itemType) {
+    case "command_execution":
+      return "Command run";
+    case "file_change":
+      return "File change";
+    case "mcp_tool_call":
+      return "MCP tool call";
+    case "collab_agent_tool_call":
+      return "Subagent task";
+    case "web_search":
+      return "Web search";
+    case "image_view":
+      return "Image view";
+    case "dynamic_tool_call":
+      return "Tool call";
     default:
-      return "dynamic_tool_call";
+      return "Item";
   }
+}
+
+export function forgeToolLifecycleItemType(toolName: string): ToolLifecycleItemType {
+  const normalized = normalizeForgeToolName(toolName);
+  if (normalized.length === 0) {
+    return "dynamic_tool_call";
+  }
+  if (normalized.includes("websearch") || normalized.includes("web search")) {
+    return "web_search";
+  }
+  if (normalized.includes("image")) {
+    return "image_view";
+  }
+  if (
+    normalized === "sage" ||
+    normalized === "task" ||
+    normalized === "agent" ||
+    normalized.includes("subagent") ||
+    normalized.includes("sub-agent") ||
+    normalized.includes("agent")
+  ) {
+    return "collab_agent_tool_call";
+  }
+  if (
+    normalized.includes("bash") ||
+    normalized.includes("command") ||
+    normalized.includes("shell") ||
+    normalized.includes("terminal")
+  ) {
+    return "command_execution";
+  }
+  if (
+    normalized === "read" ||
+    normalized === "fs_search" ||
+    normalized.includes("read file") ||
+    normalized.includes("grep") ||
+    normalized.includes("glob") ||
+    normalized.includes("search")
+  ) {
+    return "dynamic_tool_call";
+  }
+  if (
+    normalized.includes("edit") ||
+    normalized.includes("write") ||
+    normalized.includes("patch") ||
+    normalized.includes("replace") ||
+    normalized.includes("create") ||
+    normalized.includes("delete") ||
+    normalized.includes("rename")
+  ) {
+    return "file_change";
+  }
+  if (normalized.includes("mcp")) {
+    return "mcp_tool_call";
+  }
+  return "dynamic_tool_call";
+}
+
+export function forgeToolLifecycleTitle(toolName: string): string {
+  const normalized = normalizeForgeToolName(toolName);
+  if (normalized === "read" || normalized.includes("read file")) {
+    return "Read file";
+  }
+  if (
+    normalized === "fs_search" ||
+    normalized.includes("grep") ||
+    normalized.includes("glob") ||
+    normalized.includes("search")
+  ) {
+    return normalized.includes("web") ? "Web search" : "Search files";
+  }
+  if (
+    normalized === "sage" ||
+    normalized === "task" ||
+    normalized === "agent" ||
+    normalized.includes("subagent") ||
+    normalized.includes("sub-agent") ||
+    normalized.includes("agent")
+  ) {
+    return "Subagent task";
+  }
+  return titleForForgeItemType(forgeToolLifecycleItemType(toolName));
 }
 
 export function toForgeThreadTokenUsageSnapshot(

@@ -16,6 +16,7 @@ import type {
   ProviderSendTurnInput,
   ProviderSession,
   ProviderSessionStartInput,
+  ServerProviderBusyFollowupMode,
   ThreadId,
   ProviderTurnStartResult,
   TurnId,
@@ -30,6 +31,10 @@ export interface ProviderAdapterCapabilities {
    * Declares whether changing the model on an existing session is supported.
    */
   readonly sessionModelSwitch: ProviderSessionModelSwitchMode;
+  /**
+   * Declares whether the provider can accept follow-up prompts while a turn is already running.
+   */
+  readonly busyFollowupMode: ServerProviderBusyFollowupMode;
 }
 
 export interface ProviderThreadTurnSnapshot {

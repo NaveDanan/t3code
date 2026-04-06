@@ -385,6 +385,125 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
       return [userMessageEvent, turnStartRequestedEvent];
     }
 
+    case "thread.queued-followup.enqueue": {
+      const targetThread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const sourceProposedPlan = command.followup.sourceProposedPlan;
+      const sourceThread = sourceProposedPlan
+        ? yield* requireThread({
+            readModel,
+            command,
+            threadId: sourceProposedPlan.threadId,
+          })
+        : null;
+      const sourcePlan =
+        sourceProposedPlan && sourceThread
+          ? sourceThread.proposedPlans.find((entry) => entry.id === sourceProposedPlan.planId)
+          : null;
+      if (sourceProposedPlan && !sourcePlan) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Proposed plan '${sourceProposedPlan.planId}' does not exist on thread '${sourceProposedPlan.threadId}'.`,
+        });
+      }
+      if (sourceThread && sourceThread.projectId !== targetThread.projectId) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Proposed plan '${sourceProposedPlan?.planId}' belongs to thread '${sourceThread.id}' in a different project.`,
+        });
+      }
+      if (targetThread.queuedFollowups.some((entry) => entry.id === command.followup.id)) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Queued follow-up '${command.followup.id}' already exists on thread '${command.threadId}'.`,
+        });
+      }
+      return {
+        ...withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        }),
+        type: "thread.queued-followup-enqueued",
+        payload: {
+          threadId: command.threadId,
+          followup: {
+            ...command.followup,
+            updatedAt: command.createdAt,
+          },
+        },
+      };
+    }
+
+    case "thread.queued-followup.remove": {
+      const thread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const queuedFollowup = thread.queuedFollowups.find(
+        (entry) => entry.id === command.queuedFollowupId,
+      );
+      if (!queuedFollowup) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Queued follow-up '${command.queuedFollowupId}' does not exist on thread '${command.threadId}'.`,
+        });
+      }
+      return {
+        ...withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        }),
+        type: "thread.queued-followup-removed",
+        payload: {
+          threadId: command.threadId,
+          queuedFollowupId: command.queuedFollowupId,
+          reason: "removed",
+          removedAt: command.createdAt,
+        },
+      };
+    }
+
+    case "thread.queued-followup.dispatch-now": {
+      const thread = yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      const queuedFollowup = thread.queuedFollowups.find(
+        (entry) => entry.id === command.queuedFollowupId,
+      );
+      if (!queuedFollowup) {
+        return yield* new OrchestrationCommandInvariantError({
+          commandType: command.type,
+          detail: `Queued follow-up '${command.queuedFollowupId}' does not exist on thread '${command.threadId}'.`,
+        });
+      }
+      void queuedFollowup;
+      void thread;
+      return {
+        ...withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        }),
+        type: "thread.queued-followup-dispatch-requested",
+        payload: {
+          threadId: command.threadId,
+          queuedFollowupId: command.queuedFollowupId,
+          createdAt: command.createdAt,
+        },
+      };
+    }
+
     case "thread.turn.interrupt": {
       yield* requireThread({
         readModel,
@@ -643,6 +762,36 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
         payload: {
           threadId: command.threadId,
           turnCount: command.turnCount,
+        },
+      };
+    }
+
+    case "thread.turn.dispatched": {
+      yield* requireThread({
+        readModel,
+        command,
+        threadId: command.threadId,
+      });
+      return {
+        ...withEventBase({
+          aggregateKind: "thread",
+          aggregateId: command.threadId,
+          occurredAt: command.createdAt,
+          commandId: command.commandId,
+        }),
+        type: "thread.turn-dispatched",
+        payload: {
+          threadId: command.threadId,
+          turnId: command.turnId,
+          messageId: command.messageId,
+          ...(command.queuedFollowupId !== undefined
+            ? { queuedFollowupId: command.queuedFollowupId }
+            : {}),
+          ...(command.sourceProposedPlan !== undefined
+            ? { sourceProposedPlan: command.sourceProposedPlan }
+            : {}),
+          requestedAt: command.requestedAt,
+          dispatchedAt: command.createdAt,
         },
       };
     }

@@ -42,7 +42,7 @@ import {
   dumpForgeConversation,
   forgeAgentIdForInteractionMode,
   forgeToolLifecycleItemType,
-  showForgeConversationMessage,
+  forgeToolLifecycleTitle,
   toForgeThreadTokenUsageSnapshot,
 } from "../forgecodeRuntime.ts";
 import type { ProviderThreadSnapshot } from "../Services/ProviderAdapter.ts";
@@ -63,12 +63,18 @@ interface ForgeTurnState {
   readonly agentId: "forge" | "muse";
   readonly resolvedModel: ForgeResolvedModel;
   readonly startedAt: string;
-  readonly previousAssistantText?: string;
+  readonly projectedToolStateByCallId: Map<string, ForgeProjectedToolState>;
   process?: ForgeSpawnedProcess;
   interrupted: boolean;
   interruptState?: "interrupted" | "cancelled";
   streamedAssistantText: string;
   streamingClosed: boolean;
+}
+
+interface ForgeProjectedToolState {
+  readonly itemId: RuntimeItemId;
+  lastInProgressFingerprint?: string;
+  lastCompletedFingerprint?: string;
 }
 
 interface ForgeSessionContext {
@@ -289,11 +295,19 @@ function normalizeForgeAssistantText(value: string | undefined): string | undefi
   return value.replace(/\r\n/g, "\n");
 }
 
-function assistantItemIdForTurn(context: ForgeSessionContext, turnState: ForgeTurnState): RuntimeItemId {
-  return runtimeItemId(`forgecode-item:${context.conversationId}:turn:${turnState.index}:assistant`);
+function assistantItemIdForTurn(
+  context: ForgeSessionContext,
+  turnState: ForgeTurnState,
+): RuntimeItemId {
+  return runtimeItemId(
+    `forgecode-item:${context.conversationId}:turn:${turnState.index}:assistant`,
+  );
 }
 
-function computeAppendedTextDelta(previousText: string, nextText: string | undefined): string | undefined {
+function computeAppendedTextDelta(
+  previousText: string,
+  nextText: string | undefined,
+): string | undefined {
   const normalizedNextText = normalizeForgeAssistantText(nextText);
   if (!normalizedNextText || normalizedNextText.length === 0) {
     return undefined;
@@ -301,27 +315,54 @@ function computeAppendedTextDelta(previousText: string, nextText: string | undef
   if (previousText.length === 0) {
     return normalizedNextText;
   }
-  if (!normalizedNextText.startsWith(previousText) || normalizedNextText.length === previousText.length) {
+  if (
+    !normalizedNextText.startsWith(previousText) ||
+    normalizedNextText.length === previousText.length
+  ) {
     return undefined;
   }
   return normalizedNextText.slice(previousText.length);
 }
 
-function computePreviewAssistantDelta(turnState: ForgeTurnState, previewText: string | undefined): string | undefined {
-  if (turnState.streamedAssistantText.length > 0) {
-    return computeAppendedTextDelta(turnState.streamedAssistantText, previewText);
-  }
-  const normalizedPreviewText = normalizeForgeAssistantText(previewText);
-  if (!normalizedPreviewText || normalizedPreviewText.length === 0) {
+function projectionFingerprint(value: unknown): string | undefined {
+  try {
+    return JSON.stringify(value);
+  } catch {
     return undefined;
   }
-  if (
-    turnState.previousAssistantText &&
-    normalizeForgeAssistantText(turnState.previousAssistantText) === normalizedPreviewText
-  ) {
-    return undefined;
-  }
-  return normalizedPreviewText;
+}
+
+function toolInProgressFingerprint(
+  toolCall: ForgeParsedTurn["toolCalls"][number],
+): string | undefined {
+  return projectionFingerprint({
+    detail: truncateDetail(toolCall.detail),
+    input: toolCall.args,
+  });
+}
+
+function toolCompletedFingerprint(
+  toolCall: ForgeParsedTurn["toolCalls"][number],
+): string | undefined {
+  return projectionFingerprint({
+    detail: truncateDetail(toolCall.detail ?? toolCall.result?.text),
+    input: toolCall.args,
+    result: toolCall.result
+      ? {
+          callId: toolCall.result.callId,
+          isError: toolCall.result.isError,
+          name: toolCall.result.name,
+          text: truncateDetail(toolCall.result.text),
+        }
+      : null,
+  });
+}
+
+function exactForgeTurn(
+  turns: ReadonlyArray<ForgeParsedTurn>,
+  index: number,
+): ForgeParsedTurn | undefined {
+  return turns.find((turn) => turn.index === index);
 }
 
 function threadSnapshotFromTurns(
@@ -467,20 +508,6 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
     });
   });
 
-  const readAssistantPreview = Effect.fn("readAssistantPreview")(function* (
-    context: ForgeSessionContext,
-  ) {
-    return yield* Effect.tryPromise({
-      try: () =>
-        showForgeConversationMessage({
-          binaryPath: context.binaryPath,
-          conversationId: context.conversationId,
-          cliApi: context.cliApi,
-        }),
-      catch: () => undefined,
-    }).pipe(Effect.catchAll(() => Effect.succeed(undefined)));
-  });
-
   const emitLiveAssistantDelta = Effect.fn("emitLiveAssistantDelta")(function* (
     context: ForgeSessionContext,
     turnState: ForgeTurnState,
@@ -492,12 +519,6 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
         turnId: turnState.turnId,
         payload: {
           delta,
-        },
-        raw: {
-          source: "forge.cli.show",
-          payload: {
-            assistantText: turnState.streamedAssistantText + delta,
-          },
         },
       });
       return;
@@ -511,13 +532,129 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
         streamKind: "assistant_text",
         delta,
       },
-      raw: {
-        source: "forge.cli.show",
+    });
+  });
+
+  const emitProjectedToolProgress = Effect.fn("emitProjectedToolProgress")(function* (
+    context: ForgeSessionContext,
+    turnState: ForgeTurnState,
+    toolCall: ForgeParsedTurn["toolCalls"][number],
+    rawSource: "forge.cli.dump",
+  ) {
+    const itemId = runtimeItemId(
+      `forgecode-item:${context.conversationId}:turn:${turnState.index}:tool:${toolCall.callId}`,
+    );
+    const itemType = forgeToolLifecycleItemType(toolCall.name);
+    const itemTitle = forgeToolLifecycleTitle(toolCall.name);
+    const existingState = turnState.projectedToolStateByCallId.get(toolCall.callId);
+
+    if (!existingState) {
+      turnState.projectedToolStateByCallId.set(toolCall.callId, { itemId });
+      yield* emitRuntimeEvent(context, {
+        type: "item.started",
+        turnId: turnState.turnId,
+        itemId,
         payload: {
-          assistantText: turnState.streamedAssistantText + delta,
+          itemType,
+          status: "inProgress",
+          title: itemTitle,
+          ...(toolCall.detail ? { detail: truncateDetail(toolCall.detail) } : {}),
+          data: {
+            toolName: toolCall.name,
+            callId: toolCall.callId,
+            input: toolCall.args,
+          },
+        },
+        raw: {
+          source: rawSource,
+          payload: toolCall,
+        },
+      });
+    }
+
+    const projectedState = turnState.projectedToolStateByCallId.get(toolCall.callId) ?? { itemId };
+    if (!toolCall.result) {
+      const nextFingerprint = toolInProgressFingerprint(toolCall);
+      if (!nextFingerprint || projectedState.lastInProgressFingerprint === nextFingerprint) {
+        return;
+      }
+
+      turnState.projectedToolStateByCallId.set(toolCall.callId, {
+        ...projectedState,
+        lastInProgressFingerprint: nextFingerprint,
+      });
+      yield* emitRuntimeEvent(context, {
+        type: "item.updated",
+        turnId: turnState.turnId,
+        itemId,
+        payload: {
+          itemType,
+          status: "inProgress",
+          title: itemTitle,
+          ...(toolCall.detail ? { detail: truncateDetail(toolCall.detail) } : {}),
+          data: {
+            toolName: toolCall.name,
+            callId: toolCall.callId,
+            input: toolCall.args,
+          },
+        },
+        raw: {
+          source: rawSource,
+          payload: toolCall,
+        },
+      });
+      return;
+    }
+
+    const completedFingerprint = toolCompletedFingerprint(toolCall);
+    if (completedFingerprint && projectedState.lastCompletedFingerprint === completedFingerprint) {
+      return;
+    }
+
+    turnState.projectedToolStateByCallId.set(toolCall.callId, {
+      ...projectedState,
+      ...(completedFingerprint ? { lastCompletedFingerprint: completedFingerprint } : {}),
+    });
+    yield* emitRuntimeEvent(context, {
+      type: "item.completed",
+      turnId: turnState.turnId,
+      itemId,
+      payload: {
+        itemType,
+        status: toolCall.result.isError ? "failed" : "completed",
+        title: itemTitle,
+        ...(truncateDetail(toolCall.detail ?? toolCall.result.text)
+          ? { detail: truncateDetail(toolCall.detail ?? toolCall.result.text) }
+          : {}),
+        data: {
+          toolName: toolCall.name,
+          callId: toolCall.callId,
+          input: toolCall.args,
+          result: toolCall.result,
         },
       },
+      raw: {
+        source: rawSource,
+        payload: toolCall,
+      },
     });
+  });
+
+  const emitProjectedAssistantProgress = Effect.fn("emitProjectedAssistantProgress")(function* (
+    context: ForgeSessionContext,
+    turnState: ForgeTurnState,
+    parsedTurn: ForgeParsedTurn,
+  ) {
+    const remainingAssistantDelta = computeAppendedTextDelta(
+      turnState.streamedAssistantText,
+      parsedTurn.assistantText,
+    );
+    if (!remainingAssistantDelta || remainingAssistantDelta.length === 0) {
+      return;
+    }
+
+    yield* emitLiveAssistantDelta(context, turnState, remainingAssistantDelta);
+    turnState.streamedAssistantText += remainingAssistantDelta;
   });
 
   const streamLiveAssistant = Effect.fn("streamLiveAssistant")(function* (
@@ -530,20 +667,15 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
       !context.stopped &&
       context.activeTurn === turnState
     ) {
-      const previewText = yield* readAssistantPreview(context);
-      if (
-        turnState.streamingClosed ||
-        turnState.interrupted ||
-        context.stopped ||
-        context.activeTurn !== turnState
-      ) {
-        return;
-      }
-
-      const delta = computePreviewAssistantDelta(turnState, previewText);
-      if (delta && delta.length > 0) {
-        yield* emitLiveAssistantDelta(context, turnState, delta);
-        turnState.streamedAssistantText += delta;
+      const conversationResult = yield* readConversation(context).pipe(Effect.result);
+      if (Result.isSuccess(conversationResult)) {
+        const parsedTurn = exactForgeTurn(conversationResult.success.turns, turnState.index);
+        if (parsedTurn) {
+          for (const toolCall of parsedTurn.toolCalls) {
+            yield* emitProjectedToolProgress(context, turnState, toolCall, "forge.cli.dump");
+          }
+          yield* emitProjectedAssistantProgress(context, turnState, parsedTurn);
+        }
       }
 
       if (
@@ -564,55 +696,7 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
     parsedTurn: ForgeParsedTurn,
   ) {
     for (const toolCall of parsedTurn.toolCalls) {
-      const itemId = runtimeItemId(
-        `forgecode-item:${context.conversationId}:turn:${turnState.index}:tool:${toolCall.callId}`,
-      );
-      const itemType = forgeToolLifecycleItemType(toolCall.name);
-
-      yield* emitRuntimeEvent(context, {
-        type: "item.started",
-        turnId: turnState.turnId,
-        itemId,
-        payload: {
-          itemType,
-          status: "inProgress",
-          title: toolCall.name,
-          ...(toolCall.detail ? { detail: truncateDetail(toolCall.detail) } : {}),
-          data: {
-            toolName: toolCall.name,
-            callId: toolCall.callId,
-            args: toolCall.args,
-          },
-        },
-        raw: {
-          source: "forge.cli.dump",
-          payload: toolCall,
-        },
-      });
-
-      yield* emitRuntimeEvent(context, {
-        type: "item.completed",
-        turnId: turnState.turnId,
-        itemId,
-        payload: {
-          itemType,
-          status: toolCall.result?.isError ? "failed" : "completed",
-          title: toolCall.name,
-          ...(truncateDetail(toolCall.result?.text ?? toolCall.detail)
-            ? { detail: truncateDetail(toolCall.result?.text ?? toolCall.detail) }
-            : {}),
-          data: {
-            toolName: toolCall.name,
-            callId: toolCall.callId,
-            args: toolCall.args,
-            result: toolCall.result,
-          },
-        },
-        raw: {
-          source: "forge.cli.dump",
-          payload: toolCall,
-        },
-      });
+      yield* emitProjectedToolProgress(context, turnState, toolCall, "forge.cli.dump");
     }
 
     if (parsedTurn.assistantText.trim().length > 0) {
@@ -630,26 +714,7 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
         });
       } else {
         const assistantItemId = assistantItemIdForTurn(context, turnState);
-        const remainingAssistantDelta = computeAppendedTextDelta(
-          turnState.streamedAssistantText,
-          parsedTurn.assistantText,
-        );
-        if (remainingAssistantDelta && remainingAssistantDelta.length > 0) {
-          yield* emitRuntimeEvent(context, {
-            type: "content.delta",
-            turnId: turnState.turnId,
-            itemId: assistantItemId,
-            payload: {
-              streamKind: "assistant_text",
-              delta: remainingAssistantDelta,
-            },
-            raw: {
-              source: "forge.cli.dump",
-              payload: parsedTurn,
-            },
-          });
-          turnState.streamedAssistantText += remainingAssistantDelta;
-        }
+        yield* emitProjectedAssistantProgress(context, turnState, parsedTurn);
         yield* emitRuntimeEvent(context, {
           type: "item.completed",
           turnId: turnState.turnId,
@@ -712,7 +777,12 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
         context.lastKnownTurnCount = conversation.turns.length;
         conversationTitle = conversation.title;
         parsedTurn = latestForgeTurn(conversation.turns, turnState.index);
-        context.lastAssistantText = normalizeForgeAssistantText(parsedTurn?.assistantText);
+        const lastAssistantText = normalizeForgeAssistantText(parsedTurn?.assistantText);
+        if (lastAssistantText) {
+          context.lastAssistantText = lastAssistantText;
+        } else {
+          delete context.lastAssistantText;
+        }
         totalCostUsd = parsedTurn?.usage?.totalCostUsd;
         usageRaw = parsedTurn?.usage?.raw;
       } else {
@@ -1173,7 +1243,7 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
       agentId,
       resolvedModel,
       startedAt: nowIso(),
-      ...(context.lastAssistantText ? { previousAssistantText: context.lastAssistantText } : {}),
+      projectedToolStateByCallId: new Map(),
       interrupted: false,
       streamedAssistantText: "",
       streamingClosed: false,
@@ -1282,7 +1352,12 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
 
     const conversation = yield* readConversation(context);
     context.lastKnownTurnCount = conversation.turns.length;
-    context.lastAssistantText = normalizeForgeAssistantText(conversation.turns.at(-1)?.assistantText);
+    const lastAssistantText = normalizeForgeAssistantText(conversation.turns.at(-1)?.assistantText);
+    if (lastAssistantText) {
+      context.lastAssistantText = lastAssistantText;
+    } else {
+      delete context.lastAssistantText;
+    }
     return threadSnapshotFromTurns(threadId, context.conversationId, conversation.turns);
   });
 
@@ -1364,6 +1439,7 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
     provider: PROVIDER,
     capabilities: {
       sessionModelSwitch: "in-session",
+      busyFollowupMode: "queue-only",
     },
     startSession,
     sendTurn,

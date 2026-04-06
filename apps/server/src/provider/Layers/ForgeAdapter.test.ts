@@ -6,7 +6,7 @@ import { PassThrough } from "node:stream";
 
 import { ThreadId, type ProviderRuntimeEvent } from "@t3tools/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { Effect, Fiber, Layer, Stream } from "effect";
+import { Effect, Fiber, Layer, Queue, Stream } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
 import { ServerSettingsService } from "../../serverSettings.ts";
@@ -54,13 +54,15 @@ class FakeChildProcess extends EventEmitter {
   }
 }
 
-function processResult(overrides?: Partial<{
-  stdout: string;
-  stderr: string;
-  code: number;
-  signal: NodeJS.Signals | null;
-  timedOut: boolean;
-}>) {
+function processResult(
+  overrides?: Partial<{
+    stdout: string;
+    stderr: string;
+    code: number;
+    signal: NodeJS.Signals | null;
+    timedOut: boolean;
+  }>,
+) {
   return {
     stdout: "",
     stderr: "",
@@ -71,7 +73,19 @@ function processResult(overrides?: Partial<{
   };
 }
 
-function buildConversationDump(turns: ReadonlyArray<{ userText: string; assistantText: string }>): string {
+function buildConversationDump(
+  turns: ReadonlyArray<{
+    userText: string;
+    assistantText: string;
+    toolCalls?: ReadonlyArray<{
+      name: string;
+      callId: string;
+      args: unknown;
+      resultText?: string;
+      isError?: boolean;
+    }>;
+  }>,
+): string {
   const messages = turns.flatMap((turn, index) => [
     {
       text: {
@@ -89,8 +103,33 @@ function buildConversationDump(turns: ReadonlyArray<{ userText: string; assistan
       text: {
         role: "Assistant",
         content: turn.assistantText,
+        ...(turn.toolCalls && turn.toolCalls.length > 0
+          ? {
+              tool_calls: turn.toolCalls.map((toolCall) => ({
+                name: toolCall.name,
+                call_id: toolCall.callId,
+                arguments: toolCall.args,
+              })),
+            }
+          : {}),
       },
     },
+    ...(turn.toolCalls ?? []).flatMap((toolCall) =>
+      toolCall.resultText !== undefined || toolCall.isError === true
+        ? [
+            {
+              tool: {
+                name: toolCall.name,
+                call_id: toolCall.callId,
+                output: {
+                  is_error: toolCall.isError === true,
+                  values: toolCall.resultText ? [{ text: toolCall.resultText }] : [],
+                },
+              },
+            },
+          ]
+        : [],
+    ),
   ]);
 
   return JSON.stringify({
@@ -105,9 +144,24 @@ function buildConversationDump(turns: ReadonlyArray<{ userText: string; assistan
 }
 
 interface FakeForgeState {
-  currentShownAssistantText?: string;
+  currentAssistantText?: string;
   includeCurrentTurn: boolean;
+  currentToolCalls?: ReadonlyArray<{
+    name: string;
+    callId: string;
+    args: unknown;
+    resultText?: string;
+    isError?: boolean;
+  }>;
+  currentTranscript?: string;
 }
+
+const RAW_FORGE_TRANSCRIPT = [
+  "Initialize ... Planning task workflow",
+  "Read Todos",
+  "Update Todos 3 item(s)",
+  "Execute [cmd.exe] bun fmt",
+].join("\n");
 
 function makeFakeCliApi(state: FakeForgeState): ForgeCliApi {
   return {
@@ -121,7 +175,7 @@ function makeFakeCliApi(state: FakeForgeState): ForgeCliApi {
       }
       if (args[0] === "conversation" && args[1] === "show") {
         return processResult({
-          stdout: state.currentShownAssistantText ? `${state.currentShownAssistantText}\n` : "",
+          stdout: state.currentTranscript ? `${state.currentTranscript}\n` : "",
         });
       }
       if (args[0] === "conversation" && args[1] === "dump") {
@@ -137,7 +191,8 @@ function makeFakeCliApi(state: FakeForgeState): ForgeCliApi {
             ? [
                 {
                   userText: "Current prompt",
-                  assistantText: "Fresh answer",
+                  assistantText: state.currentAssistantText ?? "",
+                  ...(state.currentToolCalls ? { toolCalls: state.currentToolCalls } : {}),
                 },
               ]
             : []),
@@ -149,15 +204,15 @@ function makeFakeCliApi(state: FakeForgeState): ForgeCliApi {
     },
     spawn: (_input: ForgeCommandInput) => {
       const child = new FakeChildProcess();
-      state.currentShownAssistantText = "Previous answer";
+      state.currentTranscript = RAW_FORGE_TRANSCRIPT;
 
       setTimeout(() => {
-        state.currentShownAssistantText = "Fresh";
         state.includeCurrentTurn = true;
+        state.currentAssistantText = "Fresh";
       }, 350);
 
       setTimeout(() => {
-        state.currentShownAssistantText = "Fresh answer";
+        state.currentAssistantText = "Fresh answer";
       }, 650);
 
       setTimeout(() => {
@@ -172,10 +227,219 @@ function makeFakeCliApi(state: FakeForgeState): ForgeCliApi {
   };
 }
 
+function makeTranscriptStreamingCliApi(state: FakeForgeState): ForgeCliApi {
+  return {
+    run: async (input: ForgeCommandInput) => {
+      const args = [...input.args];
+      if (args[0] === "list" && args[1] === "agent") {
+        return processResult({ stdout: AGENT_CATALOG_OUTPUT });
+      }
+      if (args[0] === "list" && args[1] === "model") {
+        return processResult({ stdout: MODEL_CATALOG_OUTPUT });
+      }
+      if (args[0] === "conversation" && args[1] === "show") {
+        return processResult({
+          stdout: state.currentTranscript ? `${state.currentTranscript}\n` : "",
+        });
+      }
+      if (args[0] === "conversation" && args[1] === "dump") {
+        if (!input.cwd) {
+          throw new Error("conversation dump requires a cwd");
+        }
+        const dump = buildConversationDump([
+          {
+            userText: "Previous prompt",
+            assistantText: "Previous answer",
+          },
+          ...(state.includeCurrentTurn
+            ? [
+                {
+                  userText: "Current prompt",
+                  assistantText: state.currentAssistantText ?? "",
+                },
+              ]
+            : []),
+        ]);
+        await writeFile(join(input.cwd, "conversation-dump.json"), dump, "utf8");
+        return processResult({ stdout: "dumped\n" });
+      }
+      throw new Error(`Unexpected Forge CLI args: ${args.join(" ")}`);
+    },
+    spawn: (_input: ForgeCommandInput) => {
+      const child = new FakeChildProcess();
+      state.currentTranscript = RAW_FORGE_TRANSCRIPT;
+
+      setTimeout(() => {
+        child.stdout.write(`${RAW_FORGE_TRANSCRIPT}\n`);
+      }, 150);
+
+      setTimeout(() => {
+        state.includeCurrentTurn = true;
+        state.currentAssistantText = "Fresh answer";
+      }, 350);
+
+      setTimeout(() => {
+        child.close(0);
+      }, 650);
+
+      return {
+        process: child as never,
+        kill: () => child.close(130, "SIGTERM"),
+      };
+    },
+  };
+}
+
+function makeToolingCliApi(): ForgeCliApi {
+  const state: FakeForgeState = {
+    currentAssistantText: "",
+    includeCurrentTurn: false,
+    currentToolCalls: [],
+  };
+
+  return {
+    run: async (input: ForgeCommandInput) => {
+      const args = [...input.args];
+      if (args[0] === "list" && args[1] === "agent") {
+        return processResult({ stdout: AGENT_CATALOG_OUTPUT });
+      }
+      if (args[0] === "list" && args[1] === "model") {
+        return processResult({ stdout: MODEL_CATALOG_OUTPUT });
+      }
+      if (args[0] === "conversation" && args[1] === "show") {
+        return processResult({
+          stdout: state.currentTranscript ? `${state.currentTranscript}\n` : "",
+        });
+      }
+      if (args[0] === "conversation" && args[1] === "dump") {
+        if (!input.cwd) {
+          throw new Error("conversation dump requires a cwd");
+        }
+        const dump = buildConversationDump([
+          {
+            userText: "Previous prompt",
+            assistantText: "Previous answer",
+          },
+          ...(state.includeCurrentTurn
+            ? [
+                {
+                  userText: "Current prompt",
+                  assistantText: state.currentAssistantText ?? "",
+                  ...(state.currentToolCalls ? { toolCalls: state.currentToolCalls } : {}),
+                },
+              ]
+            : []),
+        ]);
+        await writeFile(join(input.cwd, "conversation-dump.json"), dump, "utf8");
+        return processResult({ stdout: "dumped\n" });
+      }
+      throw new Error(`Unexpected Forge CLI args: ${args.join(" ")}`);
+    },
+    spawn: (_input: ForgeCommandInput) => {
+      const child = new FakeChildProcess();
+
+      setTimeout(() => {
+        state.includeCurrentTurn = true;
+        state.currentToolCalls = [
+          {
+            name: "Shell",
+            callId: "call-shell-1",
+            args: { command: ["bun", "run", "lint"] },
+          },
+        ];
+      }, 100);
+
+      setTimeout(() => {
+        state.currentToolCalls = [
+          {
+            name: "Shell",
+            callId: "call-shell-1",
+            args: { command: ["bun", "run", "lint"] },
+          },
+        ];
+      }, 620);
+
+      setTimeout(() => {
+        state.currentToolCalls = [
+          {
+            name: "Shell",
+            callId: "call-shell-1",
+            args: { command: ["bun", "run", "lint"] },
+            resultText: "lint complete",
+          },
+          {
+            name: "WriteFile",
+            callId: "call-write-1",
+            args: { filePath: "apps/web/src/components/ChatView.tsx" },
+          },
+          {
+            name: "Sage",
+            callId: "call-sage-1",
+            args: { tasks: ["Review the new layout and summarize risks"] },
+          },
+        ];
+        state.currentAssistantText = "Fresh answer";
+      }, 860);
+
+      setTimeout(() => {
+        state.currentToolCalls = [
+          {
+            name: "Shell",
+            callId: "call-shell-1",
+            args: { command: ["bun", "run", "lint"] },
+            resultText: "lint complete",
+          },
+          {
+            name: "WriteFile",
+            callId: "call-write-1",
+            args: { filePath: "apps/web/src/components/ChatView.tsx" },
+            resultText: "wrote ChatView",
+          },
+          {
+            name: "Sage",
+            callId: "call-sage-1",
+            args: { tasks: ["Review the new layout and summarize risks"] },
+            resultText: "subagent finished",
+          },
+        ];
+      }, 1_050);
+
+      setTimeout(() => {
+        child.close(0);
+      }, 1_250);
+
+      return {
+        process: child as never,
+        kill: () => child.close(130, "SIGTERM"),
+      };
+    },
+  };
+}
+
+function collectEventsThroughTurnCompletion(stream: Stream.Stream<ProviderRuntimeEvent>) {
+  return Effect.gen(function* () {
+    const queue = yield* Queue.unbounded<ProviderRuntimeEvent>();
+    const collector = yield* Stream.runForEach(stream, (event) =>
+      Queue.offer(queue, event).pipe(Effect.asVoid),
+    ).pipe(Effect.forkChild);
+
+    const events: ProviderRuntimeEvent[] = [];
+    while (true) {
+      const event = yield* Queue.take(queue);
+      events.push(event);
+      if (event.type === "turn.completed") {
+        break;
+      }
+    }
+
+    yield* Fiber.interrupt(collector);
+    return events;
+  });
+}
+
 describe("ForgeAdapter live assistant streaming", () => {
-  it("streams only the new assistant message before the final dump reconciliation", async () => {
+  it("streams only the new assistant message from parsed turn snapshots", async () => {
     const state: FakeForgeState = {
-      currentShownAssistantText: "Previous answer",
       includeCurrentTurn: false,
     };
 
@@ -199,10 +463,6 @@ describe("ForgeAdapter live assistant streaming", () => {
     const events = await Effect.runPromise(
       Effect.gen(function* () {
         const adapter = yield* ForgeAdapter;
-        const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 10).pipe(
-          Stream.runCollect,
-          Effect.forkChild,
-        );
 
         yield* adapter.startSession({
           provider: "forgecode",
@@ -222,7 +482,7 @@ describe("ForgeAdapter live assistant streaming", () => {
           interactionMode: "default",
         });
 
-        return Array.from(yield* Fiber.join(runtimeEventsFiber));
+        return yield* collectEventsThroughTurnCompletion(adapter.streamEvents);
       }).pipe(Effect.provide(layer)),
     );
 
@@ -230,7 +490,11 @@ describe("ForgeAdapter live assistant streaming", () => {
       (event): event is Extract<ProviderRuntimeEvent, { type: "content.delta" }> =>
         event.type === "content.delta",
     );
-    expect(contentDeltas.map((event) => event.payload.delta)).toEqual(["Fresh", " answer"]);
+    expect(contentDeltas.length).toBeGreaterThan(0);
+    expect(contentDeltas.map((event) => event.payload.delta).join("")).toBe("Fresh answer");
+    expect(contentDeltas.some((event) => event.payload.delta.includes("Previous answer"))).toBe(
+      false,
+    );
 
     const turnCompletedIndex = events.findIndex((event) => event.type === "turn.completed");
     const lastDeltaIndex = events.findLastIndex((event) => event.type === "content.delta");
@@ -243,5 +507,169 @@ describe("ForgeAdapter live assistant streaming", () => {
         event.type === "item.completed" && event.payload.itemType === "assistant_message",
     );
     expect(completedAssistantItem?.payload.detail).toBe("Fresh answer");
+  });
+
+  it("ignores transcript stdout and only emits structured assistant text", async () => {
+    const state: FakeForgeState = {
+      includeCurrentTurn: false,
+    };
+
+    const layer = makeForgeAdapterLive({
+      cliApiFactory: () => makeTranscriptStreamingCliApi(state),
+    }).pipe(
+      Layer.provideMerge(
+        ServerSettingsService.layerTest({
+          providers: {
+            forgecode: {
+              enabled: true,
+              binaryPath: "forge",
+              executionBackend: "native",
+            },
+          },
+        }),
+      ),
+      Layer.provideMerge(NodeServices.layer),
+    );
+
+    const events = await Effect.runPromise(
+      Effect.gen(function* () {
+        const adapter = yield* ForgeAdapter;
+
+        yield* adapter.startSession({
+          provider: "forgecode",
+          threadId: THREAD_ID,
+          runtimeMode: "full-access",
+          cwd: "D:/Projects/t3code",
+          resumeCursor: {
+            conversationId: CONVERSATION_ID,
+            cwd: "D:/Projects/t3code",
+            executionBackend: "native",
+          },
+        });
+
+        yield* adapter.sendTurn({
+          threadId: THREAD_ID,
+          input: "Current prompt",
+          interactionMode: "default",
+        });
+
+        return yield* collectEventsThroughTurnCompletion(adapter.streamEvents);
+      }).pipe(Effect.provide(layer)),
+    );
+
+    const contentDeltas = events.filter(
+      (event): event is Extract<ProviderRuntimeEvent, { type: "content.delta" }> =>
+        event.type === "content.delta",
+    );
+    expect(contentDeltas.length).toBeGreaterThan(0);
+    expect(contentDeltas.map((event) => event.payload.delta).join("")).toBe("Fresh answer");
+    expect(
+      contentDeltas.some(
+        (event) =>
+          event.payload.delta.includes("Planning task workflow") ||
+          event.payload.delta.includes("Execute [cmd.exe] bun fmt"),
+      ),
+    ).toBe(false);
+
+    const completedAssistantItem = events.find(
+      (event): event is Extract<ProviderRuntimeEvent, { type: "item.completed" }> =>
+        event.type === "item.completed" && event.payload.itemType === "assistant_message",
+    );
+    expect(completedAssistantItem?.payload.detail).toBe("Fresh answer");
+  });
+
+  it("maps Forge tool calls onto the shared work-log metadata", async () => {
+    const layer = makeForgeAdapterLive({
+      cliApiFactory: () => makeToolingCliApi(),
+    }).pipe(
+      Layer.provideMerge(
+        ServerSettingsService.layerTest({
+          providers: {
+            forgecode: {
+              enabled: true,
+              binaryPath: "forge",
+              executionBackend: "native",
+            },
+          },
+        }),
+      ),
+      Layer.provideMerge(NodeServices.layer),
+    );
+
+    const events = await Effect.runPromise(
+      Effect.gen(function* () {
+        const adapter = yield* ForgeAdapter;
+
+        yield* adapter.startSession({
+          provider: "forgecode",
+          threadId: THREAD_ID,
+          runtimeMode: "full-access",
+          cwd: "D:/Projects/t3code",
+          resumeCursor: {
+            conversationId: CONVERSATION_ID,
+            cwd: "D:/Projects/t3code",
+            executionBackend: "native",
+          },
+        });
+
+        yield* adapter.sendTurn({
+          threadId: THREAD_ID,
+          input: "Current prompt",
+          interactionMode: "default",
+        });
+
+        return yield* collectEventsThroughTurnCompletion(adapter.streamEvents);
+      }).pipe(Effect.provide(layer)),
+    );
+
+    const completedToolEvents = events.filter(
+      (event): event is Extract<ProviderRuntimeEvent, { type: "item.completed" }> =>
+        event.type === "item.completed" && event.payload.itemType !== "assistant_message",
+    );
+    const liveToolUpdateIndex = events.findIndex(
+      (event) => event.type === "item.updated" && event.payload.itemType === "command_execution",
+    );
+    const turnCompletedIndex = events.findIndex((event) => event.type === "turn.completed");
+
+    expect(liveToolUpdateIndex).toBeGreaterThan(-1);
+    expect(turnCompletedIndex).toBeGreaterThan(liveToolUpdateIndex);
+
+    expect(completedToolEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            itemType: "command_execution",
+            title: "Command run",
+            detail: "bun run lint",
+            data: expect.objectContaining({
+              toolName: "Shell",
+              input: { command: ["bun", "run", "lint"] },
+            }),
+          }),
+        }),
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            itemType: "file_change",
+            title: "File change",
+            detail: "apps/web/src/components/ChatView.tsx",
+            data: expect.objectContaining({
+              toolName: "WriteFile",
+              input: { filePath: "apps/web/src/components/ChatView.tsx" },
+            }),
+          }),
+        }),
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            itemType: "collab_agent_tool_call",
+            title: "Subagent task",
+            detail: "Review the new layout and summarize risks",
+            data: expect.objectContaining({
+              toolName: "Sage",
+              input: { tasks: ["Review the new layout and summarize risks"] },
+            }),
+          }),
+        }),
+      ]),
+    );
   });
 });

@@ -42,12 +42,16 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
       } satisfies OrchestrationCommand;
     }
 
-    if (command.type !== "thread.turn.start") {
+    if (command.type !== "thread.turn.start" && command.type !== "thread.queued-followup.enqueue") {
       return command as OrchestrationCommand;
     }
 
+    const uploadAttachments =
+      command.type === "thread.turn.start"
+        ? command.message.attachments
+        : command.followup.attachments;
     const normalizedAttachments = yield* Effect.forEach(
-      command.message.attachments,
+      uploadAttachments,
       (attachment) =>
         Effect.gen(function* () {
           const parsed = parseBase64DataUrl(attachment.dataUrl);
@@ -111,10 +115,20 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
       { concurrency: 1 },
     );
 
+    if (command.type === "thread.turn.start") {
+      return {
+        ...command,
+        message: {
+          ...command.message,
+          attachments: normalizedAttachments,
+        },
+      } satisfies OrchestrationCommand;
+    }
+
     return {
       ...command,
-      message: {
-        ...command.message,
+      followup: {
+        ...command.followup,
         attachments: normalizedAttachments,
       },
     } satisfies OrchestrationCommand;

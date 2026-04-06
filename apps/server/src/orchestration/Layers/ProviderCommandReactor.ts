@@ -2,9 +2,11 @@ import {
   type ChatAttachment,
   CommandId,
   EventId,
+  MessageId,
   type ModelSelection,
   type OrchestrationEvent,
   ProviderKind,
+  QueuedFollowupId,
   type OrchestrationSession,
   ThreadId,
   type ProviderSession,
@@ -32,10 +34,12 @@ type ProviderIntentEvent = Extract<
   {
     type:
       | "thread.runtime-mode-set"
+      | "thread.queued-followup-dispatch-requested"
       | "thread.turn-start-requested"
       | "thread.turn-interrupt-requested"
       | "thread.approval-response-requested"
       | "thread.user-input-response-requested"
+      | "thread.session-set"
       | "thread.session-stop-requested";
   }
 >;
@@ -224,6 +228,11 @@ const make = Effect.gen(function* () {
     return readModel.threads.find((entry) => entry.id === threadId);
   });
 
+  const resolveRuntimeSession = (threadId: ThreadId) =>
+    providerService
+      .listSessions()
+      .pipe(Effect.map((sessions) => sessions.find((session) => session.threadId === threadId)));
+
   const ensureSessionForThread = Effect.fn("ensureSessionForThread")(function* (
     threadId: ThreadId,
     createdAt: string,
@@ -262,11 +271,6 @@ const make = Effect.gen(function* () {
       projects: readModel.projects,
     });
 
-    const resolveActiveSession = (threadId: ThreadId) =>
-      providerService
-        .listSessions()
-        .pipe(Effect.map((sessions) => sessions.find((session) => session.threadId === threadId)));
-
     const startProviderSession = (input?: {
       readonly resumeCursor?: unknown;
       readonly provider?: ProviderKind;
@@ -303,7 +307,7 @@ const make = Effect.gen(function* () {
       const providerChanged =
         requestedModelSelection !== undefined &&
         requestedModelSelection.provider !== currentProvider;
-      const activeSession = yield* resolveActiveSession(existingSessionThreadId);
+      const activeSession = yield* resolveRuntimeSession(existingSessionThreadId);
       const sessionModelSwitch =
         currentProvider === undefined
           ? "in-session"
@@ -366,10 +370,17 @@ const make = Effect.gen(function* () {
 
   const sendTurnForThread = Effect.fn("sendTurnForThread")(function* (input: {
     readonly threadId: ThreadId;
+    readonly messageId: MessageId;
     readonly messageText: string;
     readonly attachments?: ReadonlyArray<ChatAttachment>;
     readonly modelSelection?: ModelSelection;
     readonly interactionMode?: "default" | "plan";
+    readonly sourceProposedPlan?: {
+      readonly threadId: ThreadId;
+      readonly planId: string;
+    };
+    readonly queuedFollowupId?: QueuedFollowupId;
+    readonly requestedAt?: string;
     readonly createdAt: string;
   }) {
     const thread = yield* resolveThread(input.threadId);
@@ -386,15 +397,15 @@ const make = Effect.gen(function* () {
     }
     const normalizedInput = toNonEmptyProviderInput(input.messageText);
     const normalizedAttachments = input.attachments ?? [];
-    const activeSession = yield* providerService
-      .listSessions()
-      .pipe(
-        Effect.map((sessions) => sessions.find((session) => session.threadId === input.threadId)),
-      );
+    const activeSession = yield* resolveRuntimeSession(input.threadId);
     const sessionModelSwitch =
       activeSession === undefined
         ? "in-session"
         : (yield* providerService.getCapabilities(activeSession.provider)).sessionModelSwitch;
+    const busyFollowupMode =
+      activeSession === undefined
+        ? "queue-only"
+        : (yield* providerService.getCapabilities(activeSession.provider)).busyFollowupMode;
     const requestedModelSelection =
       input.modelSelection ?? threadModelSelections.get(input.threadId) ?? thread.modelSelection;
     const modelForTurn =
@@ -407,13 +418,37 @@ const make = Effect.gen(function* () {
           : requestedModelSelection
         : input.modelSelection;
 
-    yield* providerService.sendTurn({
+    if (activeSession?.activeTurnId !== undefined && busyFollowupMode !== "native-steer") {
+      return yield* new ProviderAdapterRequestError({
+        provider: activeSession.provider,
+        method: "thread.turn.start",
+        detail: `Provider '${activeSession.provider}' cannot accept a follow-up while turn '${activeSession.activeTurnId}' is still running.`,
+      });
+    }
+
+    const startedTurn = yield* providerService.sendTurn({
       threadId: input.threadId,
       ...(normalizedInput ? { input: normalizedInput } : {}),
       ...(normalizedAttachments.length > 0 ? { attachments: normalizedAttachments } : {}),
       ...(modelForTurn !== undefined ? { modelSelection: modelForTurn } : {}),
       ...(input.interactionMode !== undefined ? { interactionMode: input.interactionMode } : {}),
     });
+
+    yield* orchestrationEngine.dispatch({
+      type: "thread.turn.dispatched",
+      commandId: serverCommandId("provider-turn-dispatched"),
+      threadId: input.threadId,
+      turnId: startedTurn.turnId,
+      messageId: input.messageId,
+      ...(input.queuedFollowupId !== undefined ? { queuedFollowupId: input.queuedFollowupId } : {}),
+      ...(input.sourceProposedPlan !== undefined
+        ? { sourceProposedPlan: input.sourceProposedPlan }
+        : {}),
+      requestedAt: input.requestedAt ?? input.createdAt,
+      createdAt: new Date().toISOString(),
+    });
+
+    return startedTurn;
   });
 
   const maybeGenerateAndRenameWorktreeBranchForFirstTurn = Effect.fn(
@@ -515,6 +550,71 @@ const make = Effect.gen(function* () {
     },
   );
 
+  const dispatchQueuedFollowupTurnStart = Effect.fn("dispatchQueuedFollowupTurnStart")(
+    function* (input: {
+      readonly threadId: ThreadId;
+      readonly queuedFollowupId: QueuedFollowupId;
+      readonly createdAt: string;
+      readonly appendFailureActivityOnUnsupported?: boolean;
+    }) {
+      const thread = yield* resolveThread(input.threadId);
+      if (!thread) {
+        return;
+      }
+
+      const queuedFollowup = thread.queuedFollowups.find(
+        (entry) => entry.id === input.queuedFollowupId,
+      );
+      if (!queuedFollowup) {
+        return;
+      }
+
+      if (thread.messages.some((entry) => entry.id === queuedFollowup.messageId)) {
+        return;
+      }
+
+      const activeSession = yield* resolveRuntimeSession(input.threadId);
+      if (activeSession?.activeTurnId !== undefined) {
+        const busyFollowupMode = (yield* providerService.getCapabilities(activeSession.provider))
+          .busyFollowupMode;
+        if (busyFollowupMode !== "native-steer") {
+          if (input.appendFailureActivityOnUnsupported !== false) {
+            yield* appendProviderFailureActivity({
+              threadId: input.threadId,
+              kind: "provider.turn.start.failed",
+              summary: "Provider turn start failed",
+              detail: `Provider '${activeSession.provider}' cannot dispatch queued follow-ups while turn '${activeSession.activeTurnId}' is still running.`,
+              turnId: null,
+              createdAt: input.createdAt,
+            });
+          }
+          return;
+        }
+      }
+
+      yield* orchestrationEngine.dispatch({
+        type: "thread.turn.start",
+        commandId: serverCommandId("queued-followup-turn-start"),
+        threadId: input.threadId,
+        message: {
+          messageId: queuedFollowup.messageId,
+          role: "user",
+          text: queuedFollowup.text,
+          attachments: queuedFollowup.attachments,
+        },
+        ...(queuedFollowup.modelSelection !== undefined
+          ? { modelSelection: queuedFollowup.modelSelection }
+          : {}),
+        runtimeMode: thread.runtimeMode,
+        interactionMode: queuedFollowup.interactionMode,
+        ...(queuedFollowup.sourceProposedPlan !== undefined
+          ? { sourceProposedPlan: queuedFollowup.sourceProposedPlan }
+          : {}),
+        createdAt: input.createdAt,
+      });
+    },
+  );
+
   const processTurnStartRequested = Effect.fn("processTurnStartRequested")(function* (
     event: Extract<ProviderIntentEvent, { type: "thread.turn-start-requested" }>,
   ) {
@@ -540,6 +640,9 @@ const make = Effect.gen(function* () {
       });
       return;
     }
+    const queuedFollowup = thread.queuedFollowups.find(
+      (entry) => entry.messageId === event.payload.messageId,
+    );
 
     const isFirstUserMessageTurn =
       thread.messages.filter((entry) => entry.role === "user").length === 1;
@@ -573,12 +676,18 @@ const make = Effect.gen(function* () {
 
     yield* sendTurnForThread({
       threadId: event.payload.threadId,
+      messageId: event.payload.messageId,
       messageText: message.text,
       ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
       ...(event.payload.modelSelection !== undefined
         ? { modelSelection: event.payload.modelSelection }
         : {}),
       interactionMode: event.payload.interactionMode,
+      ...(event.payload.sourceProposedPlan !== undefined
+        ? { sourceProposedPlan: event.payload.sourceProposedPlan }
+        : {}),
+      ...(queuedFollowup !== undefined ? { queuedFollowupId: queuedFollowup.id } : {}),
+      requestedAt: event.payload.createdAt,
       createdAt: event.payload.createdAt,
     }).pipe(
       Effect.catchCause((cause) =>
@@ -709,6 +818,45 @@ const make = Effect.gen(function* () {
     },
   );
 
+  const processQueuedFollowupDispatchRequested = Effect.fn(
+    "processQueuedFollowupDispatchRequested",
+  )(function* (
+    event: Extract<ProviderIntentEvent, { type: "thread.queued-followup-dispatch-requested" }>,
+  ) {
+    yield* dispatchQueuedFollowupTurnStart({
+      threadId: event.payload.threadId,
+      queuedFollowupId: event.payload.queuedFollowupId,
+      createdAt: event.payload.createdAt,
+    });
+  });
+
+  const processSessionSet = Effect.fn("processSessionSet")(function* (
+    event: Extract<ProviderIntentEvent, { type: "thread.session-set" }>,
+  ) {
+    if (event.payload.session.status !== "ready") {
+      return;
+    }
+
+    const thread = yield* resolveThread(event.payload.threadId);
+    if (!thread) {
+      return;
+    }
+
+    const nextQueuedFollowup = thread.queuedFollowups.find(
+      (entry) => !thread.messages.some((message) => message.id === entry.messageId),
+    );
+    if (!nextQueuedFollowup) {
+      return;
+    }
+
+    yield* dispatchQueuedFollowupTurnStart({
+      threadId: event.payload.threadId,
+      queuedFollowupId: nextQueuedFollowup.id,
+      createdAt: event.occurredAt,
+      appendFailureActivityOnUnsupported: false,
+    });
+  });
+
   const processSessionStopRequested = Effect.fn("processSessionStopRequested")(function* (
     event: Extract<ProviderIntentEvent, { type: "thread.session-stop-requested" }>,
   ) {
@@ -762,6 +910,9 @@ const make = Effect.gen(function* () {
         );
         return;
       }
+      case "thread.queued-followup-dispatch-requested":
+        yield* processQueuedFollowupDispatchRequested(event);
+        return;
       case "thread.turn-start-requested":
         yield* processTurnStartRequested(event);
         return;
@@ -773,6 +924,9 @@ const make = Effect.gen(function* () {
         return;
       case "thread.user-input-response-requested":
         yield* processUserInputResponseRequested(event);
+        return;
+      case "thread.session-set":
+        yield* processSessionSet(event);
         return;
       case "thread.session-stop-requested":
         yield* processSessionStopRequested(event);
@@ -799,10 +953,12 @@ const make = Effect.gen(function* () {
     const processEvent = Effect.fn("processEvent")(function* (event: OrchestrationEvent) {
       if (
         event.type === "thread.runtime-mode-set" ||
+        event.type === "thread.queued-followup-dispatch-requested" ||
         event.type === "thread.turn-start-requested" ||
         event.type === "thread.turn-interrupt-requested" ||
         event.type === "thread.approval-response-requested" ||
         event.type === "thread.user-input-response-requested" ||
+        event.type === "thread.session-set" ||
         event.type === "thread.session-stop-requested"
       ) {
         return yield* worker.enqueue(event);

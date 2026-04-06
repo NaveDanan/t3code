@@ -27,6 +27,82 @@ function truncateText(value: string, limit = 240): string {
   return value.length > limit ? `${value.slice(0, limit - 3)}...` : value;
 }
 
+function firstTrimmedString(
+  record: Record<string, unknown> | null,
+  keys: ReadonlyArray<string>,
+): string | undefined {
+  for (const key of keys) {
+    const value = asTrimmedString(record?.[key]);
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function normalizedStringValue(value: unknown): string | undefined {
+  const direct = asTrimmedString(value);
+  if (direct) {
+    return direct;
+  }
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const parts = value
+    .map((entry) => asTrimmedString(entry))
+    .filter((entry): entry is string => entry !== undefined);
+  return parts.length > 0 ? parts.join(" ") : undefined;
+}
+
+const FORGE_HARNESS_STATUS_REGEX = /[ \t]*●\s*\[[^\]\n\r]*(?:\]|$)\s*([^\n\r]*)/g;
+const FORGE_STATUS_ID_REGEX =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
+
+function normalizeForgeHarnessStatusAction(raw: string): string | undefined {
+  const normalized = raw.replace(FORGE_STATUS_ID_REGEX, "...").replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
+  if (/^Finished(?:\s+\.\.\.)?$/i.test(normalized)) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function normalizeForgeHarnessStatusLine(line: string): {
+  readonly text: string;
+  readonly hadHarnessStatus: boolean;
+} {
+  let hadHarnessStatus = false;
+  const text = line.replace(
+    FORGE_HARNESS_STATUS_REGEX,
+    (_match: string, body: string, offset: number): string => {
+      hadHarnessStatus = true;
+      const action = normalizeForgeHarnessStatusAction(body);
+      if (!action) {
+        return "";
+      }
+      return offset === 0 ? action : ` ${action}`;
+    },
+  );
+  return { text, hadHarnessStatus };
+}
+
+export function normalizeForgeConversationText(raw: string): string | undefined {
+  const normalized = raw.replace(/\r\n/g, "\n");
+  const sanitizedLines: string[] = [];
+  for (const line of normalized.split("\n")) {
+    const sanitizedLine = normalizeForgeHarnessStatusLine(line);
+    if (sanitizedLine.hadHarnessStatus && sanitizedLine.text.trim().length === 0) {
+      continue;
+    }
+    sanitizedLines.push(sanitizedLine.text);
+  }
+  const sanitized = sanitizedLines.join("\n");
+  const withoutTerminalNewline = sanitized.endsWith("\n") ? sanitized.slice(0, -1) : sanitized;
+  return withoutTerminalNewline.length > 0 ? withoutTerminalNewline : undefined;
+}
+
 export interface ForgeParsedUsage {
   readonly usedTokens: number;
   readonly inputTokens?: number;
@@ -77,13 +153,14 @@ export function normalizeForgeToolOutputText(rawText: string): string {
 
 export function describeForgeToolCall(toolName: string, args: unknown): string | undefined {
   const record = asRecord(args);
-  switch (toolName.trim().toLowerCase()) {
+  const normalized = toolName.trim().toLowerCase();
+  switch (normalized) {
     case "shell":
-      return asTrimmedString(record?.command);
+      return normalizedStringValue(record?.command);
     case "read":
-      return asTrimmedString(record?.file_path);
+      return firstTrimmedString(record, ["file_path", "filePath", "path"]);
     case "fs_search":
-      return asTrimmedString(record?.pattern);
+      return firstTrimmedString(record, ["pattern", "query", "path"]);
     case "sage": {
       const tasks = record?.tasks;
       if (!Array.isArray(tasks)) {
@@ -94,16 +171,31 @@ export function describeForgeToolCall(toolName: string, args: unknown): string |
         .find((entry) => entry !== undefined);
       return task ? truncateText(task) : undefined;
     }
-    default: {
-      if (!record) {
-        return undefined;
-      }
-      try {
-        return truncateText(JSON.stringify(record));
-      } catch {
-        return undefined;
-      }
-    }
+  }
+
+  if (
+    normalized.includes("edit") ||
+    normalized.includes("write") ||
+    normalized.includes("patch") ||
+    normalized.includes("replace") ||
+    normalized.includes("create") ||
+    normalized.includes("delete") ||
+    normalized.includes("rename")
+  ) {
+    return firstTrimmedString(record, ["file_path", "filePath", "path", "newPath", "oldPath"]);
+  }
+
+  if (normalized.includes("grep") || normalized.includes("glob") || normalized.includes("search")) {
+    return firstTrimmedString(record, ["pattern", "query", "path"]);
+  }
+
+  if (!record) {
+    return undefined;
+  }
+  try {
+    return truncateText(JSON.stringify(record));
+  } catch {
+    return undefined;
   }
 }
 
@@ -171,11 +263,17 @@ function finalizeTurn(
     return;
   }
 
+  const assistantTextParts = currentTurn.assistantTextParts
+    .map((part) => normalizeForgeConversationText(part))
+    .filter((part): part is string => part !== undefined);
+  const assistantText =
+    normalizeForgeConversationText(currentTurn.assistantTextParts.join("\n\n").trim()) ?? "";
+
   turns.push({
     index: currentTurn.index,
     userText: currentTurn.userText,
-    assistantTextParts: [...currentTurn.assistantTextParts],
-    assistantText: currentTurn.assistantTextParts.join("\n\n").trim(),
+    assistantTextParts,
+    assistantText,
     toolCalls: currentTurn.toolCalls.map((toolCall) => {
       const result = currentTurn.toolResultsById.get(toolCall.callId);
       return {

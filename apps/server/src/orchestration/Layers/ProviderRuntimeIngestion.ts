@@ -664,6 +664,15 @@ const make = Effect.fn("make")(function* () {
         : (input.fallbackText?.trim().length ?? 0) > 0
           ? input.fallbackText!
           : "";
+    const readModel = yield* orchestrationEngine.getReadModel();
+    const existingAssistantMessage = readModel.threads
+      .find((thread) => thread.id === input.threadId)
+      ?.messages.find((message) => message.id === input.messageId);
+
+    if (text.length === 0 && !existingAssistantMessage) {
+      yield* clearAssistantMessageState(input.messageId);
+      return;
+    }
 
     if (text.length > 0) {
       yield* orchestrationEngine.dispatch({
@@ -799,33 +808,26 @@ const make = Effect.fn("make")(function* () {
     ).pipe(Effect.asVoid);
   });
 
-  const getSourceProposedPlanReferenceForPendingTurnStart = Effect.fn(
-    "getSourceProposedPlanReferenceForPendingTurnStart",
-  )(function* (threadId: ThreadId) {
-    const pendingTurnStart = yield* projectionTurnRepository.getPendingTurnStartByThreadId({
-      threadId,
-    });
-    if (Option.isNone(pendingTurnStart)) {
-      return null;
-    }
+  const getSourceProposedPlanReferenceForTurn = Effect.fn("getSourceProposedPlanReferenceForTurn")(
+    function* (threadId: ThreadId, turnId: TurnId) {
+      const turn = yield* projectionTurnRepository.getByTurnId({
+        threadId,
+        turnId,
+      });
+      if (Option.isNone(turn)) {
+        return null;
+      }
 
-    const sourceThreadId = pendingTurnStart.value.sourceProposedPlanThreadId;
-    const sourcePlanId = pendingTurnStart.value.sourceProposedPlanId;
-    if (sourceThreadId === null || sourcePlanId === null) {
-      return null;
-    }
+      const sourceThreadId = turn.value.sourceProposedPlanThreadId;
+      const sourcePlanId = turn.value.sourceProposedPlanId;
+      if (sourceThreadId === null || sourcePlanId === null) {
+        return null;
+      }
 
-    return {
-      sourceThreadId,
-      sourcePlanId,
-    } as const;
-  });
-
-  const getExpectedProviderTurnIdForThread = Effect.fn("getExpectedProviderTurnIdForThread")(
-    function* (threadId: ThreadId) {
-      const sessions = yield* providerService.listSessions();
-      const session = sessions.find((entry) => entry.threadId === threadId);
-      return session?.activeTurnId;
+      return {
+        sourceThreadId,
+        sourcePlanId,
+      } as const;
     },
   );
 
@@ -836,12 +838,7 @@ const make = Effect.fn("make")(function* () {
       return null;
     }
 
-    const expectedTurnId = yield* getExpectedProviderTurnIdForThread(threadId);
-    if (!sameId(expectedTurnId, eventTurnId)) {
-      return null;
-    }
-
-    return yield* getSourceProposedPlanReferenceForPendingTurnStart(threadId);
+    return yield* getSourceProposedPlanReferenceForTurn(threadId, eventTurnId);
   });
 
   const markSourceProposedPlanImplemented = Effect.fn("markSourceProposedPlanImplemented")(
@@ -1016,7 +1013,10 @@ const make = Effect.fn("make")(function* () {
 
       const assistantDeliveryMode: AssistantDeliveryMode = yield* Effect.map(
         serverSettingsService.getSettings,
-        (settings) => (settings.enableAssistantStreaming ? "streaming" : "buffered"),
+        (settings) =>
+          settings.enableAssistantStreaming || event.provider === "opencode"
+            ? "streaming"
+            : "buffered",
       );
       if (assistantDeliveryMode === "buffered") {
         const spillChunk = yield* appendBufferedAssistantText(assistantMessageId, assistantDelta);
