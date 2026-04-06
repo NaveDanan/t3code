@@ -85,6 +85,11 @@ const TIMESTAMP_FORMAT_LABELS = {
   "24-hour": "24-hour",
 } as const;
 
+const BUSY_THREAD_FOLLOWUP_MODE_LABELS = {
+  steer: "Steer if supported",
+  queue: "Always queue",
+} as const;
+
 type InstallProviderSettings = {
   provider: ProviderKind;
   title: string;
@@ -988,6 +993,47 @@ export function GeneralSettingsPanel() {
                 </SelectItem>
                 <SelectItem hideIndicator value="worktree">
                   New worktree
+                </SelectItem>
+              </SelectPopup>
+            </Select>
+          }
+        />
+
+        <SettingsRow
+          title="Busy thread follow-ups"
+          description="Choose whether sending on a running thread should steer the current run when the provider supports it, or always land in the queue."
+          resetAction={
+            settings.busyThreadFollowupMode !== DEFAULT_UNIFIED_SETTINGS.busyThreadFollowupMode ? (
+              <SettingResetButton
+                label="busy thread follow-ups"
+                onClick={() =>
+                  updateSettings({
+                    busyThreadFollowupMode: DEFAULT_UNIFIED_SETTINGS.busyThreadFollowupMode,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.busyThreadFollowupMode}
+              onValueChange={(value) => {
+                if (value === "steer" || value === "queue") {
+                  updateSettings({ busyThreadFollowupMode: value });
+                }
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-44" aria-label="Busy thread follow-up mode">
+                <SelectValue>
+                  {BUSY_THREAD_FOLLOWUP_MODE_LABELS[settings.busyThreadFollowupMode]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                <SelectItem hideIndicator value="steer">
+                  {BUSY_THREAD_FOLLOWUP_MODE_LABELS.steer}
+                </SelectItem>
+                <SelectItem hideIndicator value="queue">
+                  {BUSY_THREAD_FOLLOWUP_MODE_LABELS.queue}
                 </SelectItem>
               </SelectPopup>
             </Select>

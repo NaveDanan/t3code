@@ -25,7 +25,14 @@ export const SidebarThreadSortOrder = Schema.Literals(["updated_at", "created_at
 export type SidebarThreadSortOrder = typeof SidebarThreadSortOrder.Type;
 export const DEFAULT_SIDEBAR_THREAD_SORT_ORDER: SidebarThreadSortOrder = "updated_at";
 
+export const BusyThreadFollowupMode = Schema.Literals(["steer", "queue"]);
+export type BusyThreadFollowupMode = typeof BusyThreadFollowupMode.Type;
+export const DEFAULT_BUSY_THREAD_FOLLOWUP_MODE: BusyThreadFollowupMode = "queue";
+
 export const ClientSettingsSchema = Schema.Struct({
+  busyThreadFollowupMode: BusyThreadFollowupMode.pipe(
+    Schema.withDecodingDefault(() => DEFAULT_BUSY_THREAD_FOLLOWUP_MODE),
+  ),
   confirmThreadArchive: Schema.Boolean.pipe(Schema.withDecodingDefault(() => false)),
   confirmThreadDelete: Schema.Boolean.pipe(Schema.withDecodingDefault(() => true)),
   diffWordWrap: Schema.Boolean.pipe(Schema.withDecodingDefault(() => false)),

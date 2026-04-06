@@ -14,4 +14,8 @@ describe("default provider settings", () => {
     expect(DEFAULT_UNIFIED_SETTINGS.providers.opencode.enabled).toBe(true);
     expect(DEFAULT_UNIFIED_SETTINGS.providers.forgecode.enabled).toBe(true);
   });
+
+  it("defaults busy thread follow-ups to queue", () => {
+    expect(DEFAULT_UNIFIED_SETTINGS.busyThreadFollowupMode).toBe("queue");
+  });
 });
