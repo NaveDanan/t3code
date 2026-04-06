@@ -99,6 +99,15 @@ describe("resolveSelectableModel", () => {
     expect(resolveSelectableModel("codex", "gpt-5.3 codex", options)).toBe("gpt-5.3-codex");
     expect(resolveSelectableModel("claudeAgent", "sonnet", options)).toBe("claude-sonnet-4-6");
   });
+
+  it("upgrades unique legacy Forge model ids to provider-qualified slugs", () => {
+    const options = [
+      { slug: "openai/gpt-5.4", name: "OpenAI GPT-5.4" },
+      { slug: "anthropic/sonnet-4-6", name: "Anthropic Sonnet 4.6" },
+    ];
+    expect(resolveSelectableModel("forgecode", "gpt-5.4", options)).toBe("openai/gpt-5.4");
+    expect(resolveSelectableModel("forgecode", "sonnet-4-6", options)).toBe("anthropic/sonnet-4-6");
+  });
 });
 
 describe("capability helpers", () => {

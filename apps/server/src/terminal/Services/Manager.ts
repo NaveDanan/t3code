@@ -7,6 +7,7 @@
  * @module TerminalManager
  */
 import {
+  type ForgeExecutionBackend,
   TerminalClearInput,
   TerminalCloseInput,
   TerminalEvent,
@@ -38,6 +39,7 @@ export interface TerminalSessionState {
   terminalId: string;
   cwd: string;
   worktreePath: string | null;
+  executionBackend?: ForgeExecutionBackend;
   status: TerminalSessionStatus;
   pid: number | null;
   history: string;

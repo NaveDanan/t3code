@@ -2,6 +2,8 @@ import path from "node:path";
 
 import {
   DEFAULT_TERMINAL_ID,
+  ThreadId,
+  type ForgeExecutionBackend,
   type TerminalEvent,
   type TerminalSessionSnapshot,
   type TerminalSessionStatus,
@@ -29,6 +31,15 @@ import {
   terminalSessionsTotal,
 } from "../../observability/Metrics";
 import { runProcess } from "../../processRunner";
+import { ServerSettingsService } from "../../serverSettings";
+import { ProviderSessionDirectory } from "../../provider/Services/ProviderSessionDirectory";
+import {
+  buildForgeBackendTerminalSpawnSpec,
+  parseForgeAdapterKey,
+  resolveForgeExecutionTarget,
+  type ForgeExecutionTarget,
+  type ForgeSpawnSpec,
+} from "../../provider/forgecode";
 import {
   TerminalCwdError,
   TerminalHistoryError,
@@ -81,6 +92,7 @@ interface TerminalStartInput {
   terminalId: string;
   cwd: string;
   worktreePath?: string | null;
+  executionBackend?: ForgeExecutionBackend;
   cols: number;
   rows: number;
   env?: Record<string, string>;
@@ -91,6 +103,7 @@ interface TerminalSessionState {
   terminalId: string;
   cwd: string;
   worktreePath: string | null;
+  executionBackend: ForgeExecutionBackend | undefined;
   status: TerminalSessionStatus;
   pid: number | null;
   history: string;
@@ -146,6 +159,7 @@ function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
     terminalId: session.terminalId,
     cwd: session.cwd,
     worktreePath: session.worktreePath,
+    ...(session.executionBackend ? { executionBackend: session.executionBackend } : {}),
     status: session.status,
     pid: session.pid,
     history: session.history,
@@ -646,6 +660,10 @@ interface TerminalManagerOptions {
   historyLineLimit?: number;
   ptyAdapter: PtyAdapterShape;
   shellResolver?: () => string;
+  resolveForgeTerminalExecutionTarget?: (input: {
+    readonly threadId: string;
+    readonly executionBackend?: ForgeExecutionBackend;
+  }) => Effect.Effect<ForgeExecutionTarget | undefined, PtySpawnError>;
   subprocessChecker?: TerminalSubprocessChecker;
   subprocessPollIntervalMs?: number;
   processKillGraceMs?: number;
@@ -655,9 +673,82 @@ interface TerminalManagerOptions {
 const makeTerminalManager = Effect.fn("makeTerminalManager")(function* () {
   const { terminalLogsDir } = yield* ServerConfig;
   const ptyAdapter = yield* PtyAdapter;
+  const serverSettings = yield* ServerSettingsService;
+  const providerSessionDirectory = yield* ProviderSessionDirectory;
   return yield* makeTerminalManagerWithOptions({
     logsDir: terminalLogsDir,
     ptyAdapter,
+    resolveForgeTerminalExecutionTarget: ({ threadId, executionBackend }) =>
+      Effect.gen(function* () {
+        if (executionBackend) {
+          return yield* Effect.tryPromise({
+            try: () => resolveForgeExecutionTarget({ executionBackend }),
+            catch: (cause) =>
+              new PtySpawnError({
+                adapter: "terminal-manager",
+                message:
+                  cause instanceof Error ? cause.message : "Failed to resolve Forge backend.",
+                cause,
+              }),
+          });
+        }
+
+        const bindingOption = yield* providerSessionDirectory
+          .getBinding(ThreadId.makeUnsafe(threadId))
+          .pipe(Effect.orElseSucceed(() => Option.none()));
+        const binding = Option.getOrUndefined(bindingOption);
+        if (!binding || binding.provider !== "forgecode") {
+          return undefined;
+        }
+
+        const resumeCursor =
+          binding.resumeCursor &&
+          typeof binding.resumeCursor === "object" &&
+          !Array.isArray(binding.resumeCursor)
+            ? (binding.resumeCursor as Record<string, unknown>)
+            : null;
+        const adapterExecutionTarget = parseForgeAdapterKey(binding.adapterKey);
+        const forgeSettings = yield* serverSettings.getSettings.pipe(
+          Effect.map((settings) => settings.providers.forgecode),
+          Effect.mapError(
+            (cause) =>
+              new PtySpawnError({
+                adapter: "terminal-manager",
+                message:
+                  cause instanceof Error ? cause.message : "Failed to read Forge backend settings.",
+                cause,
+              }),
+          ),
+        );
+        const resumeExecutionBackend =
+          resumeCursor?.executionBackend === "native" ||
+          resumeCursor?.executionBackend === "wsl" ||
+          resumeCursor?.executionBackend === "gitbash"
+            ? (resumeCursor.executionBackend as ForgeExecutionBackend)
+            : undefined;
+        const requestedBackend =
+          resumeExecutionBackend ??
+          adapterExecutionTarget?.executionBackend ??
+          forgeSettings.executionBackend;
+        const wslDistro =
+          typeof resumeCursor?.wslDistro === "string"
+            ? resumeCursor.wslDistro
+            : adapterExecutionTarget?.wslDistro;
+
+        return yield* Effect.tryPromise({
+          try: () =>
+            resolveForgeExecutionTarget({
+              executionBackend: requestedBackend,
+              ...(wslDistro ? { wslDistro } : {}),
+            }),
+          catch: (cause) =>
+            new PtySpawnError({
+              adapter: "terminal-manager",
+              message: cause instanceof Error ? cause.message : "Failed to resolve Forge backend.",
+              cause,
+            }),
+        });
+      }),
   });
 });
 
@@ -1296,6 +1387,35 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       return yield* trySpawn(shellCandidates, spawnEnv, session, index + 1, spawnError);
     });
 
+    const trySpawnSpec = Effect.fn("terminal.trySpawnSpec")(function* (
+      spec: ForgeSpawnSpec,
+      spawnEnv: NodeJS.ProcessEnv,
+      session: TerminalSessionState,
+    ): Effect.fn.Return<{ process: PtyProcess; shellLabel: string }, PtySpawnError> {
+      const attempt = yield* Effect.result(
+        options.ptyAdapter.spawn({
+          shell: spec.command,
+          ...(spec.args.length > 0 ? { args: [...spec.args] } : {}),
+          cwd: spec.cwd ?? session.cwd,
+          cols: session.cols,
+          rows: session.rows,
+          env: spawnEnv,
+        }),
+      );
+
+      if (attempt._tag === "Failure") {
+        return yield* attempt.failure;
+      }
+
+      return {
+        process: attempt.success,
+        shellLabel: formatShellCandidate({
+          shell: spec.command,
+          ...(spec.args.length > 0 ? { args: [...spec.args] } : {}),
+        }),
+      };
+    });
+
     const startSession = Effect.fn("terminal.startSession")(function* (
       session: TerminalSessionState,
       input: TerminalStartInput,
@@ -1313,6 +1433,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
         session.status = "starting";
         session.cwd = input.cwd;
         session.worktreePath = input.worktreePath ?? null;
+        session.executionBackend = input.executionBackend;
         session.cols = input.cols;
         session.rows = input.rows;
         session.exitCode = null;
@@ -1332,9 +1453,23 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
         increment(terminalSessionsTotal, { lifecycle: eventType }).pipe(
           Effect.andThen(
             Effect.gen(function* () {
-              const shellCandidates = resolveShellCandidates(shellResolver);
               const terminalEnv = createTerminalSpawnEnv(process.env, session.runtimeEnv);
-              const spawnResult = yield* trySpawn(shellCandidates, terminalEnv, session);
+              const forgeExecutionTarget = options.resolveForgeTerminalExecutionTarget
+                ? yield* options.resolveForgeTerminalExecutionTarget({
+                    threadId: session.threadId,
+                    ...(input.executionBackend ? { executionBackend: input.executionBackend } : {}),
+                  })
+                : undefined;
+              const spawnResult = forgeExecutionTarget
+                ? yield* trySpawnSpec(
+                    buildForgeBackendTerminalSpawnSpec({
+                      executionTarget: forgeExecutionTarget,
+                      cwd: session.cwd,
+                    }),
+                    terminalEnv,
+                    session,
+                  )
+                : yield* trySpawn(resolveShellCandidates(shellResolver), terminalEnv, session);
               ptyProcess = spawnResult.process;
               startedShell = spawnResult.shellLabel;
 
@@ -1356,6 +1491,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
                 session.process = ptyProcess;
                 session.pid = processPid;
                 session.status = "running";
+                session.executionBackend = forgeExecutionTarget?.executionBackend;
                 session.updatedAt = new Date().toISOString();
                 session.unsubscribeData = unsubscribeData;
                 session.unsubscribeExit = unsubscribeExit;
@@ -1582,6 +1718,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               terminalId,
               cwd: input.cwd,
               worktreePath: input.worktreePath ?? null,
+              executionBackend: input.executionBackend,
               status: "starting",
               pid: null,
               history,
@@ -1761,6 +1898,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               terminalId,
               cwd: input.cwd,
               worktreePath: input.worktreePath ?? null,
+              executionBackend: input.executionBackend,
               status: "starting",
               pid: null,
               history: "",

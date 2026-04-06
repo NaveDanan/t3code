@@ -1,6 +1,7 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Plus, SquareSplitHorizontal, TerminalSquare, Trash2, XIcon } from "lucide-react";
 import {
+  type ForgeExecutionBackend,
   type TerminalEvent,
   type TerminalSessionSnapshot,
   type ThreadId,
@@ -213,6 +214,7 @@ interface TerminalViewportProps {
   terminalLabel: string;
   cwd: string;
   worktreePath?: string | null;
+  executionBackend?: ForgeExecutionBackend;
   runtimeEnv?: Record<string, string>;
   onSessionExited: () => void;
   onAddTerminalContext: (selection: TerminalContextSelection) => void;
@@ -228,6 +230,7 @@ function TerminalViewport({
   terminalLabel,
   cwd,
   worktreePath,
+  executionBackend,
   runtimeEnv,
   onSessionExited,
   onAddTerminalContext,
@@ -600,6 +603,7 @@ function TerminalViewport({
           terminalId,
           cwd,
           ...(worktreePath !== undefined ? { worktreePath } : {}),
+          ...(executionBackend ? { executionBackend } : {}),
           cols: activeTerminal.cols,
           rows: activeTerminal.rows,
           ...(runtimeEnv ? { env: runtimeEnv } : {}),
@@ -724,6 +728,7 @@ interface ThreadTerminalDrawerProps {
   threadId: ThreadId;
   cwd: string;
   worktreePath?: string | null;
+  executionBackend?: ForgeExecutionBackend;
   runtimeEnv?: Record<string, string>;
   visible?: boolean;
   height: number;
@@ -776,6 +781,7 @@ export default function ThreadTerminalDrawer({
   threadId,
   cwd,
   worktreePath,
+  executionBackend,
   runtimeEnv,
   visible = true,
   height,
@@ -1103,6 +1109,7 @@ export default function ThreadTerminalDrawer({
                         terminalLabel={terminalLabelById.get(terminalId) ?? "Terminal"}
                         cwd={cwd}
                         {...(worktreePath !== undefined ? { worktreePath } : {})}
+                        {...(executionBackend ? { executionBackend } : {})}
                         {...(runtimeEnv ? { runtimeEnv } : {})}
                         onSessionExited={() => onCloseTerminal(terminalId)}
                         onAddTerminalContext={onAddTerminalContext}
@@ -1124,6 +1131,7 @@ export default function ThreadTerminalDrawer({
                   terminalLabel={terminalLabelById.get(resolvedActiveTerminalId) ?? "Terminal"}
                   cwd={cwd}
                   {...(worktreePath !== undefined ? { worktreePath } : {})}
+                  {...(executionBackend ? { executionBackend } : {})}
                   {...(runtimeEnv ? { runtimeEnv } : {})}
                   onSessionExited={() => onCloseTerminal(resolvedActiveTerminalId)}
                   onAddTerminalContext={onAddTerminalContext}

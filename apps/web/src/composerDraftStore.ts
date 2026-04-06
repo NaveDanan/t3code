@@ -409,7 +409,7 @@ function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
   );
 }
 
-const KNOWN_PROVIDER_KINDS = ["codex", "claudeAgent", "opencode"] as const;
+const KNOWN_PROVIDER_KINDS = ["codex", "claudeAgent", "opencode", "forgecode"] as const;
 
 function normalizeProviderKind(value: unknown): ProviderKind | null {
   return KNOWN_PROVIDER_KINDS.includes(value as ProviderKind) ? (value as ProviderKind) : null;
@@ -555,7 +555,9 @@ function normalizeModelSelection(
       ? modelOptions?.codex
       : provider === "claudeAgent"
         ? modelOptions?.claudeAgent
-        : modelOptions?.opencode;
+        : provider === "opencode"
+          ? modelOptions?.opencode
+          : modelOptions?.forgecode;
   return buildModelSelection(provider, model, options);
 }
 

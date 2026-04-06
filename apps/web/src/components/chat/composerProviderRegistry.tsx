@@ -11,6 +11,7 @@ import { TraitsMenuContent, TraitsPicker } from "./TraitsPicker";
 import {
   normalizeClaudeModelOptionsWithCapabilities,
   normalizeCodexModelOptionsWithCapabilities,
+  normalizeForgeCodeModelOptionsWithCapabilities,
   normalizeOpencodeModelOptionsWithCapabilities,
 } from "@t3tools/shared/model";
 
@@ -98,6 +99,21 @@ function getProviderStateFromCapabilities(
         modelOptionsForDispatch: normalizeOpencodeModelOptionsWithCapabilities(
           caps,
           providerOptions,
+        ),
+        ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
+        ...(ultrathinkActive
+          ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
+          : {}),
+        ...(ultrathinkActive ? { modelPickerIconClassName: "ultrathink-chroma" } : {}),
+      };
+    }
+    case "forgecode": {
+      return {
+        provider,
+        promptEffort: null,
+        modelOptionsForDispatch: normalizeForgeCodeModelOptionsWithCapabilities(
+          caps,
+          modelOptions?.forgecode,
         ),
         ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
         ...(ultrathinkActive
@@ -197,6 +213,38 @@ const composerProviderRegistry: Record<ProviderKind, ProviderRegistryEntry> = {
     renderTraitsPicker: ({ threadId, model, models, modelOptions, prompt, onPromptChange }) => (
       <TraitsPicker
         provider="opencode"
+        models={models}
+        threadId={threadId}
+        model={model}
+        modelOptions={modelOptions}
+        prompt={prompt}
+        onPromptChange={onPromptChange}
+      />
+    ),
+  },
+  forgecode: {
+    getState: (input) => getProviderStateFromCapabilities(input),
+    renderTraitsMenuContent: ({
+      threadId,
+      model,
+      models,
+      modelOptions,
+      prompt,
+      onPromptChange,
+    }) => (
+      <TraitsMenuContent
+        provider="forgecode"
+        models={models}
+        threadId={threadId}
+        model={model}
+        modelOptions={modelOptions}
+        prompt={prompt}
+        onPromptChange={onPromptChange}
+      />
+    ),
+    renderTraitsPicker: ({ threadId, model, models, modelOptions, prompt, onPromptChange }) => (
+      <TraitsPicker
+        provider="forgecode"
         models={models}
         threadId={threadId}
         model={model}

@@ -7,13 +7,14 @@ import {
   PlusIcon,
   XIcon,
 } from "lucide-react";
-import { type RefObject, useState } from "react";
+import { type RefObject, useMemo, useState } from "react";
 import type { ProviderKind, ServerProviderModel, UpstreamProvider } from "@t3tools/contracts";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Collapsible, CollapsibleContent } from "../ui/collapsible";
 import { Input } from "../ui/input";
+import { SuggestiveSearch } from "../ui/suggestive-search";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 // ── Upstream Providers (connection status list for multi-provider harnesses) ──
@@ -61,6 +62,42 @@ function UpstreamProvidersSection({
   upstreamProviders: ReadonlyArray<UpstreamProvider>;
 }) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const trimmedSearchQuery = searchQuery.trim();
+  const normalizedSearchQuery = trimmedSearchQuery.toLowerCase();
+  const filteredUpstreamProviders = useMemo(() => {
+    if (!normalizedSearchQuery) {
+      return upstreamProviders;
+    }
+
+    return upstreamProviders.filter((upstream) => {
+      return `${upstream.name} ${upstream.id}`.toLowerCase().includes(normalizedSearchQuery);
+    });
+  }, [normalizedSearchQuery, upstreamProviders]);
+  const searchSuggestions = useMemo(() => {
+    const uniqueSuggestions: string[] = [];
+    const seenSuggestions = new Set<string>();
+
+    for (const upstream of upstreamProviders) {
+      const suggestion = upstream.name.trim();
+      if (!suggestion || seenSuggestions.has(suggestion)) {
+        continue;
+      }
+
+      uniqueSuggestions.push(suggestion);
+      seenSuggestions.add(suggestion);
+
+      if (uniqueSuggestions.length === 6) {
+        break;
+      }
+    }
+
+    return uniqueSuggestions.length > 0 ? uniqueSuggestions : ["Search providers"];
+  }, [upstreamProviders]);
+  const providerCountLabel = trimmedSearchQuery
+    ? `${filteredUpstreamProviders.length}/${upstreamProviders.length}`
+    : String(upstreamProviders.length);
 
   if (upstreamProviders.length === 0) return null;
 
@@ -75,7 +112,7 @@ function UpstreamProvidersSection({
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-foreground">Providers</span>
           <Badge variant="outline" size="sm">
-            {upstreamProviders.length}
+            {providerCountLabel}
           </Badge>
         </div>
         <ChevronDownIcon
@@ -87,10 +124,30 @@ function UpstreamProvidersSection({
       </button>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleContent>
+          <div className="mt-2">
+            <SuggestiveSearch
+              ariaLabel="Search harness providers"
+              className="w-full rounded-lg border-input px-3 py-1.5 shadow-xs/5"
+              deleteDurationMs={120}
+              effect="fade"
+              pauseAfterTypeMs={1600}
+              suggestions={searchSuggestions}
+              typeDurationMs={180}
+              onChange={setSearchQuery}
+            />
+          </div>
           <div className="mt-2 max-h-40 overflow-y-auto">
-            {upstreamProviders.map((upstream) => (
-              <UpstreamProviderRow key={upstream.id} upstream={upstream} />
-            ))}
+            {filteredUpstreamProviders.length > 0 ? (
+              filteredUpstreamProviders.map((upstream) => (
+                <UpstreamProviderRow key={upstream.id} upstream={upstream} />
+              ))
+            ) : (
+              <p className="py-2 text-xs text-muted-foreground">
+                No providers match {'"'}
+                {trimmedSearchQuery}
+                {'"'}.
+              </p>
+            )}
           </div>
         </CollapsibleContent>
       </Collapsible>

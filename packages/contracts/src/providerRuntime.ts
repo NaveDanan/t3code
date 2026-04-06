@@ -25,6 +25,7 @@ const RuntimeEventRawSource = Schema.Literals([
   "claude.sdk.permission",
   "codex.sdk.thread-event",
   "opencode.sdk.event",
+  "forge.cli.dump",
 ]);
 export type RuntimeEventRawSource = typeof RuntimeEventRawSource.Type;
 

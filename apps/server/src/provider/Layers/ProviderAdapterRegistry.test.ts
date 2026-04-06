@@ -6,6 +6,7 @@ import { Effect, Layer, Stream } from "effect";
 
 import { ClaudeAdapter, ClaudeAdapterShape } from "../Services/ClaudeAdapter.ts";
 import { CodexAdapter, CodexAdapterShape } from "../Services/CodexAdapter.ts";
+import { ForgeAdapter, ForgeAdapterShape } from "../Services/ForgeAdapter.ts";
 import { OpencodeAdapter, OpencodeAdapterShape } from "../Services/OpencodeAdapter.ts";
 import { ProviderAdapterRegistry } from "../Services/ProviderAdapterRegistry.ts";
 import { ProviderAdapterRegistryLive } from "./ProviderAdapterRegistry.ts";
@@ -63,6 +64,23 @@ const fakeOpencodeAdapter: OpencodeAdapterShape = {
   streamEvents: Stream.empty,
 };
 
+const fakeForgeAdapter: ForgeAdapterShape = {
+  provider: "forgecode",
+  capabilities: { sessionModelSwitch: "in-session" },
+  startSession: vi.fn(),
+  sendTurn: vi.fn(),
+  interruptTurn: vi.fn(),
+  respondToRequest: vi.fn(),
+  respondToUserInput: vi.fn(),
+  stopSession: vi.fn(),
+  listSessions: vi.fn(),
+  hasSession: vi.fn(),
+  readThread: vi.fn(),
+  rollbackThread: vi.fn(),
+  stopAll: vi.fn(),
+  streamEvents: Stream.empty,
+};
+
 const layer = it.layer(
   Layer.mergeAll(
     Layer.provide(
@@ -70,6 +88,7 @@ const layer = it.layer(
       Layer.mergeAll(
         Layer.succeed(CodexAdapter, fakeCodexAdapter),
         Layer.succeed(ClaudeAdapter, fakeClaudeAdapter),
+        Layer.succeed(ForgeAdapter, fakeForgeAdapter),
         Layer.succeed(OpencodeAdapter, fakeOpencodeAdapter),
       ),
     ),
@@ -83,13 +102,15 @@ layer("ProviderAdapterRegistryLive", (it) => {
       const registry = yield* ProviderAdapterRegistry;
       const codex = yield* registry.getByProvider("codex");
       const claude = yield* registry.getByProvider("claudeAgent");
+      const forge = yield* registry.getByProvider("forgecode");
       const opencode = yield* registry.getByProvider("opencode");
       assert.equal(codex, fakeCodexAdapter);
       assert.equal(claude, fakeClaudeAdapter);
+      assert.equal(forge, fakeForgeAdapter);
       assert.equal(opencode, fakeOpencodeAdapter);
 
       const providers = yield* registry.listProviders();
-      assert.deepEqual(providers, ["codex", "claudeAgent", "opencode"]);
+      assert.deepEqual(providers, ["codex", "claudeAgent", "forgecode", "opencode"]);
     }),
   );
 

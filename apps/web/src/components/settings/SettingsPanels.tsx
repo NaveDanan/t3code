@@ -117,6 +117,12 @@ const PROVIDER_SETTINGS: readonly InstallProviderSettings[] = [
     binaryPlaceholder: "OpenCode binary path",
     binaryDescription: "Path to the OpenCode binary",
   },
+  {
+    provider: "forgecode",
+    title: "ForgeCode",
+    binaryPlaceholder: "forge",
+    binaryDescription: "Path or command used to launch the ForgeCode binary",
+  },
 ] as const;
 
 const PROVIDER_STATUS_STYLES = {
@@ -548,6 +554,15 @@ export function GeneralSettingsPanel() {
         DEFAULT_UNIFIED_SETTINGS.providers.opencode.binaryPath ||
       settings.providers.opencode.customModels.length > 0,
     ),
+    forgecode: Boolean(
+      settings.providers.forgecode.enabled !==
+        DEFAULT_UNIFIED_SETTINGS.providers.forgecode.enabled ||
+      settings.providers.forgecode.binaryPath !==
+        DEFAULT_UNIFIED_SETTINGS.providers.forgecode.binaryPath ||
+      settings.providers.forgecode.executionBackend !==
+        DEFAULT_UNIFIED_SETTINGS.providers.forgecode.executionBackend ||
+      settings.providers.forgecode.customModels.length > 0,
+    ),
   });
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
     Record<ProviderKind, string>
@@ -555,6 +570,7 @@ export function GeneralSettingsPanel() {
     codex: "",
     claudeAgent: "",
     opencode: "",
+    forgecode: "",
   });
   const [customModelErrorByProvider, setCustomModelErrorByProvider] = useState<
     Partial<Record<ProviderKind, string | null>>
@@ -791,6 +807,7 @@ export function GeneralSettingsPanel() {
       homeDescription: providerSettings.homeDescription,
       binaryPathValue: providerConfig.binaryPath,
       isDirty: !Equal.equals(providerConfig, defaultProviderConfig),
+      executionBackends: liveProvider?.executionBackends ?? [],
       liveProvider,
       models,
       providerConfig,
@@ -1304,6 +1321,78 @@ export function GeneralSettingsPanel() {
                       </div>
                     ) : null}
 
+                    {providerCard.provider === "forgecode" &&
+                    providerCard.executionBackends.length > 0 ? (
+                      <div className="border-t border-border/60 px-4 py-3 sm:px-5">
+                        <label
+                          htmlFor="provider-install-forgecode-execution-backend"
+                          className="block"
+                        >
+                          <span className="text-xs font-medium text-foreground">Forge backend</span>
+                          <Select
+                            value={settings.providers.forgecode.executionBackend}
+                            onValueChange={(value) => {
+                              if (value === "native" || value === "wsl" || value === "gitbash") {
+                                updateSettings({
+                                  providers: {
+                                    ...settings.providers,
+                                    forgecode: {
+                                      ...settings.providers.forgecode,
+                                      executionBackend: value,
+                                    },
+                                  },
+                                });
+                              }
+                            }}
+                          >
+                            <SelectTrigger
+                              id="provider-install-forgecode-execution-backend"
+                              className="mt-1.5 w-full"
+                              aria-label="Forge execution backend"
+                            >
+                              <SelectValue>
+                                {providerCard.executionBackends.find(
+                                  (backend) =>
+                                    backend.id === settings.providers.forgecode.executionBackend,
+                                )?.label ?? settings.providers.forgecode.executionBackend}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectPopup align="start" alignItemWithTrigger={false}>
+                              {providerCard.executionBackends.map((backend) => (
+                                <SelectItem
+                                  hideIndicator
+                                  key={backend.id}
+                                  value={backend.id}
+                                  disabled={!backend.available}
+                                >
+                                  {backend.available
+                                    ? backend.label
+                                    : `${backend.label} (${backend.reason ?? "Unavailable"})`}
+                                </SelectItem>
+                              ))}
+                            </SelectPopup>
+                          </Select>
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            Backend changes apply only to new Forge sessions.
+                          </span>
+                          {providerCard.executionBackends.some((backend) => !backend.available) ? (
+                            <div className="mt-2 space-y-1">
+                              {providerCard.executionBackends
+                                .filter((backend) => !backend.available && backend.reason)
+                                .map((backend) => (
+                                  <span
+                                    key={`${backend.id}-reason`}
+                                    className="block text-xs text-muted-foreground"
+                                  >
+                                    {backend.label}: {backend.reason}
+                                  </span>
+                                ))}
+                            </div>
+                          ) : null}
+                        </label>
+                      </div>
+                    ) : null}
+
                     <ProviderHarnessDetails
                       provider={providerCard.provider}
                       models={providerCard.models}
@@ -1314,7 +1403,11 @@ export function GeneralSettingsPanel() {
                       customModelPlaceholder={
                         providerCard.provider === "codex"
                           ? "gpt-6.7-codex-ultra-preview"
-                          : "claude-sonnet-5-0"
+                          : providerCard.provider === "claudeAgent"
+                            ? "claude-sonnet-5-0"
+                            : providerCard.provider === "opencode"
+                              ? "openai/gpt-5"
+                              : "github_copilot/gpt-5.4"
                       }
                       modelListRef={modelListRefs}
                       onToggleVisibility={toggleModelVisibility}

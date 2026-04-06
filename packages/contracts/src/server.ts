@@ -10,7 +10,7 @@ import { KeybindingRule, ResolvedKeybindingsConfig } from "./keybindings";
 import { EditorId } from "./editor";
 import { ModelCapabilities } from "./model";
 import { ProviderKind } from "./orchestration";
-import { ServerSettings } from "./settings";
+import { ForgeExecutionBackend, ServerSettings } from "./settings";
 
 const KeybindingsMalformedConfigIssue = Schema.Struct({
   kind: Schema.Literal("keybindings.malformed-config"),
@@ -64,6 +64,15 @@ export const UpstreamProvider = Schema.Struct({
 });
 export type UpstreamProvider = typeof UpstreamProvider.Type;
 
+export const ServerProviderExecutionBackend = Schema.Struct({
+  id: ForgeExecutionBackend,
+  label: TrimmedNonEmptyString,
+  available: Schema.Boolean,
+  isDefault: Schema.Boolean,
+  reason: Schema.optional(TrimmedNonEmptyString),
+});
+export type ServerProviderExecutionBackend = typeof ServerProviderExecutionBackend.Type;
+
 export const ServerProvider = Schema.Struct({
   provider: ProviderKind,
   enabled: Schema.Boolean,
@@ -75,6 +84,7 @@ export const ServerProvider = Schema.Struct({
   message: Schema.optional(TrimmedNonEmptyString),
   models: Schema.Array(ServerProviderModel),
   upstreamProviders: Schema.optional(Schema.Array(UpstreamProvider)),
+  executionBackends: Schema.optional(Schema.Array(ServerProviderExecutionBackend)),
 });
 export type ServerProvider = typeof ServerProvider.Type;
 

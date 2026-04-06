@@ -8,11 +8,14 @@ import { Effect, Equal, Layer, PubSub, Ref, Stream } from "effect";
 
 import { ClaudeProviderLive } from "./ClaudeProvider";
 import { CodexProviderLive } from "./CodexProvider";
+import { ForgeProviderLive } from "./ForgeProvider";
 import { OpencodeProviderLive } from "./OpencodeProvider";
 import type { ClaudeProviderShape } from "../Services/ClaudeProvider";
 import { ClaudeProvider } from "../Services/ClaudeProvider";
 import type { CodexProviderShape } from "../Services/CodexProvider";
 import { CodexProvider } from "../Services/CodexProvider";
+import type { ForgeProviderShape } from "../Services/ForgeProvider";
+import { ForgeProvider } from "../Services/ForgeProvider";
 import type { OpencodeProviderShape } from "../Services/OpencodeProvider";
 import { OpencodeProvider } from "../Services/OpencodeProvider";
 import { ProviderRegistry, type ProviderRegistryShape } from "../Services/ProviderRegistry";
@@ -20,10 +23,16 @@ import { ProviderRegistry, type ProviderRegistryShape } from "../Services/Provid
 const loadProviders = (
   codexProvider: CodexProviderShape,
   claudeProvider: ClaudeProviderShape,
+  forgeProvider: ForgeProviderShape,
   opencodeProvider: OpencodeProviderShape,
-): Effect.Effect<readonly [ServerProvider, ServerProvider, ServerProvider]> =>
+): Effect.Effect<readonly [ServerProvider, ServerProvider, ServerProvider, ServerProvider]> =>
   Effect.all(
-    [codexProvider.getSnapshot, claudeProvider.getSnapshot, opencodeProvider.getSnapshot],
+    [
+      codexProvider.getSnapshot,
+      claudeProvider.getSnapshot,
+      forgeProvider.getSnapshot,
+      opencodeProvider.getSnapshot,
+    ],
     {
       concurrency: "unbounded",
     },
@@ -39,20 +48,26 @@ export const ProviderRegistryLive = Layer.effect(
   Effect.gen(function* () {
     const codexProvider = yield* CodexProvider;
     const claudeProvider = yield* ClaudeProvider;
+    const forgeProvider = yield* ForgeProvider;
     const opencodeProvider = yield* OpencodeProvider;
     const changesPubSub = yield* Effect.acquireRelease(
       PubSub.unbounded<ReadonlyArray<ServerProvider>>(),
       PubSub.shutdown,
     );
     const providersRef = yield* Ref.make<ReadonlyArray<ServerProvider>>(
-      yield* loadProviders(codexProvider, claudeProvider, opencodeProvider),
+      yield* loadProviders(codexProvider, claudeProvider, forgeProvider, opencodeProvider),
     );
 
     const syncProviders = Effect.fn("syncProviders")(function* (options?: {
       readonly publish?: boolean;
     }) {
       const previousProviders = yield* Ref.get(providersRef);
-      const providers = yield* loadProviders(codexProvider, claudeProvider, opencodeProvider);
+      const providers = yield* loadProviders(
+        codexProvider,
+        claudeProvider,
+        forgeProvider,
+        opencodeProvider,
+      );
       yield* Ref.set(providersRef, providers);
 
       if (options?.publish !== false && haveProvidersChanged(previousProviders, providers)) {
@@ -68,6 +83,9 @@ export const ProviderRegistryLive = Layer.effect(
     yield* Stream.runForEach(claudeProvider.streamChanges, () => syncProviders()).pipe(
       Effect.forkScoped,
     );
+    yield* Stream.runForEach(forgeProvider.streamChanges, () => syncProviders()).pipe(
+      Effect.forkScoped,
+    );
     yield* Stream.runForEach(opencodeProvider.streamChanges, () => syncProviders()).pipe(
       Effect.forkScoped,
     );
@@ -80,12 +98,20 @@ export const ProviderRegistryLive = Layer.effect(
         case "claudeAgent":
           yield* claudeProvider.refresh;
           break;
+        case "forgecode":
+          yield* forgeProvider.refresh;
+          break;
         case "opencode":
           yield* opencodeProvider.refresh;
           break;
         default:
           yield* Effect.all(
-            [codexProvider.refresh, claudeProvider.refresh, opencodeProvider.refresh],
+            [
+              codexProvider.refresh,
+              claudeProvider.refresh,
+              forgeProvider.refresh,
+              opencodeProvider.refresh,
+            ],
             {
               concurrency: "unbounded",
             },
@@ -113,5 +139,6 @@ export const ProviderRegistryLive = Layer.effect(
 ).pipe(
   Layer.provideMerge(CodexProviderLive),
   Layer.provideMerge(ClaudeProviderLive),
+  Layer.provideMerge(ForgeProviderLive),
   Layer.provideMerge(OpencodeProviderLive),
 );

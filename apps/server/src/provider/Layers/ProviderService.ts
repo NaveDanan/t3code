@@ -44,6 +44,7 @@ import {
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
 import { AnalyticsService } from "../../telemetry/Services/AnalyticsService.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { buildForgeAdapterKey, parseForgeAdapterKey } from "../forgecode.ts";
 
 export interface ProviderServiceLiveOptions {
   readonly canonicalEventLogPath?: string;
@@ -120,10 +121,20 @@ function toRuntimePayloadFromSession(
 }
 
 function readPersistedModelSelection(
+  provider: ProviderSession["provider"],
   runtimePayload: ProviderRuntimeBinding["runtimePayload"],
 ): ModelSelection | undefined {
   if (!runtimePayload || typeof runtimePayload !== "object" || Array.isArray(runtimePayload)) {
     return undefined;
+  }
+  if (provider === "forgecode") {
+    const runtimeModel = "model" in runtimePayload ? runtimePayload.model : undefined;
+    if (typeof runtimeModel === "string" && runtimeModel.trim().length > 0) {
+      return {
+        provider: "forgecode",
+        model: runtimeModel.trim(),
+      };
+    }
   }
   const raw = "modelSelection" in runtimePayload ? runtimePayload.modelSelection : undefined;
   return Schema.is(ModelSelection)(raw) ? raw : undefined;
@@ -139,6 +150,66 @@ function readPersistedCwd(
   if (typeof rawCwd !== "string") return undefined;
   const trimmed = rawCwd.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function forgeAdapterKeyFromResumeCursor(
+  resumeCursor: ProviderSession["resumeCursor"],
+): string | undefined {
+  if (!resumeCursor || typeof resumeCursor !== "object" || Array.isArray(resumeCursor)) {
+    return undefined;
+  }
+  const record = resumeCursor as Record<string, unknown>;
+  const executionBackend =
+    record.executionBackend === "native" ||
+    record.executionBackend === "wsl" ||
+    record.executionBackend === "gitbash"
+      ? record.executionBackend
+      : undefined;
+  if (!executionBackend) {
+    return undefined;
+  }
+  return buildForgeAdapterKey({
+    executionBackend,
+    ...(typeof record.wslDistro === "string" ? { wslDistro: record.wslDistro } : {}),
+  });
+}
+
+function adapterKeyFromSession(session: ProviderSession): string | undefined {
+  if (session.provider !== "forgecode") {
+    return undefined;
+  }
+  return forgeAdapterKeyFromResumeCursor(session.resumeCursor);
+}
+
+function augmentForgeResumeCursor(
+  provider: ProviderSession["provider"],
+  resumeCursor: unknown,
+  adapterKey: string | undefined,
+): unknown {
+  if (provider !== "forgecode") {
+    return resumeCursor;
+  }
+  if (!resumeCursor || typeof resumeCursor !== "object" || Array.isArray(resumeCursor)) {
+    const executionTarget = parseForgeAdapterKey(adapterKey);
+    return executionTarget ?? resumeCursor;
+  }
+  const record = resumeCursor as Record<string, unknown>;
+  if (
+    record.executionBackend === "native" ||
+    record.executionBackend === "wsl" ||
+    record.executionBackend === "gitbash"
+  ) {
+    return resumeCursor;
+  }
+  const executionTarget = parseForgeAdapterKey(adapterKey);
+  if (!executionTarget) {
+    return resumeCursor;
+  }
+  return {
+    ...record,
+    executionBackend: executionTarget.executionBackend,
+    ...(executionTarget.wslDistro ? { wslDistro: executionTarget.wslDistro } : {}),
+  };
 }
 
 const makeProviderService = Effect.fn("makeProviderService")(function* (
@@ -176,15 +247,18 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       readonly lastRuntimeEvent?: string;
       readonly lastRuntimeEventAt?: string;
     },
-  ) =>
-    directory.upsert({
+  ) => {
+    const adapterKey = adapterKeyFromSession(session);
+    return directory.upsert({
       threadId,
       provider: session.provider,
+      ...(adapterKey ? { adapterKey } : {}),
       runtimeMode: session.runtimeMode,
       status: toRuntimeStatus(session),
       ...(session.resumeCursor !== undefined ? { resumeCursor: session.resumeCursor } : {}),
       runtimePayload: toRuntimePayloadFromSession(session, extra),
     });
+  };
 
   const providers = yield* registry.listProviders();
   const adapters = yield* Effect.forEach(providers, (provider) => registry.getByProvider(provider));
@@ -243,14 +317,22 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       }
 
       const persistedCwd = readPersistedCwd(input.binding.runtimePayload);
-      const persistedModelSelection = readPersistedModelSelection(input.binding.runtimePayload);
+      const persistedModelSelection = readPersistedModelSelection(
+        input.binding.provider,
+        input.binding.runtimePayload,
+      );
+      const resumeCursor = augmentForgeResumeCursor(
+        input.binding.provider,
+        input.binding.resumeCursor,
+        input.binding.adapterKey,
+      );
 
       const resumed = yield* adapter.startSession({
         threadId: input.binding.threadId,
         provider: input.binding.provider,
         ...(persistedCwd ? { cwd: persistedCwd } : {}),
         ...(persistedModelSelection ? { modelSelection: persistedModelSelection } : {}),
-        ...(hasResumeCursor ? { resumeCursor: input.binding.resumeCursor } : {}),
+        ...(hasResumeCursor ? { resumeCursor } : {}),
         runtimeMode: input.binding.runtimeMode ?? "full-access",
       });
       if (resumed.provider !== adapter.provider) {
@@ -344,7 +426,11 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         const effectiveResumeCursor =
           input.resumeCursor ??
           (persistedBinding?.provider === input.provider
-            ? persistedBinding.resumeCursor
+            ? augmentForgeResumeCursor(
+                persistedBinding.provider,
+                persistedBinding.resumeCursor,
+                persistedBinding.adapterKey,
+              )
             : undefined);
         const adapter = yield* registry.getByProvider(input.provider);
         const session = yield* adapter.startSession({
@@ -422,9 +508,14 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         ...(input.modelSelection?.model ? { "provider.model": input.modelSelection.model } : {}),
       });
       const turn = yield* routed.adapter.sendTurn(input);
+      const adapterKey =
+        routed.adapter.provider === "forgecode"
+          ? forgeAdapterKeyFromResumeCursor(turn.resumeCursor)
+          : undefined;
       yield* directory.upsert({
         threadId: input.threadId,
         provider: routed.adapter.provider,
+        ...(adapterKey ? { adapterKey } : {}),
         status: "running",
         ...(turn.resumeCursor !== undefined ? { resumeCursor: turn.resumeCursor } : {}),
         runtimePayload: {

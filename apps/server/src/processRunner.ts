@@ -5,6 +5,7 @@ export interface ProcessRunOptions {
   timeoutMs?: number | undefined;
   env?: NodeJS.ProcessEnv | undefined;
   stdin?: string | undefined;
+  shell?: boolean | undefined;
   allowNonZeroExit?: boolean | undefined;
   maxBufferBytes?: number | undefined;
   outputMode?: "error" | "truncate" | undefined;
@@ -139,7 +140,7 @@ export async function runProcess(
       cwd: options.cwd,
       env: options.env,
       stdio: "pipe",
-      shell: process.platform === "win32",
+      shell: options.shell ?? process.platform === "win32",
     });
 
     let stdout = "";

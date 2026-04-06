@@ -64,6 +64,7 @@ describe("TerminalOpenInput", () => {
       threadId: "thread-1",
       cwd: "/tmp/project",
       worktreePath: "/tmp/project/.t3/worktrees/feature-a",
+      executionBackend: "wsl",
       cols: 100,
       rows: 24,
       env: {
@@ -76,6 +77,7 @@ describe("TerminalOpenInput", () => {
       CUSTOM_FLAG: "1",
     });
     expect(parsed.worktreePath).toBe("/tmp/project/.t3/worktrees/feature-a");
+    expect(parsed.executionBackend).toBe("wsl");
   });
 
   it("rejects invalid env keys", () => {
@@ -160,6 +162,7 @@ describe("TerminalSessionSnapshot", () => {
         terminalId: DEFAULT_TERMINAL_ID,
         cwd: "/tmp/project",
         worktreePath: null,
+        executionBackend: "gitbash",
         status: "running",
         pid: 1234,
         history: "hello\n",
@@ -221,6 +224,7 @@ describe("TerminalEvent", () => {
           terminalId: DEFAULT_TERMINAL_ID,
           cwd: "/tmp/project/.t3/worktrees/feature-a",
           worktreePath: "/tmp/project/.t3/worktrees/feature-a",
+          executionBackend: "wsl",
           status: "running",
           pid: 1234,
           history: "",

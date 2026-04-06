@@ -1,6 +1,7 @@
 import type {
   ClaudeModelOptions,
   CodexModelOptions,
+  ForgeCodeModelOptions,
   ModelSelection,
   OpencodeModelOptions,
   ProviderKind,
@@ -22,14 +23,19 @@ export function buildModelSelection(
   options?: OpencodeModelOptions,
 ): ModelSelection;
 export function buildModelSelection(
-  provider: ProviderKind,
+  provider: "forgecode",
   model: string,
-  options?: CodexModelOptions | ClaudeModelOptions | OpencodeModelOptions,
+  options?: ForgeCodeModelOptions,
 ): ModelSelection;
 export function buildModelSelection(
   provider: ProviderKind,
   model: string,
-  options?: CodexModelOptions | ClaudeModelOptions | OpencodeModelOptions,
+  options?: CodexModelOptions | ClaudeModelOptions | OpencodeModelOptions | ForgeCodeModelOptions,
+): ModelSelection;
+export function buildModelSelection(
+  provider: ProviderKind,
+  model: string,
+  options?: CodexModelOptions | ClaudeModelOptions | OpencodeModelOptions | ForgeCodeModelOptions,
 ): ModelSelection {
   switch (provider) {
     case "codex":
@@ -43,6 +49,10 @@ export function buildModelSelection(
     case "opencode":
       return options
         ? { provider, model, options: options as OpencodeModelOptions }
+        : { provider, model };
+    case "forgecode":
+      return options
+        ? { provider, model, options: options as ForgeCodeModelOptions }
         : { provider, model };
   }
 }

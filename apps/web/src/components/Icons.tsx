@@ -424,3 +424,22 @@ export const OpenCodeIcon: Icon = (props) => (
     </defs>
   </svg>
 );
+
+export const ForgeCodeIcon: Icon = (props) => (
+  <svg {...props} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M16 3 27 9.5v13L16 29 5 22.5v-13L16 3Z"
+      fill="currentColor"
+      fillOpacity=".18"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M11 12h10M11 16h7M11 20h10"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);

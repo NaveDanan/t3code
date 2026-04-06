@@ -54,6 +54,14 @@ const PROVIDER_CUSTOM_MODEL_CONFIG: Record<ProviderKind, ProviderCustomModelConf
     placeholder: "provider-id/model-id",
     example: "openai/gpt-5",
   },
+  forgecode: {
+    provider: "forgecode",
+    title: "ForgeCode",
+    description:
+      "Save additional ForgeCode provider/model slugs for the picker and `/model` command.",
+    placeholder: "provider-id/model-id",
+    example: "github_copilot/gpt-5.4",
+  },
 };
 
 export const MODEL_PROVIDER_SETTINGS = Object.values(PROVIDER_CUSTOM_MODEL_CONFIG);
@@ -180,6 +188,12 @@ export function getCustomModelOptionsByProvider(
       providers,
       "opencode",
       selectedProvider === "opencode" ? selectedModel : undefined,
+    ),
+    forgecode: getAppModelOptions(
+      settings,
+      providers,
+      "forgecode",
+      selectedProvider === "forgecode" ? selectedModel : undefined,
     ),
   };
 }

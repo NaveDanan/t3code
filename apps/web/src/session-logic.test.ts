@@ -1161,19 +1161,26 @@ describe("deriveActiveWorkStartedAt", () => {
 });
 
 describe("PROVIDER_OPTIONS", () => {
-  it("advertises OpenCode alongside Claude while keeping Cursor as a placeholder", () => {
+  it("advertises ForgeCode and OpenCode alongside Claude while keeping Cursor as a placeholder", () => {
     const claude = PROVIDER_OPTIONS.find((option) => option.value === "claudeAgent");
+    const forge = PROVIDER_OPTIONS.find((option) => option.value === "forgecode");
     const opencode = PROVIDER_OPTIONS.find((option) => option.value === "opencode");
     const cursor = PROVIDER_OPTIONS.find((option) => option.value === "cursor");
     expect(PROVIDER_OPTIONS).toEqual([
       { value: "codex", label: "Codex", available: true },
       { value: "claudeAgent", label: "Claude", available: true },
       { value: "opencode", label: "OpenCode", available: true },
+      { value: "forgecode", label: "ForgeCode", available: true },
       { value: "cursor", label: "Cursor", available: false },
     ]);
     expect(claude).toEqual({
       value: "claudeAgent",
       label: "Claude",
+      available: true,
+    });
+    expect(forge).toEqual({
+      value: "forgecode",
+      label: "ForgeCode",
       available: true,
     });
     expect(opencode).toEqual({

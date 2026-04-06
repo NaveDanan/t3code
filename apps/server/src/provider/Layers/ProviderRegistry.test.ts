@@ -4,6 +4,7 @@ import {
   Effect,
   Exit,
   FileSystem,
+  Fiber,
   Layer,
   Path,
   PubSub,
@@ -22,6 +23,7 @@ import {
 import * as PlatformError from "effect/PlatformError";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { deepMerge } from "@t3tools/shared/Struct";
+import { TestClock } from "effect/testing";
 
 import {
   checkCodexProviderStatus,
@@ -30,6 +32,7 @@ import {
   readCodexConfigModelProvider,
 } from "./CodexProvider";
 import { checkClaudeProviderStatus, parseClaudeAuthStatusFromOutput } from "./ClaudeProvider";
+import { checkForgeProviderStatus, setForgeProviderProcessRunnerForTests } from "./ForgeProvider";
 import { checkOpencodeProviderStatus } from "./OpencodeProvider";
 import { haveProvidersChanged, ProviderRegistryLive } from "./ProviderRegistry";
 import { ServerSettingsService, type ServerSettingsShape } from "../../serverSettings";
@@ -80,7 +83,21 @@ function mockSpawnerLayer(
     ChildProcessSpawner.ChildProcessSpawner,
     ChildProcessSpawner.make((command) => {
       const cmd = command as unknown as { args: ReadonlyArray<string> };
-      return Effect.succeed(mockHandle(handler(cmd.args)));
+      return Effect.try({
+        try: () => mockHandle(handler(cmd.args)),
+        catch: (error) => {
+          const joined = cmd.args.join(" ");
+          if (joined.includes(" forge ") || joined.endsWith(" forge")) {
+            return PlatformError.systemError({
+              _tag: "NotFound",
+              module: "ChildProcess",
+              method: "spawn",
+              description: "spawn forge ENOENT",
+            });
+          }
+          throw error;
+        },
+      });
     }),
   );
 }
@@ -97,6 +114,28 @@ function mockCommandSpawnerLayer(
       const cmd = command as unknown as { command: string; args: ReadonlyArray<string> };
       return Effect.succeed(mockHandle(handler(cmd.command, cmd.args)));
     }),
+  );
+}
+
+function hangingCommandSpawnerLayer() {
+  return Layer.succeed(
+    ChildProcessSpawner.ChildProcessSpawner,
+    ChildProcessSpawner.make(() =>
+      Effect.succeed(
+        ChildProcessSpawner.makeHandle({
+          pid: ChildProcessSpawner.ProcessId(1),
+          exitCode: Effect.never,
+          isRunning: Effect.succeed(true),
+          kill: () => Effect.void,
+          stdin: Sink.drain,
+          stdout: Stream.empty,
+          stderr: Stream.empty,
+          all: Stream.empty,
+          getInputFd: () => Sink.drain,
+          getOutputFd: () => Stream.empty,
+        }),
+      ),
+    ),
   );
 }
 
@@ -934,7 +973,17 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
 
       it.effect("reruns codex health when codex provider settings change", () =>
         Effect.gen(function* () {
-          const serverSettings = yield* makeMutableServerSettingsService();
+          const serverSettings = yield* makeMutableServerSettingsService(
+            Schema.decodeSync(ServerSettings)(
+              deepMerge(DEFAULT_SERVER_SETTINGS, {
+                providers: {
+                  forgecode: {
+                    enabled: false,
+                  },
+                },
+              }),
+            ),
+          );
           const scope = yield* Scope.make();
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const providerRegistryLayer = ProviderRegistryLive.pipe(
@@ -942,6 +991,12 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             Layer.provideMerge(
               mockCommandSpawnerLayer((command, args) => {
                 const joined = args.join(" ");
+                if (command === "wsl.exe" && joined === "--status") {
+                  return { stdout: "", stderr: "wsl unavailable", code: 1 };
+                }
+                if (command.toLowerCase().endsWith("bash.exe") && joined === "-lc command -v zsh") {
+                  return { stdout: "", stderr: "zsh unavailable", code: 1 };
+                }
                 if (joined === "--version") {
                   if (command === "codex") {
                     return { stdout: "codex 1.0.0\n", stderr: "", code: 0 };
@@ -1431,6 +1486,86 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             }),
           ),
         ),
+      );
+    });
+
+    describe("checkForgeProviderStatus", () => {
+      it.effect(
+        "returns ready when forge is installed and an upstream provider is authenticated",
+        () =>
+          Effect.gen(function* () {
+            setForgeProviderProcessRunnerForTests(async (command, args) => {
+              const joined = args.join(" ");
+              if (command.toLowerCase().endsWith("bash.exe")) {
+                if (joined === "-lc command -v zsh") {
+                  return {
+                    stdout: "/usr/bin/zsh\n",
+                    stderr: "",
+                    code: 0,
+                  };
+                }
+                throw new Error(`Unexpected command: ${command} ${joined}`);
+              }
+              assert.strictEqual(command, "wsl.exe");
+              if (joined === "--status") {
+                return {
+                  stdout: "Default Distribution: Ubuntu-24.04\nDefault Version: 2\n",
+                  stderr: "",
+                  code: 0,
+                };
+              }
+              if (joined.includes("sh -lc command -v zsh")) {
+                return {
+                  stdout: "/usr/bin/zsh\n",
+                  stderr: "",
+                  code: 0,
+                };
+              }
+              if (joined.includes("--version")) {
+                return { stdout: "forge 1.0.0\n", stderr: "", code: 0 };
+              }
+              if (joined.includes("provider") && joined.includes("list")) {
+                return {
+                  stdout:
+                    "NAME    ID      HOST              LOGGED IN\nOpenAI  openai  api.openai.com      [yes]\n",
+                  stderr: "",
+                  code: 0,
+                };
+              }
+              if (joined.includes("list") && joined.includes("model")) {
+                return {
+                  stdout:
+                    "ID       MODEL    PROVIDER  PROVIDER ID\ngpt-5.4  GPT-5.4  OpenAI    openai\n",
+                  stderr: "",
+                  code: 0,
+                };
+              }
+              throw new Error(`Unexpected command: ${command} ${joined}`);
+            });
+            const status = yield* checkForgeProviderStatus;
+            assert.strictEqual(status.provider, "forgecode");
+            assert.strictEqual(status.status, "ready");
+            assert.strictEqual(status.installed, true);
+            assert.strictEqual(status.auth.status, "authenticated");
+            assert.strictEqual(status.auth.type, "openai");
+            assert.deepStrictEqual(
+              status.models.map((model) => model.slug),
+              ["openai/gpt-5.4"],
+            );
+          }).pipe(Effect.ensuring(Effect.sync(() => setForgeProviderProcessRunnerForTests(null)))),
+      );
+
+      it.effect("returns an error instead of hanging when forge version checks time out", () =>
+        Effect.gen(function* () {
+          const fiber = yield* Effect.forkScoped(checkForgeProviderStatus);
+          yield* TestClock.adjust("5 seconds");
+          const status = yield* Fiber.join(fiber);
+          assert.strictEqual(status.provider, "forgecode");
+          assert.strictEqual(status.status, "error");
+          assert.strictEqual(status.installed, false);
+          assert.strictEqual(status.auth.status, "unknown");
+          assert.strictEqual(status.message, "Timed out while querying WSL status.");
+        }).pipe(Effect.provide(Layer.mergeAll(TestClock.layer(), hangingCommandSpawnerLayer()))),
       );
     });
 

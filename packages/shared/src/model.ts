@@ -4,6 +4,7 @@ import {
   type ClaudeCodeEffort,
   type ClaudeModelOptions,
   type CodexModelOptions,
+  type ForgeCodeModelOptions,
   type ModelCapabilities,
   type ModelSelection,
   type OpencodeModelOptions,
@@ -129,6 +130,13 @@ export function normalizeOpencodeModelOptionsWithCapabilities(
   return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
 }
 
+export function normalizeForgeCodeModelOptionsWithCapabilities(
+  _caps: ModelCapabilities,
+  _modelOptions: ForgeCodeModelOptions | null | undefined,
+): ForgeCodeModelOptions | undefined {
+  return undefined;
+}
+
 export function isClaudeUltrathinkPrompt(text: string | null | undefined): boolean {
   return typeof text === "string" && /\bultrathink\b/i.test(text);
 }
@@ -170,6 +178,13 @@ export function resolveSelectableModel(
   const direct = options.find((option) => option.slug === trimmed);
   if (direct) {
     return direct.slug;
+  }
+
+  if (provider === "forgecode" && !trimmed.includes("/")) {
+    const forgeMatches = options.filter((option) => option.slug.endsWith(`/${trimmed}`));
+    if (forgeMatches.length === 1) {
+      return forgeMatches[0]!.slug;
+    }
   }
 
   const byName = options.find((option) => option.name.toLowerCase() === trimmed.toLowerCase());

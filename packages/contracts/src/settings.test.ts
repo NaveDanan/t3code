@@ -7,6 +7,11 @@ describe("default provider settings", () => {
     expect(DEFAULT_SERVER_SETTINGS.providers.codex.enabled).toBe(true);
     expect(DEFAULT_SERVER_SETTINGS.providers.claudeAgent.enabled).toBe(true);
     expect(DEFAULT_SERVER_SETTINGS.providers.opencode.enabled).toBe(true);
+    expect(DEFAULT_SERVER_SETTINGS.providers.forgecode.enabled).toBe(true);
+    expect(DEFAULT_SERVER_SETTINGS.providers.forgecode.executionBackend).toBe(
+      process.platform === "win32" ? "wsl" : "native",
+    );
     expect(DEFAULT_UNIFIED_SETTINGS.providers.opencode.enabled).toBe(true);
+    expect(DEFAULT_UNIFIED_SETTINGS.providers.forgecode.enabled).toBe(true);
   });
 });

@@ -6,6 +6,7 @@ import {
   ClaudeModelOptions,
   CodexModelOptions,
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
+  ForgeCodeModelOptions,
   OpencodeModelOptions,
 } from "./model";
 import { ModelSelection } from "./orchestration";
@@ -57,6 +58,19 @@ const makeBinaryPathSetting = (fallback: string) =>
     Schema.withDecodingDefault(() => fallback),
   );
 
+const makeForgeBinaryPathSetting = () =>
+  TrimmedString.pipe(
+    Schema.decodeTo(
+      Schema.String,
+      SchemaTransformation.transformOrFail({
+        decode: (value) =>
+          Effect.succeed(value === "" || value === "~/.local/bin/forge" ? "forge" : value),
+        encode: (value) => Effect.succeed(value),
+      }),
+    ),
+    Schema.withDecodingDefault(() => "forge"),
+  );
+
 export const CodexSettings = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(() => true)),
   binaryPath: makeBinaryPathSetting("codex"),
@@ -82,6 +96,24 @@ export const OpencodeSettings = Schema.Struct({
 });
 export type OpencodeSettings = typeof OpencodeSettings.Type;
 
+export const ForgeExecutionBackend = Schema.Literals(["native", "wsl", "gitbash"]);
+export type ForgeExecutionBackend = typeof ForgeExecutionBackend.Type;
+
+export function defaultForgeExecutionBackend(): ForgeExecutionBackend {
+  return typeof process !== "undefined" && process.platform === "win32" ? "wsl" : "native";
+}
+
+export const ForgeCodeSettings = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(() => true)),
+  binaryPath: makeForgeBinaryPathSetting(),
+  executionBackend: ForgeExecutionBackend.pipe(
+    Schema.withDecodingDefault(() => defaultForgeExecutionBackend()),
+  ),
+  customModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(() => [])),
+  hiddenModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(() => [])),
+});
+export type ForgeCodeSettings = typeof ForgeCodeSettings.Type;
+
 export const ObservabilitySettings = Schema.Struct({
   otlpTracesUrl: TrimmedString.pipe(Schema.withDecodingDefault(() => "")),
   otlpMetricsUrl: TrimmedString.pipe(Schema.withDecodingDefault(() => "")),
@@ -105,6 +137,7 @@ export const ServerSettings = Schema.Struct({
     codex: CodexSettings.pipe(Schema.withDecodingDefault(() => ({}))),
     claudeAgent: ClaudeSettings.pipe(Schema.withDecodingDefault(() => ({}))),
     opencode: OpencodeSettings.pipe(Schema.withDecodingDefault(() => ({}))),
+    forgecode: ForgeCodeSettings.pipe(Schema.withDecodingDefault(() => ({}))),
   }).pipe(Schema.withDecodingDefault(() => ({}))),
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(() => ({}))),
 });
@@ -151,6 +184,10 @@ const OpencodeModelOptionsPatch = Schema.Struct({
   ...OpencodeModelOptions.fields,
 });
 
+const ForgeCodeModelOptionsPatch = Schema.Struct({
+  ...ForgeCodeModelOptions.fields,
+});
+
 const ModelSelectionPatch = Schema.Union([
   Schema.Struct({
     provider: Schema.optionalKey(Schema.Literal("codex")),
@@ -166,6 +203,11 @@ const ModelSelectionPatch = Schema.Union([
     provider: Schema.optionalKey(Schema.Literal("opencode")),
     model: Schema.optionalKey(TrimmedNonEmptyString),
     options: Schema.optionalKey(OpencodeModelOptionsPatch),
+  }),
+  Schema.Struct({
+    provider: Schema.optionalKey(Schema.Literal("forgecode")),
+    model: Schema.optionalKey(TrimmedNonEmptyString),
+    options: Schema.optionalKey(ForgeCodeModelOptionsPatch),
   }),
 ]);
 
@@ -191,6 +233,14 @@ const OpencodeSettingsPatch = Schema.Struct({
   hiddenModels: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
+const ForgeCodeSettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(Schema.String),
+  executionBackend: Schema.optionalKey(ForgeExecutionBackend),
+  customModels: Schema.optionalKey(Schema.Array(Schema.String)),
+  hiddenModels: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+
 export const ServerSettingsPatch = Schema.Struct({
   enableAssistantStreaming: Schema.optionalKey(Schema.Boolean),
   defaultThreadEnvMode: Schema.optionalKey(ThreadEnvMode),
@@ -206,6 +256,7 @@ export const ServerSettingsPatch = Schema.Struct({
       codex: Schema.optionalKey(CodexSettingsPatch),
       claudeAgent: Schema.optionalKey(ClaudeSettingsPatch),
       opencode: Schema.optionalKey(OpencodeSettingsPatch),
+      forgecode: Schema.optionalKey(ForgeCodeSettingsPatch),
     }),
   ),
 });

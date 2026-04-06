@@ -5,7 +5,7 @@
  * API constrained to store actions/selectors.
  */
 
-import { ThreadId, type TerminalEvent } from "@t3tools/contracts";
+import { ThreadId, type ForgeExecutionBackend, type TerminalEvent } from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { resolveStorage } from "./lib/storage";
@@ -30,6 +30,7 @@ interface ThreadTerminalState {
 export interface ThreadTerminalLaunchContext {
   cwd: string;
   worktreePath: string | null;
+  executionBackend?: ForgeExecutionBackend;
 }
 
 export interface TerminalEventEntry {
@@ -282,6 +283,9 @@ function launchContextFromStartEvent(
   return {
     cwd: event.snapshot.cwd,
     worktreePath: event.snapshot.worktreePath,
+    ...(event.snapshot.executionBackend
+      ? { executionBackend: event.snapshot.executionBackend }
+      : {}),
   };
 }
 

@@ -10,6 +10,7 @@ import { Effect, Layer, ServiceMap } from "effect";
 import { TextGeneration, type TextGenerationShape } from "../Services/TextGeneration.ts";
 import { CodexTextGenerationLive } from "./CodexTextGeneration.ts";
 import { ClaudeTextGenerationLive } from "./ClaudeTextGeneration.ts";
+import { ForgeTextGenerationLive } from "./ForgeTextGeneration.ts";
 import { OpencodeTextGenerationLive } from "./OpencodeTextGeneration.ts";
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,10 @@ class ClaudeTextGen extends ServiceMap.Service<ClaudeTextGen, TextGenerationShap
   "t3/git/Layers/RoutingTextGeneration/ClaudeTextGen",
 ) {}
 
+class ForgeTextGen extends ServiceMap.Service<ForgeTextGen, TextGenerationShape>()(
+  "t3/git/Layers/RoutingTextGeneration/ForgeTextGen",
+) {}
+
 class OpencodeTextGen extends ServiceMap.Service<OpencodeTextGen, TextGenerationShape>()(
   "t3/git/Layers/RoutingTextGeneration/OpencodeTextGen",
 ) {}
@@ -35,6 +40,7 @@ class OpencodeTextGen extends ServiceMap.Service<OpencodeTextGen, TextGeneration
 const makeRoutingTextGeneration = Effect.gen(function* () {
   const codex = yield* CodexTextGen;
   const claude = yield* ClaudeTextGen;
+  const forge = yield* ForgeTextGen;
   const opencode = yield* OpencodeTextGen;
 
   return {
@@ -44,6 +50,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generateCommitMessage(input);
         case "claudeAgent":
           return claude.generateCommitMessage(input);
+        case "forgecode":
+          return forge.generateCommitMessage(input);
         case "opencode":
           return opencode.generateCommitMessage(input);
       }
@@ -54,6 +62,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generatePrContent(input);
         case "claudeAgent":
           return claude.generatePrContent(input);
+        case "forgecode":
+          return forge.generatePrContent(input);
         case "opencode":
           return opencode.generatePrContent(input);
       }
@@ -64,6 +74,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generateBranchName(input);
         case "claudeAgent":
           return claude.generateBranchName(input);
+        case "forgecode":
+          return forge.generateBranchName(input);
         case "opencode":
           return opencode.generateBranchName(input);
       }
@@ -74,6 +86,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generateThreadTitle(input);
         case "claudeAgent":
           return claude.generateThreadTitle(input);
+        case "forgecode":
+          return forge.generateThreadTitle(input);
         case "opencode":
           return opencode.generateThreadTitle(input);
       }
@@ -97,6 +111,14 @@ const InternalClaudeLayer = Layer.effect(
   }),
 ).pipe(Layer.provide(ClaudeTextGenerationLive));
 
+const InternalForgeLayer = Layer.effect(
+  ForgeTextGen,
+  Effect.gen(function* () {
+    const svc = yield* TextGeneration;
+    return svc;
+  }),
+).pipe(Layer.provide(ForgeTextGenerationLive));
+
 const InternalOpencodeLayer = Layer.effect(
   OpencodeTextGen,
   Effect.gen(function* () {
@@ -111,5 +133,6 @@ export const RoutingTextGenerationLive = Layer.effect(
 ).pipe(
   Layer.provide(InternalCodexLayer),
   Layer.provide(InternalClaudeLayer),
+  Layer.provide(InternalForgeLayer),
   Layer.provide(InternalOpencodeLayer),
 );

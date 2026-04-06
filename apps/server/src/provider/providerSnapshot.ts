@@ -1,6 +1,7 @@
 import type {
   ServerProvider,
   ServerProviderAuth,
+  ServerProviderExecutionBackend,
   ServerProviderModel,
   ServerProviderState,
   UpstreamProvider,
@@ -147,6 +148,7 @@ export function buildServerProvider(input: {
   models: ReadonlyArray<ServerProviderModel>;
   probe: ProviderProbeResult;
   upstreamProviders?: ReadonlyArray<UpstreamProvider>;
+  executionBackends?: ReadonlyArray<ServerProviderExecutionBackend>;
 }): ServerProvider {
   return {
     provider: input.provider,
@@ -159,6 +161,7 @@ export function buildServerProvider(input: {
     ...(input.probe.message ? { message: input.probe.message } : {}),
     models: input.models,
     ...(input.upstreamProviders ? { upstreamProviders: input.upstreamProviders } : {}),
+    ...(input.executionBackends ? { executionBackends: input.executionBackends } : {}),
   };
 }
 

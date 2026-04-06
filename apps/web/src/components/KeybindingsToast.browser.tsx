@@ -72,6 +72,13 @@ function createBaseServerConfig(): ServerConfig {
         codex: { enabled: true, binaryPath: "", homePath: "", customModels: [], hiddenModels: [] },
         claudeAgent: { enabled: true, binaryPath: "", customModels: [], hiddenModels: [] },
         opencode: { enabled: true, binaryPath: "", customModels: [], hiddenModels: [] },
+        forgecode: {
+          enabled: true,
+          binaryPath: "",
+          executionBackend: DEFAULT_SERVER_SETTINGS.providers.forgecode.executionBackend,
+          customModels: [],
+          hiddenModels: [],
+        },
       },
     },
   };

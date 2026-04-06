@@ -2,6 +2,7 @@ import {
   type ApprovalRequestId,
   DEFAULT_MODEL_BY_PROVIDER,
   type ClaudeCodeEffort,
+  type ForgeExecutionBackend,
   type MessageId,
   type ModelSelection,
   type ProjectScript,
@@ -336,9 +337,13 @@ interface TerminalLaunchContext {
   threadId: ThreadId;
   cwd: string;
   worktreePath: string | null;
+  executionBackend?: ForgeExecutionBackend;
 }
 
-type PersistentTerminalLaunchContext = Pick<TerminalLaunchContext, "cwd" | "worktreePath">;
+type PersistentTerminalLaunchContext = Pick<
+  TerminalLaunchContext,
+  "cwd" | "worktreePath" | "executionBackend"
+>;
 
 function useLocalDispatchState(input: {
   activeThread: Thread | undefined;
@@ -449,6 +454,7 @@ function PersistentThreadTerminalDrawer({
     }
     return worktreePath;
   }, [launchContext, worktreePath]);
+  const effectiveExecutionBackend = launchContext?.executionBackend;
   const cwd = useMemo(
     () =>
       launchContext?.cwd ??
@@ -552,6 +558,7 @@ function PersistentThreadTerminalDrawer({
         threadId={threadId}
         cwd={cwd}
         worktreePath={effectiveWorktreePath}
+        {...(effectiveExecutionBackend ? { executionBackend: effectiveExecutionBackend } : {})}
         runtimeEnv={runtimeEnv}
         visible={visible}
         height={terminalState.terminalHeight}
@@ -1408,6 +1415,9 @@ export default function ChatView({ threadId }: ChatViewProps) {
       ),
       opencode: getProviderModels(providerStatuses, "opencode").filter(
         (model) => !settings.providers.opencode.hiddenModels.includes(model.slug),
+      ),
+      forgecode: getProviderModels(providerStatuses, "forgecode").filter(
+        (model) => !settings.providers.forgecode.hiddenModels.includes(model.slug),
       ),
     }),
     [providerStatuses, settings.providers],

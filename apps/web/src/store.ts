@@ -81,7 +81,7 @@ function updateProject(
 }
 
 function normalizeModelSelection<
-  T extends { provider: "codex" | "claudeAgent" | "opencode"; model: string },
+  T extends { provider: "codex" | "claudeAgent" | "opencode" | "forgecode"; model: string },
 >(selection: T): T {
   return {
     ...selection,
@@ -493,7 +493,12 @@ function toLegacySessionStatus(
 }
 
 function toLegacyProvider(providerName: string | null): ProviderKind {
-  if (providerName === "codex" || providerName === "claudeAgent" || providerName === "opencode") {
+  if (
+    providerName === "codex" ||
+    providerName === "claudeAgent" ||
+    providerName === "opencode" ||
+    providerName === "forgecode"
+  ) {
     return providerName;
   }
   return "codex";
