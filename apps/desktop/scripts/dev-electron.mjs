@@ -67,9 +67,11 @@ function startApp() {
     return;
   }
 
+  const sandboxArgs = process.platform === "linux" ? ["--no-sandbox"] : [];
+
   const app = spawn(
     resolveElectronPath(),
-    [`--t3code-dev-root=${desktopDir}`, "dist-electron/main.js"],
+    [...sandboxArgs, `--t3code-dev-root=${desktopDir}`, "dist-electron/main.js"],
     {
       cwd: desktopDir,
       env: {

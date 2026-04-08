@@ -45,11 +45,17 @@ import { OpencodeAdapter, type OpencodeAdapterShape } from "../Services/Opencode
 import {
   OpencodeServerManager,
   type OpencodeServerEvent,
+  type OpencodeServerProbe,
 } from "../Services/OpencodeServerManager.ts";
 import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogger.ts";
-import { resolveOpencodeModel } from "../opencode.ts";
+import {
+  resolveFallbackOpencodeModel,
+  resolveOpencodeModel,
+  type OpencodeResolvedModel,
+} from "../opencode.ts";
 
 const PROVIDER = "opencode" as const;
+const OPENCODE_AUTO_COMPACT_USAGE_THRESHOLD = 0.85;
 
 interface OpencodeResumeCursor {
   readonly sessionId?: string;
@@ -66,6 +72,10 @@ interface OpencodeTurnState {
   readonly planMode: boolean;
   readonly planTextParts: Array<string>;
   readonly requestedModelSlug?: string;
+  readonly resolvedModel?: OpencodeResolvedModel;
+  readonly contextWindowLimitTokens?: number;
+  lastPublishedUsage: ThreadTokenUsageSnapshot | undefined;
+  lastPublishedUsageKey: string | undefined;
   aggregatedUsage: ThreadTokenUsageSnapshot | undefined;
   accumulatedTotalCostUsd: number | undefined;
   latestStopReason: string | null | undefined;
@@ -94,6 +104,8 @@ interface OpencodeSessionContext {
   readonly completedItemIds: Set<string>;
   readonly partsWithDelta: Set<string>;
   lastTodoFingerprint: string | undefined;
+  lastThreadUsage: ThreadTokenUsageSnapshot | undefined;
+  lastResolvedModel: OpencodeResolvedModel | undefined;
   stopped: boolean;
 }
 
@@ -485,6 +497,7 @@ function streamKindFromToolItemType(itemType: CanonicalItemType) {
 
 function usageFromAssistantMessage(
   message: AssistantMessage,
+  maxTokens?: number,
 ): ThreadTokenUsageSnapshot | undefined {
   const cacheRead = message.tokens.cache.read;
   const cacheWrite = message.tokens.cache.write;
@@ -494,13 +507,23 @@ function usageFromAssistantMessage(
   const derivedUsedTokens =
     inputTokens + outputTokens + reasoningOutputTokens + cacheRead + cacheWrite;
   const usedTokens = message.tokens.total ?? derivedUsedTokens;
-  if (!Number.isFinite(usedTokens) || usedTokens <= 0) {
+  if (!Number.isFinite(usedTokens) || usedTokens < 0) {
+    return undefined;
+  }
+
+  if (
+    usedTokens === 0 &&
+    !(typeof maxTokens === "number" && Number.isFinite(maxTokens) && maxTokens > 0)
+  ) {
     return undefined;
   }
 
   return {
     usedTokens,
     totalProcessedTokens: usedTokens,
+    ...(typeof maxTokens === "number" && Number.isFinite(maxTokens) && maxTokens > 0
+      ? { maxTokens }
+      : {}),
     inputTokens,
     cachedInputTokens: cacheRead,
     outputTokens,
@@ -510,7 +533,56 @@ function usageFromAssistantMessage(
     lastCachedInputTokens: cacheRead,
     lastOutputTokens: outputTokens,
     lastReasoningOutputTokens: reasoningOutputTokens,
+    compactsAutomatically: true,
   };
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.trunc(value)
+    : undefined;
+}
+
+function resolveOpencodeContextWindowLimit(
+  probe: OpencodeServerProbe,
+  model: OpencodeResolvedModel | undefined,
+): number | undefined {
+  if (!model) {
+    return undefined;
+  }
+
+  const configuredProvider = probe.configuredProviders.find(
+    (provider) => provider.id === model.providerID,
+  );
+  const configuredModel = configuredProvider?.models[model.modelID] as
+    | {
+        readonly limit?: {
+          readonly context?: unknown;
+        };
+      }
+    | undefined;
+
+  return readPositiveInteger(configuredModel?.limit?.context);
+}
+
+function usageSnapshotKey(usage: ThreadTokenUsageSnapshot): string {
+  return JSON.stringify([
+    usage.usedTokens,
+    usage.totalProcessedTokens ?? null,
+    usage.maxTokens ?? null,
+    usage.inputTokens ?? null,
+    usage.cachedInputTokens ?? null,
+    usage.outputTokens ?? null,
+    usage.reasoningOutputTokens ?? null,
+    usage.lastUsedTokens ?? null,
+    usage.lastInputTokens ?? null,
+    usage.lastCachedInputTokens ?? null,
+    usage.lastOutputTokens ?? null,
+    usage.lastReasoningOutputTokens ?? null,
+    usage.toolUses ?? null,
+    usage.durationMs ?? null,
+    usage.compactsAutomatically ?? null,
+  ]);
 }
 
 function readSessionId(event: OpencodeEvent): string | undefined {
@@ -986,6 +1058,53 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
     });
   });
 
+  const publishThreadTokenUsage = Effect.fn("publishThreadTokenUsage")(function* (
+    context: OpencodeSessionContext,
+    turn: OpencodeTurnState,
+    input: {
+      readonly usage: ThreadTokenUsageSnapshot;
+      readonly raw?: OpencodeEvent;
+    },
+  ) {
+    const stabilizedUsage =
+      turn.lastPublishedUsage !== undefined &&
+      input.usage.usedTokens < turn.lastPublishedUsage.usedTokens
+        ? {
+            ...turn.lastPublishedUsage,
+            ...(input.usage.maxTokens !== undefined ? { maxTokens: input.usage.maxTokens } : {}),
+            ...(turn.lastPublishedUsage.compactsAutomatically === true ||
+            input.usage.compactsAutomatically === true
+              ? { compactsAutomatically: true }
+              : {}),
+          }
+        : input.usage;
+
+    context.lastThreadUsage = stabilizedUsage;
+    const snapshotKey = usageSnapshotKey(stabilizedUsage);
+    if (turn.lastPublishedUsageKey === snapshotKey) {
+      return;
+    }
+
+    turn.lastPublishedUsage = stabilizedUsage;
+    turn.lastPublishedUsageKey = snapshotKey;
+    const usageStamp = makeEventStamp();
+    yield* offerRuntimeEvent({
+      type: "thread.token-usage.updated",
+      eventId: usageStamp.eventId,
+      provider: PROVIDER,
+      threadId: context.session.threadId,
+      createdAt: usageStamp.createdAt,
+      turnId: turn.turnId,
+      providerRefs: {
+        providerTurnId: String(turn.turnId),
+      },
+      ...(input.raw ? { raw: rawEvent(input.raw) } : {}),
+      payload: {
+        usage: stabilizedUsage,
+      },
+    });
+  });
+
   const completeTurn = Effect.fn("completeTurn")(function* (
     context: OpencodeSessionContext,
     input: {
@@ -1025,21 +1144,9 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       ...(input.errorMessage ? { lastError: input.errorMessage } : {}),
     });
     if (input.usage) {
-      const usageStamp = makeEventStamp();
-      yield* offerRuntimeEvent({
-        type: "thread.token-usage.updated",
-        eventId: usageStamp.eventId,
-        provider: PROVIDER,
-        threadId: context.session.threadId,
-        createdAt: usageStamp.createdAt,
-        turnId: activeTurn.turnId,
-        providerRefs: {
-          providerTurnId: String(activeTurn.turnId),
-        },
-        ...(input.raw ? { raw: rawEvent(input.raw) } : {}),
-        payload: {
-          usage: input.usage,
-        },
+      yield* publishThreadTokenUsage(context, activeTurn, {
+        usage: input.usage,
+        ...(input.raw ? { raw: input.raw } : {}),
       });
     }
 
@@ -1460,6 +1567,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
 
       case "session.compacted": {
         logOpencodeAdapter("event.session.compacted", opencodeDebugContext(context));
+        context.lastThreadUsage = undefined;
         const stamp = makeEventStamp();
         yield* offerRuntimeEvent({
           type: "thread.state.changed",
@@ -1937,6 +2045,10 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
           context.activeTurn.userMessageId = reboundUserMessageId ?? parentMessageId;
         }
         context.activeTurn.assistantMessageId = assistantMessage.id;
+        context.lastResolvedModel = {
+          providerID: assistantMessage.providerID,
+          modelID: assistantMessage.modelID,
+        };
         context.messageInfoById.set(assistantMessage.id, {
           role: "assistant",
           ...(parentMessageId ? { parentMessageId } : {}),
@@ -1954,9 +2066,23 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
 
         yield* ensureAssistantItemStarted(context, assistantMessage.id, serverEvent.payload);
 
+        const liveUsage = usageFromAssistantMessage(
+          assistantMessage,
+          context.activeTurn.contextWindowLimitTokens,
+        );
+        if (liveUsage) {
+          yield* publishThreadTokenUsage(context, context.activeTurn, {
+            usage: liveUsage,
+            raw: serverEvent.payload,
+          });
+        }
+
         if (assistantMessage.time.completed || assistantMessage.error) {
           const errorMessage = trimString(assistantMessage.error?.data?.message);
-          const usage = usageFromAssistantMessage(assistantMessage);
+          const usage = usageFromAssistantMessage(
+            assistantMessage,
+            context.activeTurn.contextWindowLimitTokens,
+          );
           if (!context.completedItemIds.has(assistantMessage.id)) {
             rememberAssistantCompletion(context.activeTurn, {
               ...(usage ? { usage } : {}),
@@ -2625,6 +2751,8 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         completedItemIds: new Set(),
         partsWithDelta: new Set(),
         lastTodoFingerprint: undefined,
+        lastThreadUsage: undefined,
+        lastResolvedModel: undefined,
         stopped: false,
       };
 
@@ -2736,28 +2864,84 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       input.modelSelection?.provider === PROVIDER
         ? input.modelSelection.options?.effort
         : undefined;
-    const model =
-      resolvedModelSlug !== undefined
+    const probe =
+      resolvedModelSlug !== undefined || context.lastResolvedModel !== undefined || !providerIsBusy
         ? yield* opencodeServerManager
             .probe({
               binaryPath: context.binaryPath,
             })
-            .pipe(
-              Effect.mapError((error) => toProcessError(input.threadId, error.message, error)),
-              Effect.flatMap((probe) => {
-                const resolvedModel = resolveOpencodeModel(resolvedModelSlug, probe);
-                if (!resolvedModel) {
-                  return Effect.fail(
-                    toValidationError(
-                      "sendTurn",
-                      `Could not resolve OpenCode model '${resolvedModelSlug}' against the active provider catalog.`,
-                    ),
-                  );
-                }
-                return Effect.succeed(resolvedModel);
-              }),
-            )
+            .pipe(Effect.mapError((error) => toProcessError(input.threadId, error.message, error)))
         : undefined;
+    const resolvedPromptModel =
+      resolvedModelSlug !== undefined && probe !== undefined
+        ? (() => {
+            const resolvedModel = resolveOpencodeModel(resolvedModelSlug, probe);
+            if (!resolvedModel) {
+              return undefined;
+            }
+            return resolvedModel;
+          })()
+        : undefined;
+    if (resolvedModelSlug !== undefined && resolvedPromptModel === undefined) {
+      return yield* toValidationError(
+        "sendTurn",
+        `Could not resolve OpenCode model '${resolvedModelSlug}' against the active provider catalog.`,
+      );
+    }
+    const resolvedCompactionModel =
+      resolvedPromptModel ??
+      context.lastResolvedModel ??
+      (probe !== undefined ? resolveFallbackOpencodeModel(probe) : undefined);
+    const contextWindowLimitTokens =
+      probe !== undefined
+        ? resolveOpencodeContextWindowLimit(probe, resolvedCompactionModel)
+        : undefined;
+
+    if (
+      !providerIsBusy &&
+      context.lastThreadUsage !== undefined &&
+      resolvedCompactionModel !== undefined &&
+      contextWindowLimitTokens !== undefined &&
+      context.lastThreadUsage.usedTokens >=
+        Math.floor(contextWindowLimitTokens * OPENCODE_AUTO_COMPACT_USAGE_THRESHOLD)
+    ) {
+      logOpencodeAdapter("sendTurn.auto-compact.begin", {
+        usedTokens: context.lastThreadUsage.usedTokens,
+        maxTokens: contextWindowLimitTokens,
+        threshold: OPENCODE_AUTO_COMPACT_USAGE_THRESHOLD,
+        model: `${resolvedCompactionModel.providerID}/${resolvedCompactionModel.modelID}`,
+        ...opencodeDebugContext(context),
+      });
+      yield* Effect.tryPromise({
+        try: () =>
+          readSdkData<boolean>(
+            server.client.session.summarize({
+              sessionID: context.providerSessionId,
+              directory: context.cwd,
+              providerID: resolvedCompactionModel.providerID,
+              modelID: resolvedCompactionModel.modelID,
+              auto: false,
+            }),
+            "session.summarize",
+          ),
+        catch: (cause) => toRequestError("session.summarize", cause),
+      }).pipe(
+        Effect.matchEffect({
+          onFailure: (error) =>
+            Effect.sync(() =>
+              logOpencodeAdapter("sendTurn.auto-compact.failed", {
+                errorMessage: error.message,
+                ...opencodeDebugContext(context),
+              }),
+            ),
+          onSuccess: () =>
+            Effect.sync(() => {
+              context.lastThreadUsage = undefined;
+              logOpencodeAdapter("sendTurn.auto-compact.completed", opencodeDebugContext(context));
+            }),
+        }),
+      );
+    }
 
     const turnId = TurnId.makeUnsafe(crypto.randomUUID());
     const providerUserMessageId = createOpencodeMessageId();
@@ -2770,11 +2954,18 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       planMode: input.interactionMode === "plan",
       planTextParts: [],
       ...(resolvedModelSlug ? { requestedModelSlug: resolvedModelSlug } : {}),
+      ...(resolvedCompactionModel ? { resolvedModel: resolvedCompactionModel } : {}),
+      ...(contextWindowLimitTokens !== undefined ? { contextWindowLimitTokens } : {}),
+      lastPublishedUsage: undefined,
+      lastPublishedUsageKey: undefined,
       aggregatedUsage: undefined,
       accumulatedTotalCostUsd: undefined,
       latestStopReason: undefined,
       latestErrorMessage: undefined,
     };
+    if (resolvedCompactionModel) {
+      context.lastResolvedModel = resolvedCompactionModel;
+    }
     logOpencodeAdapter(
       providerIsBusy ? "sendTurn.followup-accepted" : "sendTurn.active-turn-created",
       {
@@ -2789,6 +2980,19 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       context.acceptedFollowupTurns.push(turnState);
     } else {
       yield* activateTurn(context, turnState);
+    }
+    if (!providerIsBusy && contextWindowLimitTokens !== undefined) {
+      const previousUsage = context.lastThreadUsage;
+      yield* publishThreadTokenUsage(context, turnState, {
+        usage: {
+          ...(previousUsage ?? {
+            usedTokens: 0,
+            totalProcessedTokens: 0,
+          }),
+          maxTokens: contextWindowLimitTokens,
+          compactsAutomatically: true,
+        },
+      });
     }
     logOpencodeAdapter("sendTurn.promptAsync.dispatch", {
       turnId: String(turnId),
@@ -2805,7 +3009,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
             sessionID: context.providerSessionId,
             directory: context.cwd,
             messageID: providerUserMessageId,
-            ...(model ? { model } : {}),
+            ...(resolvedPromptModel ? { model: resolvedPromptModel } : {}),
             ...(input.interactionMode === "plan" ? { agent: "plan" } : {}),
             ...(selectedVariant ? { variant: selectedVariant } : {}),
             parts: promptParts,

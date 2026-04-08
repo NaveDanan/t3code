@@ -106,6 +106,66 @@ class BuildScriptError extends Data.TaggedError("BuildScriptError")<{
   readonly cause?: unknown;
 }> {}
 
+// Resolve the on-disk directory of a package in the workspace using bun's
+// module resolution. node-pty is a server dependency, so we resolve from
+// apps/server where it is declared.
+function resolveWorkspacePackageDir(packageName: string, repoRoot: string): string | undefined {
+  const serverDir = join(repoRoot, "apps/server");
+  const result = spawnSync(
+    "bun",
+    [
+      "-e",
+      `process.stdout.write(require('path').dirname(require.resolve(${JSON.stringify(`${packageName}/package.json`)})))`,
+    ],
+    { cwd: serverDir, encoding: "utf8" },
+  );
+  if (result.status !== 0 || !result.stdout.trim()) return undefined;
+  return result.stdout.trim();
+}
+
+// node-pty ships no Linux prebuilds — it must be compiled with node-gyp.
+// This function ensures the compiled binary exists in the workspace before
+// staging so the stage install can skip re-compiling with --ignore-scripts.
+const ensureNodePtyBuilt = Effect.fn("ensureNodePtyBuilt")(function* (repoRoot: string) {
+  const nodePtyDir = resolveWorkspacePackageDir("node-pty", repoRoot);
+  if (!nodePtyDir) {
+    return yield* new BuildScriptError({ message: "Could not resolve node-pty in workspace." });
+  }
+
+  const nativeAddon = join(nodePtyDir, "build", "Release", "pty.node");
+  if (existsSync(nativeAddon)) {
+    return nodePtyDir;
+  }
+
+  // Check build tools before attempting compilation.
+  const makeCheck = spawnSync("which", ["make"], { encoding: "utf8" });
+  if (makeCheck.status !== 0) {
+    return yield* new BuildScriptError({
+      message:
+        "node-pty has no Linux prebuilds and must be compiled from source.\n" +
+        "Install build tools first:\n" +
+        "  sudo apt install build-essential",
+    });
+  }
+
+  yield* Effect.log("[desktop-artifact] Compiling node-pty native module...");
+  yield* runCommand(
+    ChildProcess.make({
+      cwd: nodePtyDir,
+      stderr: "inherit",
+      stdout: "inherit",
+    })`bunx node-gyp rebuild`,
+  );
+
+  if (!existsSync(nativeAddon)) {
+    return yield* new BuildScriptError({
+      message: `node-pty compiled but expected binary not found at ${nativeAddon}`,
+    });
+  }
+
+  return nodePtyDir;
+});
+
 function resolveGitCommitHash(repoRoot: string): string {
   const result = spawnSync("git", ["rev-parse", "--short=12", "HEAD"], {
     cwd: repoRoot,
@@ -175,7 +235,8 @@ interface StagePackageJson {
   readonly t3codeCommitHash: string;
   readonly private: true;
   readonly description: string;
-  readonly author: string;
+  readonly homepage: string;
+  readonly author: { readonly name: string; readonly email: string };
   readonly main: string;
   readonly build: Record<string, unknown>;
   readonly dependencies: Record<string, unknown>;
@@ -509,10 +570,16 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       category: "Development",
       desktop: {
         entry: {
-          StartupWMClass: "t3code",
+          StartupWMClass: productName,
         },
       },
     };
+    // deb/rpm package managers run afterInstall as root — use it to fix the
+    // chrome-sandbox SUID permissions required by Electron's process sandbox.
+    const afterInstallScript = "apps/desktop/resources/linux-after-install.sh";
+    const afterRemoveScript = "apps/desktop/resources/linux-after-remove.sh";
+    buildConfig.deb = { afterInstall: afterInstallScript, afterRemove: afterRemoveScript };
+    buildConfig.rpm = { afterInstall: afterInstallScript, afterRemove: afterRemoveScript };
   }
 
   if (platform === "win") {
@@ -662,7 +729,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     t3codeCommitHash: commitHash,
     private: true,
     description: "T3 Code desktop build",
-    author: "T3 Tools",
+    homepage: "https://github.com/pingdotgg/t3code",
+    author: { name: "T3 Tools", email: "hi@t3.chat" },
     main: "apps/desktop/dist-electron/main.js",
     build: yield* createBuildConfig(
       options.platform,
@@ -685,14 +753,30 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
 
   yield* Effect.log("[desktop-artifact] Installing staged production dependencies...");
+
+  // On Linux, node-pty has no prebuilds and would require 'make' during install.
+  // Instead we compile it once in the workspace, skip scripts during staging,
+  // then transplant the compiled binary into the stage.
+  const shouldBuildNativeModules = options.platform === "linux";
+  const workspaceNodePtyDir = shouldBuildNativeModules
+    ? yield* ensureNodePtyBuilt(repoRoot)
+    : undefined;
+
   yield* runCommand(
     ChildProcess.make({
       cwd: stageAppDir,
       ...commandOutputOptions(options.verbose),
       // Windows needs shell mode to resolve .cmd shims (e.g. bun.cmd).
       shell: process.platform === "win32",
-    })`bun install --production`,
+    })`bun install --production ${shouldBuildNativeModules ? "--ignore-scripts" : ""}`,
   );
+
+  if (workspaceNodePtyDir !== undefined) {
+    yield* Effect.log("[desktop-artifact] Transplanting compiled node-pty into stage...");
+    const stagePtyBuildDir = path.join(stageAppDir, "node_modules/node-pty/build");
+    const workspacePtyBuildDir = path.join(workspaceNodePtyDir, "build");
+    yield* fs.copy(workspacePtyBuildDir, stagePtyBuildDir, { overwrite: true });
+  }
 
   const buildEnv: NodeJS.ProcessEnv = {
     ...process.env,

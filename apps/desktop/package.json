@@ -5,6 +5,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "bun run --parallel dev:bundle dev:backend dev:electron",
+    "fix:sandbox": "node scripts/fix-linux-sandbox.mjs",
     "dev:bundle": "tsdown --config tsdown.config.mts --watch",
     "dev:backend": "bun run --cwd ../server dev:bundle",
     "dev:electron": "bun run scripts/dev-electron.mjs",

@@ -68,7 +68,7 @@ const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 const APP_DISPLAY_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
 const APP_USER_MODEL_ID = "com.t3tools.t3code";
 const LINUX_DESKTOP_ENTRY_NAME = isDevelopment ? "t3code-dev.desktop" : "t3code.desktop";
-const LINUX_WM_CLASS = isDevelopment ? "t3code-dev" : "t3code";
+const LINUX_FORCE_X11 = !isDevelopment && process.env.T3CODE_ENABLE_WAYLAND !== "1";
 const USER_DATA_DIR_NAME = isDevelopment ? "t3code-dev" : "t3code";
 const LEGACY_USER_DATA_DIR_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
 const COMMIT_HASH_PATTERN = /^[0-9a-f]{7,40}$/i;
@@ -288,7 +288,17 @@ function captureBackendOutput(child: ChildProcess.ChildProcess): void {
 initializePackagedLogging();
 
 if (process.platform === "linux") {
-  app.commandLine.appendSwitch("class", LINUX_WM_CLASS);
+  // Disable the Chromium process-level sandbox on Linux. Without this, the
+  // GPU/zygote process requires either the chrome-sandbox binary to be SUID
+  // root or unprivileged user namespaces to be enabled (which varies by
+  // distro). Setting this flag ensures the app launches reliably across all
+  // Linux distributions regardless of sandbox helper configuration.
+  if (!process.argv.some((arg) => arg === "--no-sandbox")) {
+    app.commandLine.appendSwitch("no-sandbox");
+  }
+  if (LINUX_FORCE_X11 && !process.argv.some((arg) => arg.startsWith("--ozone-platform"))) {
+    app.commandLine.appendSwitch("ozone-platform", "x11");
+  }
 }
 
 function getDestructiveMenuIcon(): Electron.NativeImage | undefined {
@@ -1367,7 +1377,7 @@ function createWindow(): BrowserWindow {
       preload: Path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
     },
   });
 

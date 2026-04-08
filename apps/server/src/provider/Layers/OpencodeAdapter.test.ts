@@ -103,6 +103,10 @@ function makeProbe(server: OpencodeServerHandle): OpencodeServerProbe {
           "gpt-5": {
             id: "gpt-5",
             name: "GPT-5",
+            limit: {
+              context: 100,
+              output: 20,
+            },
           },
         },
       } as unknown as OpencodeConfiguredProvider,
@@ -198,6 +202,15 @@ function makeHarness() {
         parts: Array<TextPartInput | FilePartInput>;
       }
     | undefined;
+  let summarizeInput:
+    | {
+        sessionID: string;
+        directory?: string;
+        providerID: string;
+        modelID: string;
+        auto?: boolean;
+      }
+    | undefined;
 
   const createSession = vi.fn(async (input: { directory: string }) => {
     createSessionInput = input;
@@ -225,6 +238,18 @@ function makeHarness() {
   const abortSession = vi.fn(async (_input: { sessionID: string; directory: string }) => ({
     data: true,
   }));
+  const summarizeSession = vi.fn(
+    async (input: {
+      sessionID: string;
+      directory?: string;
+      providerID: string;
+      modelID: string;
+      auto?: boolean;
+    }) => {
+      summarizeInput = input;
+      return { data: true };
+    },
+  );
   const listMessages = vi.fn(
     async (_input: { sessionID: string; directory: string; limit: number }) => ({ data: [] }),
   );
@@ -256,6 +281,7 @@ function makeHarness() {
       create: createSession,
       get: getSession,
       promptAsync,
+      summarize: summarizeSession,
       abort: abortSession,
       messages: listMessages,
       revert: revertSession,
@@ -298,11 +324,15 @@ function makeHarness() {
       get promptAsync() {
         return promptAsyncInput;
       },
+      get summarize() {
+        return summarizeInput;
+      },
     },
     mocks: {
       createSession,
       getSession,
       promptAsync,
+      summarizeSession,
       abortSession,
       listMessages,
       revertSession,
@@ -398,6 +428,501 @@ describe("OpencodeAdapterLive", () => {
           text: "hello",
         },
       ]);
+    }).pipe(Effect.provide(harness.layer));
+  });
+
+  it.effect("emits an initial OpenCode context window snapshot for the active model", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* OpencodeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
+
+      try {
+        yield* adapter.startSession({
+          threadId: THREAD_ID,
+          provider: "opencode",
+          cwd: "D:/repo",
+          modelSelection: {
+            provider: "opencode",
+            model: "openai/gpt-5",
+          },
+          runtimeMode: "full-access",
+        });
+
+        yield* adapter.sendTurn({
+          threadId: THREAD_ID,
+          input: "hello",
+          attachments: [],
+        });
+
+        yield* flushAsyncWork;
+
+        const initialUsageEvent = runtimeEvents.find(
+          (event): event is Extract<ProviderRuntimeEvent, { type: "thread.token-usage.updated" }> =>
+            event.type === "thread.token-usage.updated",
+        );
+        assert.equal(initialUsageEvent?.type, "thread.token-usage.updated");
+        if (initialUsageEvent?.type !== "thread.token-usage.updated") {
+          return;
+        }
+
+        assert.equal(initialUsageEvent.payload.usage.usedTokens, 0);
+        assert.equal(initialUsageEvent.payload.usage.totalProcessedTokens, 0);
+        assert.equal(initialUsageEvent.payload.usage.maxTokens, 100);
+        assert.equal(initialUsageEvent.payload.usage.compactsAutomatically, true);
+      } finally {
+        yield* Fiber.interrupt(runtimeEventsFiber);
+      }
+    }).pipe(Effect.provide(harness.layer));
+  });
+
+  it.effect("emits live OpenCode token usage snapshots with context window metadata", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* OpencodeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
+
+      try {
+        yield* adapter.startSession({
+          threadId: THREAD_ID,
+          provider: "opencode",
+          cwd: "D:/repo",
+          modelSelection: {
+            provider: "opencode",
+            model: "openai/gpt-5",
+          },
+          runtimeMode: "full-access",
+        });
+
+        yield* adapter.sendTurn({
+          threadId: THREAD_ID,
+          input: "hello",
+          attachments: [],
+        });
+
+        const providerUserMessageId = harness.inputs.promptAsync?.messageID;
+        assert.equal(typeof providerUserMessageId, "string");
+        if (!providerUserMessageId) {
+          return;
+        }
+
+        harness.eventStream.emit({
+          directory: "D:/repo",
+          payload: {
+            type: "message.updated",
+            properties: {
+              sessionID: "sdk-session-1",
+              info: {
+                id: "assistant-message-usage-live",
+                sessionID: "sdk-session-1",
+                role: "assistant",
+                time: {
+                  created: 2,
+                },
+                parentID: providerUserMessageId,
+                modelID: "gpt-5",
+                providerID: "openai",
+                mode: "default",
+                agent: "build",
+                path: {
+                  cwd: "D:/repo",
+                  root: "D:/repo",
+                },
+                cost: 0,
+                tokens: {
+                  total: 24,
+                  input: 18,
+                  output: 6,
+                  reasoning: 0,
+                  cache: {
+                    read: 0,
+                    write: 0,
+                  },
+                },
+              },
+            },
+          },
+        } as GlobalEvent);
+
+        yield* flushAsyncWork;
+        yield* flushAsyncWork;
+
+        const usageEvents = runtimeEvents.filter(
+          (event): event is Extract<ProviderRuntimeEvent, { type: "thread.token-usage.updated" }> =>
+            event.type === "thread.token-usage.updated",
+        );
+        const latestUsageEvent = usageEvents.at(-1);
+        assert.equal(latestUsageEvent?.type, "thread.token-usage.updated");
+        if (latestUsageEvent?.type !== "thread.token-usage.updated") {
+          return;
+        }
+
+        assert.equal(latestUsageEvent.payload.usage.usedTokens, 24);
+        assert.equal(latestUsageEvent.payload.usage.maxTokens, 100);
+        assert.equal(latestUsageEvent.payload.usage.compactsAutomatically, true);
+      } finally {
+        yield* Fiber.interrupt(runtimeEventsFiber);
+      }
+    }).pipe(Effect.provide(harness.layer));
+  });
+
+  it.effect(
+    "does not reset OpenCode live context usage when a later assistant message starts at zero",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const adapter = yield* OpencodeAdapter;
+        const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+        const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+          Effect.sync(() => {
+            runtimeEvents.push(event);
+          }),
+        ).pipe(Effect.forkChild);
+
+        try {
+          yield* adapter.startSession({
+            threadId: THREAD_ID,
+            provider: "opencode",
+            cwd: "D:/repo",
+            modelSelection: {
+              provider: "opencode",
+              model: "openai/gpt-5",
+            },
+            runtimeMode: "full-access",
+          });
+
+          yield* adapter.sendTurn({
+            threadId: THREAD_ID,
+            input: "hello",
+            attachments: [],
+          });
+
+          const providerUserMessageId = harness.inputs.promptAsync?.messageID;
+          assert.equal(typeof providerUserMessageId, "string");
+          if (!providerUserMessageId) {
+            return;
+          }
+
+          harness.eventStream.emit({
+            directory: "D:/repo",
+            payload: {
+              type: "message.updated",
+              properties: {
+                sessionID: "sdk-session-1",
+                info: {
+                  id: "assistant-message-before-tool",
+                  sessionID: "sdk-session-1",
+                  role: "assistant",
+                  time: {
+                    created: 2,
+                  },
+                  parentID: providerUserMessageId,
+                  modelID: "gpt-5",
+                  providerID: "openai",
+                  mode: "default",
+                  agent: "build",
+                  path: {
+                    cwd: "D:/repo",
+                    root: "D:/repo",
+                  },
+                  cost: 0,
+                  tokens: {
+                    total: 24,
+                    input: 18,
+                    output: 6,
+                    reasoning: 0,
+                    cache: {
+                      read: 0,
+                      write: 0,
+                    },
+                  },
+                },
+              },
+            },
+          } as GlobalEvent);
+
+          harness.eventStream.emit({
+            directory: "D:/repo",
+            payload: {
+              type: "message.updated",
+              properties: {
+                sessionID: "sdk-session-1",
+                info: {
+                  id: "assistant-message-after-tool",
+                  sessionID: "sdk-session-1",
+                  role: "assistant",
+                  time: {
+                    created: 3,
+                  },
+                  parentID: providerUserMessageId,
+                  modelID: "gpt-5",
+                  providerID: "openai",
+                  mode: "default",
+                  agent: "build",
+                  path: {
+                    cwd: "D:/repo",
+                    root: "D:/repo",
+                  },
+                  cost: 0,
+                  tokens: {
+                    total: 0,
+                    input: 0,
+                    output: 0,
+                    reasoning: 0,
+                    cache: {
+                      read: 0,
+                      write: 0,
+                    },
+                  },
+                },
+              },
+            },
+          } as GlobalEvent);
+
+          yield* flushAsyncWork;
+          yield* flushAsyncWork;
+
+          const latestUsageEvent = runtimeEvents.findLast(
+            (
+              event,
+            ): event is Extract<ProviderRuntimeEvent, { type: "thread.token-usage.updated" }> =>
+              event.type === "thread.token-usage.updated",
+          );
+          assert.equal(latestUsageEvent?.type, "thread.token-usage.updated");
+          if (latestUsageEvent?.type !== "thread.token-usage.updated") {
+            return;
+          }
+
+          assert.equal(latestUsageEvent.payload.usage.usedTokens, 24);
+          assert.equal(latestUsageEvent.payload.usage.maxTokens, 100);
+        } finally {
+          yield* Fiber.interrupt(runtimeEventsFiber);
+        }
+      }).pipe(Effect.provide(harness.layer));
+    },
+  );
+
+  it.effect(
+    "emits OpenCode token usage snapshots with context window metadata on completion",
+    () => {
+      const harness = makeHarness();
+      return Effect.gen(function* () {
+        const adapter = yield* OpencodeAdapter;
+        const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+        const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+          Effect.sync(() => {
+            runtimeEvents.push(event);
+          }),
+        ).pipe(Effect.forkChild);
+
+        try {
+          yield* adapter.startSession({
+            threadId: THREAD_ID,
+            provider: "opencode",
+            cwd: "D:/repo",
+            modelSelection: {
+              provider: "opencode",
+              model: "openai/gpt-5",
+            },
+            runtimeMode: "full-access",
+          });
+
+          yield* adapter.sendTurn({
+            threadId: THREAD_ID,
+            input: "hello",
+            attachments: [],
+          });
+
+          const providerUserMessageId = harness.inputs.promptAsync?.messageID;
+          assert.equal(typeof providerUserMessageId, "string");
+          if (!providerUserMessageId) {
+            return;
+          }
+
+          harness.eventStream.emit({
+            directory: "D:/repo",
+            payload: {
+              type: "message.updated",
+              properties: {
+                sessionID: "sdk-session-1",
+                info: {
+                  id: "assistant-message-usage",
+                  sessionID: "sdk-session-1",
+                  role: "assistant",
+                  time: {
+                    created: 2,
+                    completed: 3,
+                  },
+                  parentID: providerUserMessageId,
+                  modelID: "gpt-5",
+                  providerID: "openai",
+                  mode: "default",
+                  agent: "build",
+                  path: {
+                    cwd: "D:/repo",
+                    root: "D:/repo",
+                  },
+                  cost: 0,
+                  tokens: {
+                    total: 50,
+                    input: 35,
+                    output: 15,
+                    reasoning: 0,
+                    cache: {
+                      read: 0,
+                      write: 0,
+                    },
+                  },
+                },
+              },
+            },
+          } as GlobalEvent);
+
+          harness.eventStream.emit({
+            directory: "D:/repo",
+            payload: {
+              type: "session.idle",
+              properties: {
+                sessionID: "sdk-session-1",
+                status: {
+                  type: "idle",
+                },
+              },
+            },
+          } as GlobalEvent);
+
+          yield* flushAsyncWork;
+          yield* flushAsyncWork;
+
+          const usageEvent = runtimeEvents.findLast(
+            (
+              event,
+            ): event is Extract<ProviderRuntimeEvent, { type: "thread.token-usage.updated" }> =>
+              event.type === "thread.token-usage.updated",
+          );
+          assert.equal(usageEvent?.type, "thread.token-usage.updated");
+          if (usageEvent?.type !== "thread.token-usage.updated") {
+            return;
+          }
+
+          assert.equal(usageEvent.payload.usage.usedTokens, 50);
+          assert.equal(usageEvent.payload.usage.maxTokens, 100);
+          assert.equal(usageEvent.payload.usage.compactsAutomatically, true);
+        } finally {
+          yield* Fiber.interrupt(runtimeEventsFiber);
+        }
+      }).pipe(Effect.provide(harness.layer));
+    },
+  );
+
+  it.effect("auto-compacts before a new turn when usage reaches 85 percent of context", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* OpencodeAdapter;
+
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: "opencode",
+        cwd: "D:/repo",
+        modelSelection: {
+          provider: "opencode",
+          model: "openai/gpt-5",
+        },
+        runtimeMode: "full-access",
+      });
+
+      yield* adapter.sendTurn({
+        threadId: THREAD_ID,
+        input: "first turn",
+        attachments: [],
+      });
+
+      const firstProviderUserMessageId = harness.inputs.promptAsync?.messageID;
+      assert.equal(typeof firstProviderUserMessageId, "string");
+      if (!firstProviderUserMessageId) {
+        return;
+      }
+
+      harness.eventStream.emit({
+        directory: "D:/repo",
+        payload: {
+          type: "message.updated",
+          properties: {
+            sessionID: "sdk-session-1",
+            info: {
+              id: "assistant-message-first",
+              sessionID: "sdk-session-1",
+              role: "assistant",
+              time: {
+                created: 2,
+                completed: 3,
+              },
+              parentID: firstProviderUserMessageId,
+              modelID: "gpt-5",
+              providerID: "openai",
+              mode: "default",
+              agent: "build",
+              path: {
+                cwd: "D:/repo",
+                root: "D:/repo",
+              },
+              cost: 0,
+              tokens: {
+                total: 90,
+                input: 70,
+                output: 20,
+                reasoning: 0,
+                cache: {
+                  read: 0,
+                  write: 0,
+                },
+              },
+            },
+          },
+        },
+      } as GlobalEvent);
+
+      harness.eventStream.emit({
+        directory: "D:/repo",
+        payload: {
+          type: "session.idle",
+          properties: {
+            sessionID: "sdk-session-1",
+            status: {
+              type: "idle",
+            },
+          },
+        },
+      } as GlobalEvent);
+
+      yield* flushAsyncWork;
+      yield* flushAsyncWork;
+
+      yield* adapter.sendTurn({
+        threadId: THREAD_ID,
+        input: "second turn",
+        attachments: [],
+      });
+
+      assert.equal(harness.mocks.summarizeSession.mock.calls.length, 1);
+      assert.deepEqual(harness.inputs.summarize, {
+        sessionID: "sdk-session-1",
+        directory: "D:/repo",
+        providerID: "openai",
+        modelID: "gpt-5",
+        auto: false,
+      });
+      assert.equal(harness.mocks.promptAsync.mock.calls.length, 2);
     }).pipe(Effect.provide(harness.layer));
   });
 
@@ -1443,11 +1968,13 @@ describe("OpencodeAdapterLive", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
       const adapter = yield* OpencodeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
 
-      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 8).pipe(
-        Stream.runCollect,
-        Effect.forkChild,
-      );
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
 
       yield* adapter.startSession({
         threadId: THREAD_ID,
@@ -1496,19 +2023,28 @@ describe("OpencodeAdapterLive", () => {
         },
       } as GlobalEvent);
 
-      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
-      const reasoningDelta = runtimeEvents.at(-1);
+      try {
+        yield* flushAsyncWork;
+        yield* flushAsyncWork;
 
-      assert.isDefined(reasoningDelta);
-      assert.equal(reasoningDelta?.type, "content.delta");
-      if (!reasoningDelta || reasoningDelta.type !== "content.delta") {
-        return;
+        const reasoningDelta = runtimeEvents.findLast(
+          (event): event is Extract<ProviderRuntimeEvent, { type: "content.delta" }> =>
+            event.type === "content.delta" && event.itemId === "reasoning-part-1",
+        );
+
+        assert.isDefined(reasoningDelta);
+        assert.equal(reasoningDelta?.type, "content.delta");
+        if (!reasoningDelta || reasoningDelta.type !== "content.delta") {
+          return;
+        }
+
+        assert.equal(reasoningDelta.turnId, turn.turnId);
+        assert.equal(reasoningDelta.itemId, "reasoning-part-1");
+        assert.equal(reasoningDelta.payload.streamKind, "reasoning_text");
+        assert.equal(reasoningDelta.payload.delta, "thinking");
+      } finally {
+        yield* Fiber.interrupt(runtimeEventsFiber);
       }
-
-      assert.equal(reasoningDelta.turnId, turn.turnId);
-      assert.equal(reasoningDelta.itemId, "reasoning-part-1");
-      assert.equal(reasoningDelta.payload.streamKind, "reasoning_text");
-      assert.equal(reasoningDelta.payload.delta, "thinking");
     }).pipe(Effect.provide(harness.layer));
   });
 
@@ -1643,11 +2179,13 @@ describe("OpencodeAdapterLive", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
       const adapter = yield* OpencodeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
 
-      const runtimeEventsFiber = yield* Stream.take(adapter.streamEvents, 14).pipe(
-        Stream.runCollect,
-        Effect.forkChild,
-      );
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
 
       yield* adapter.startSession({
         threadId: THREAD_ID,
@@ -1804,33 +2342,39 @@ describe("OpencodeAdapterLive", () => {
         },
       } as GlobalEvent);
 
-      const runtimeEvents = Array.from(yield* Fiber.join(runtimeEventsFiber));
-      const completedAssistantItems = runtimeEvents.filter(
-        (event): event is Extract<(typeof runtimeEvents)[number], { type: "item.completed" }> =>
-          event.type === "item.completed" && event.payload.itemType === "assistant_message",
-      );
-      const secondAssistantDelta = runtimeEvents.find(
-        (event): event is Extract<(typeof runtimeEvents)[number], { type: "content.delta" }> =>
-          event.type === "content.delta" && event.itemId === "assistant-message-2",
-      );
-      const completedTurn = runtimeEvents.find(
-        (event): event is Extract<(typeof runtimeEvents)[number], { type: "turn.completed" }> =>
-          event.type === "turn.completed",
-      );
+      try {
+        yield* flushAsyncWork;
+        yield* flushAsyncWork;
 
-      assert.deepEqual(
-        completedAssistantItems.map((event) => String(event.itemId)),
-        ["assistant-message-1", "assistant-message-2"],
-      );
-      assert.equal(secondAssistantDelta?.payload.delta, "Still working on the same turn");
-      assert.equal(completedTurn?.turnId, turn.turnId);
+        const completedAssistantItems = runtimeEvents.filter(
+          (event): event is Extract<(typeof runtimeEvents)[number], { type: "item.completed" }> =>
+            event.type === "item.completed" && event.payload.itemType === "assistant_message",
+        );
+        const secondAssistantDelta = runtimeEvents.find(
+          (event): event is Extract<(typeof runtimeEvents)[number], { type: "content.delta" }> =>
+            event.type === "content.delta" && event.itemId === "assistant-message-2",
+        );
+        const completedTurn = runtimeEvents.findLast(
+          (event): event is Extract<(typeof runtimeEvents)[number], { type: "turn.completed" }> =>
+            event.type === "turn.completed",
+        );
 
-      const sessionsAfterIdle = yield* adapter.listSessions();
-      const sessionAfterIdle = sessionsAfterIdle[0];
+        assert.deepEqual(
+          completedAssistantItems.map((event) => String(event.itemId)),
+          ["assistant-message-1", "assistant-message-2"],
+        );
+        assert.equal(secondAssistantDelta?.payload.delta, "Still working on the same turn");
+        assert.equal(completedTurn?.turnId, turn.turnId);
 
-      assert.isDefined(sessionAfterIdle);
-      assert.equal(sessionAfterIdle?.status, "ready");
-      assert.equal(sessionAfterIdle?.activeTurnId, undefined);
+        const sessionsAfterIdle = yield* adapter.listSessions();
+        const sessionAfterIdle = sessionsAfterIdle[0];
+
+        assert.isDefined(sessionAfterIdle);
+        assert.equal(sessionAfterIdle?.status, "ready");
+        assert.equal(sessionAfterIdle?.activeTurnId, undefined);
+      } finally {
+        yield* Fiber.interrupt(runtimeEventsFiber);
+      }
     }).pipe(Effect.provide(harness.layer));
   });
 

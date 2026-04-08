@@ -687,6 +687,49 @@ function createSnapshotWithOpenCodeCompletionSummary(): OrchestrationReadModel {
   };
 }
 
+function createSnapshotWithOpenCodeContextWindow(): OrchestrationReadModel {
+  const snapshot = createSnapshotForTargetUser({
+    targetMessageId: "msg-user-opencode-context-target" as MessageId,
+    targetText: "opencode context thread",
+  });
+
+  return {
+    ...snapshot,
+    threads: snapshot.threads.map((thread) =>
+      thread.id === THREAD_ID
+        ? Object.assign({}, thread, {
+            modelSelection: {
+              provider: "opencode",
+              model: "openai/gpt-5",
+            },
+            activities: [
+              {
+                id: EventId.makeUnsafe("activity-opencode-context-window"),
+                tone: "info",
+                kind: "context-window.updated",
+                summary: "Context window updated",
+                payload: {
+                  usedTokens: 212_000,
+                  totalProcessedTokens: 9_600_000,
+                  maxTokens: 258_000,
+                  compactsAutomatically: true,
+                },
+                turnId: "turn-opencode-context-window" as TurnId,
+                createdAt: isoAt(1_000),
+              },
+            ],
+            session: {
+              ...thread.session,
+              providerName: "opencode",
+              updatedAt: isoAt(1_000),
+            },
+            updatedAt: isoAt(1_000),
+          })
+        : thread,
+    ),
+  };
+}
+
 function resolveWsRpc(body: NormalizedWsRpcRequestBody): unknown {
   const customResult = customWsRpcResolver?.(body);
   if (customResult !== undefined) {
@@ -3135,6 +3178,69 @@ describe("ChatView timeline estimator parity (full app)", () => {
         () => {
           expect(document.body.textContent).toContain("OpenCode finished the response.");
           expect(document.body.textContent).toContain("Worked for 9.0s");
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("shows the context window meter for opencode threads", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotWithOpenCodeContextWindow(),
+      configureFixture: (nextFixture) => {
+        nextFixture.serverConfig = {
+          ...nextFixture.serverConfig,
+          providers: [
+            ...nextFixture.serverConfig.providers,
+            {
+              provider: "opencode",
+              enabled: true,
+              installed: true,
+              version: "0.1.0",
+              status: "ready",
+              auth: { status: "unknown" },
+              checkedAt: NOW_ISO,
+              runtimeCapabilities: { busyFollowupMode: "queue-only" },
+              models: [
+                {
+                  slug: "openai/gpt-5",
+                  name: "OpenAI GPT-5",
+                  isCustom: false,
+                  capabilities: {
+                    reasoningEffortLevels: [],
+                    supportsFastMode: false,
+                    supportsThinkingToggle: false,
+                    contextWindowOptions: [],
+                    promptInjectedEffortLevels: [],
+                  },
+                },
+              ],
+            },
+          ],
+        };
+      },
+    });
+
+    try {
+      const meterButton = await waitForElement(
+        () => document.querySelector<HTMLButtonElement>('button[aria-label^="Context window"]'),
+        "Unable to find context window meter.",
+      );
+
+      meterButton.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+
+      await vi.waitFor(
+        () => {
+          expect(document.body.textContent).toContain("Context window");
+          expect(document.body.textContent).toContain("82%");
+          expect(document.body.textContent).toContain("212k/258k context used");
+          expect(document.body.textContent).toContain("Total processed: 9.6m tokens");
+          expect(document.body.textContent).toContain(
+            "Automatically compacts its context when needed.",
+          );
         },
         { timeout: 8_000, interval: 16 },
       );

@@ -2370,6 +2370,43 @@ describe("ProviderRuntimeIngestion", () => {
     });
   });
 
+  it("projects zero-usage snapshots when a context window limit is known", async () => {
+    const harness = await createHarness();
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "thread.token-usage.updated",
+      eventId: asEventId("evt-thread-token-usage-updated-zero"),
+      provider: "opencode",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      payload: {
+        usage: {
+          usedTokens: 0,
+          totalProcessedTokens: 0,
+          maxTokens: 258_000,
+          compactsAutomatically: true,
+        },
+      },
+    });
+
+    const thread = await waitForThread(harness.engine, (entry) =>
+      entry.activities.some(
+        (activity: ProviderRuntimeTestActivity) => activity.kind === "context-window.updated",
+      ),
+    );
+
+    const usageActivity = thread.activities.find(
+      (activity: ProviderRuntimeTestActivity) => activity.kind === "context-window.updated",
+    );
+    expect(usageActivity?.payload).toMatchObject({
+      usedTokens: 0,
+      totalProcessedTokens: 0,
+      maxTokens: 258_000,
+      compactsAutomatically: true,
+    });
+  });
+
   it("projects compacted thread state into context compaction activities", async () => {
     const harness = await createHarness();
     const now = new Date().toISOString();

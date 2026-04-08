@@ -64,4 +64,20 @@ describe("contextWindow", () => {
     expect(snapshot?.usedTokens).toBe(81_659);
     expect(snapshot?.totalProcessedTokens).toBe(748_126);
   });
+
+  it("keeps zero-usage snapshots when the context window is known", () => {
+    const snapshot = deriveLatestContextWindowSnapshot([
+      makeActivity("activity-1", "context-window.updated", {
+        usedTokens: 0,
+        totalProcessedTokens: 0,
+        maxTokens: 258_000,
+        compactsAutomatically: true,
+      }),
+    ]);
+
+    expect(snapshot?.usedTokens).toBe(0);
+    expect(snapshot?.maxTokens).toBe(258_000);
+    expect(snapshot?.usedPercentage).toBe(0);
+    expect(snapshot?.compactsAutomatically).toBe(true);
+  });
 });
