@@ -1,12 +1,14 @@
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
+import { ensureAuthAccessManagementSchema, getAuthSessionColumns } from "./AuthSchema.ts";
+
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
-  const sessionColumns = yield* sql<{ readonly name: string }>`
-    PRAGMA table_info(auth_sessions)
-  `;
+  yield* ensureAuthAccessManagementSchema(sql);
+
+  const sessionColumns = yield* getAuthSessionColumns(sql);
 
   if (!sessionColumns.some((column) => column.name === "last_connected_at")) {
     yield* sql`

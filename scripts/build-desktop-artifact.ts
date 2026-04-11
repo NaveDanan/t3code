@@ -243,7 +243,6 @@ interface StagePackageJson {
   readonly devDependencies: {
     readonly electron: string;
   };
-  readonly overrides: Record<string, unknown>;
 }
 
 const AzureTrustedSigningOptionsConfig = Config.all({
@@ -488,18 +487,25 @@ function validateBundledClientAssets(clientDir: string) {
 }
 
 function resolveDesktopRuntimeDependencies(
-  dependencies: Record<string, string> | undefined,
-  catalog: Record<string, string>,
+  dependencies: Record<string, unknown> | undefined,
+  catalog: Record<string, unknown>,
 ): Record<string, string> {
   if (!dependencies || Object.keys(dependencies).length === 0) {
     return {};
   }
 
   const runtimeDependencies = Object.fromEntries(
-    Object.entries(dependencies).filter(([dependencyName]) => dependencyName !== "electron"),
+    Object.entries(dependencies).filter(
+      (entry): entry is [string, string] => entry[0] !== "electron" && typeof entry[1] === "string",
+    ),
+  );
+  const resolvedCatalog = Object.fromEntries(
+    Object.entries(catalog).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
   );
 
-  return resolveCatalogDependencies(runtimeDependencies, catalog, "apps/desktop");
+  return resolveCatalogDependencies(runtimeDependencies, resolvedCatalog, "apps/desktop");
 }
 
 function resolveGitHubPublishConfig():
@@ -642,20 +648,6 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     });
   }
 
-  const resolvedOverrides = yield* Effect.try({
-    try: () =>
-      resolveCatalogDependencies(
-        rootPackageJson.overrides,
-        rootPackageJson.workspaces.catalog,
-        "apps/desktop",
-      ),
-    catch: (cause) =>
-      new BuildScriptError({
-        message: "Could not resolve overrides from package.json.",
-        cause,
-      }),
-  });
-
   const resolvedServerDependencies = yield* Effect.try({
     try: () =>
       resolveCatalogDependencies(
@@ -764,7 +756,6 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     devDependencies: {
       electron: electronVersion,
     },
-    overrides: resolvedOverrides,
   };
 
   const stagePackageJsonString = yield* encodeJsonString(stagePackageJson);
@@ -926,10 +917,8 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
 
 const cliRuntimeLayer = Layer.mergeAll(Logger.layer([Logger.consolePretty()]), NodeServices.layer);
 
-if (import.meta.main) {
-  Command.run(buildDesktopArtifactCli, { version: "0.0.0" }).pipe(
-    Effect.scoped,
-    Effect.provide(cliRuntimeLayer),
-    NodeRuntime.runMain,
-  );
-}
+Command.run(buildDesktopArtifactCli, { version: "0.0.0" }).pipe(
+  Effect.scoped,
+  Effect.provide(cliRuntimeLayer),
+  NodeRuntime.runMain,
+);

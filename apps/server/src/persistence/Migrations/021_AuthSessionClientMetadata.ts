@@ -1,12 +1,18 @@
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 
+import {
+  ensureAuthAccessManagementSchema,
+  getAuthPairingLinkColumns,
+  getAuthSessionColumns,
+} from "./AuthSchema.ts";
+
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
-  const pairingLinkColumns = yield* sql<{ readonly name: string }>`
-    PRAGMA table_info(auth_pairing_links)
-  `;
+  yield* ensureAuthAccessManagementSchema(sql);
+
+  const pairingLinkColumns = yield* getAuthPairingLinkColumns(sql);
   if (!pairingLinkColumns.some((column) => column.name === "label")) {
     yield* sql`
       ALTER TABLE auth_pairing_links
@@ -14,9 +20,7 @@ export default Effect.gen(function* () {
     `;
   }
 
-  const sessionColumns = yield* sql<{ readonly name: string }>`
-    PRAGMA table_info(auth_sessions)
-  `;
+  const sessionColumns = yield* getAuthSessionColumns(sql);
 
   if (!sessionColumns.some((column) => column.name === "client_label")) {
     yield* sql`
