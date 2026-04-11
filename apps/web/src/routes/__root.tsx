@@ -14,11 +14,13 @@ import { useEffect, useEffectEvent, useRef } from "react";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { Throttler } from "@tanstack/react-pacer";
 
+import { applyAppFontSize } from "../appFontSize";
 import { APP_DISPLAY_NAME } from "../branding";
 import { AppSidebarLayout } from "../components/AppSidebarLayout";
 import { Button } from "../components/ui/button";
 import { AnchoredToastProvider, ToastProvider, toastManager } from "../components/ui/toast";
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
+import { useSettings } from "../hooks/useSettings";
 import { readNativeApi } from "../nativeApi";
 import {
   getServerConfigUpdatedNotification,
@@ -71,6 +73,7 @@ function RootRouteView() {
   return (
     <ToastProvider>
       <AnchoredToastProvider>
+        <AppFontSizeSync />
         <ServerStateBootstrap />
         <EventRouter />
         <AppSidebarLayout>
@@ -79,6 +82,16 @@ function RootRouteView() {
       </AnchoredToastProvider>
     </ToastProvider>
   );
+}
+
+function AppFontSizeSync() {
+  const appFontSize = useSettings((settings) => settings.appFontSize);
+
+  useEffect(() => {
+    applyAppFontSize(appFontSize);
+  }, [appFontSize]);
+
+  return null;
 }
 
 function RootRouteErrorView({ error, reset }: ErrorComponentProps) {

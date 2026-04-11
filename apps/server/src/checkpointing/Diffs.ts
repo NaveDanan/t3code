@@ -1,4 +1,4 @@
-import { parsePatchFiles } from "@pierre/diffs";
+import { parseUnifiedDiffFiles } from "@t3tools/shared/diff";
 
 export interface TurnDiffFileSummary {
   readonly path: string;
@@ -9,19 +9,9 @@ export interface TurnDiffFileSummary {
 export function parseTurnDiffFilesFromUnifiedDiff(
   diff: string,
 ): ReadonlyArray<TurnDiffFileSummary> {
-  const normalized = diff.replace(/\r\n/g, "\n").trim();
-  if (normalized.length === 0) {
-    return [];
-  }
-
-  const parsedPatches = parsePatchFiles(normalized);
-  const files = parsedPatches.flatMap((patch) =>
-    patch.files.map((file) => ({
-      path: file.name,
-      additions: file.hunks.reduce((total, hunk) => total + hunk.additionLines, 0),
-      deletions: file.hunks.reduce((total, hunk) => total + hunk.deletionLines, 0),
-    })),
-  );
-
-  return files.toSorted((left, right) => left.path.localeCompare(right.path));
+  return parseUnifiedDiffFiles(diff).map(({ path, additions, deletions }) => ({
+    path,
+    additions,
+    deletions,
+  }));
 }

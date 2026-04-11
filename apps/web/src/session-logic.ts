@@ -10,6 +10,7 @@ import {
   type ThreadId,
   type TurnId,
 } from "@t3tools/contracts";
+import { extractApplyPatchPaths, parseUnifiedDiffFiles } from "@t3tools/shared/diff";
 
 import type {
   ChatMessage,
@@ -38,9 +39,11 @@ export interface WorkLogEntry {
   id: string;
   createdAt: string;
   label: string;
+  turnId?: TurnId | null;
   detail?: string;
   command?: string;
   changedFiles?: ReadonlyArray<string>;
+  unifiedDiff?: string;
   tone: "thinking" | "tool" | "info" | "error";
   toolTitle?: string;
   itemType?: ToolLifecycleItemType;
@@ -461,15 +464,21 @@ export function deriveWorkLogEntries(
   latestTurnId: TurnId | undefined,
 ): WorkLogEntry[] {
   const ordered = [...activities].toSorted(compareActivitiesByOrder);
+  const liveTurnDiffByTurnId = extractLiveTurnDiffByTurnId(ordered, latestTurnId);
   const entries = ordered
     .filter((activity) => (latestTurnId ? activity.turnId === latestTurnId : true))
     .filter((activity) => activity.kind !== "tool.started")
     .filter((activity) => activity.kind !== "task.started" && activity.kind !== "task.completed")
     .filter((activity) => activity.kind !== "context-window.updated")
+    .filter((activity) => activity.kind !== "turn.diff.updated")
     .filter((activity) => activity.summary !== "Checkpoint captured")
     .filter((activity) => !isPlanBoundaryToolActivity(activity))
     .map(toDerivedWorkLogEntry);
-  return collapseDerivedWorkLogEntries(entries).map(
+  const collapsedEntries = attachLiveTurnDiffs(
+    collapseDerivedWorkLogEntries(entries),
+    liveTurnDiffByTurnId,
+  );
+  return collapsedEntries.map(
     ({ activityKind: _activityKind, collapseKey: _collapseKey, ...entry }) => entry,
   );
 }
@@ -498,6 +507,7 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
     id: activity.id,
     createdAt: activity.createdAt,
     label: activity.summary,
+    turnId: activity.turnId,
     tone: activity.tone === "approval" ? "info" : activity.tone,
     activityKind: activity.kind,
   };
@@ -573,12 +583,16 @@ function mergeDerivedWorkLogEntries(
   const itemType = next.itemType ?? previous.itemType;
   const requestKind = next.requestKind ?? previous.requestKind;
   const collapseKey = next.collapseKey ?? previous.collapseKey;
+  const turnId = next.turnId ?? previous.turnId;
+  const unifiedDiff = next.unifiedDiff ?? previous.unifiedDiff;
   return {
     ...previous,
     ...next,
+    ...(turnId !== undefined ? { turnId } : {}),
     ...(detail ? { detail } : {}),
     ...(command ? { command } : {}),
     ...(changedFiles.length > 0 ? { changedFiles } : {}),
+    ...(unifiedDiff ? { unifiedDiff } : {}),
     ...(toolTitle ? { toolTitle } : {}),
     ...(itemType ? { itemType } : {}),
     ...(requestKind ? { requestKind } : {}),
@@ -608,6 +622,72 @@ function deriveToolLifecycleCollapseKey(entry: DerivedWorkLogEntry): string | un
     return undefined;
   }
   return [itemType, normalizedLabel, detail].join("\u001f");
+}
+
+function extractLiveTurnDiffByTurnId(
+  activities: ReadonlyArray<OrchestrationThreadActivity>,
+  latestTurnId: TurnId | undefined,
+): ReadonlyMap<TurnId, string> {
+  const result = new Map<TurnId, string>();
+  for (const activity of activities) {
+    if (latestTurnId && activity.turnId !== latestTurnId) {
+      continue;
+    }
+    if (activity.kind !== "turn.diff.updated" || !activity.turnId) {
+      continue;
+    }
+    const payload =
+      activity.payload && typeof activity.payload === "object"
+        ? (activity.payload as Record<string, unknown>)
+        : null;
+    if (typeof payload?.unifiedDiff !== "string" || payload.unifiedDiff.trim().length === 0) {
+      continue;
+    }
+    result.set(activity.turnId, payload.unifiedDiff);
+  }
+  return result;
+}
+
+function attachLiveTurnDiffs(
+  entries: ReadonlyArray<DerivedWorkLogEntry>,
+  liveTurnDiffByTurnId: ReadonlyMap<TurnId, string>,
+): DerivedWorkLogEntry[] {
+  if (entries.length === 0 || liveTurnDiffByTurnId.size === 0) {
+    return [...entries];
+  }
+
+  const lastEligibleIndexByTurnId = new Map<TurnId, number>();
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    if (!entry?.turnId || !isFileChangeWorkLogEntry(entry)) {
+      continue;
+    }
+    lastEligibleIndexByTurnId.set(entry.turnId, index);
+  }
+
+  return entries.map((entry, index) => {
+    if (!entry.turnId) {
+      return entry;
+    }
+    if (lastEligibleIndexByTurnId.get(entry.turnId) !== index) {
+      return entry;
+    }
+    const unifiedDiff = liveTurnDiffByTurnId.get(entry.turnId);
+    if (!unifiedDiff) {
+      return entry;
+    }
+    return { ...entry, unifiedDiff };
+  });
+}
+
+function isFileChangeWorkLogEntry(
+  entry: Pick<WorkLogEntry, "requestKind" | "itemType" | "changedFiles">,
+): boolean {
+  return (
+    entry.requestKind === "file-change" ||
+    entry.itemType === "file_change" ||
+    (entry.changedFiles?.length ?? 0) > 0
+  );
 }
 
 function normalizeCompactToolLabel(value: string): string {
@@ -754,6 +834,17 @@ function collectChangedFiles(value: unknown, target: string[], seen: Set<string>
   pushChangedFile(target, seen, record.newPath);
   pushChangedFile(target, seen, record.oldPath);
 
+  for (const patchKey of ["patch", "patchText", "diff", "unifiedDiff"] as const) {
+    const patchValue = record[patchKey];
+    if (typeof patchValue !== "string" || patchValue.trim().length === 0) {
+      continue;
+    }
+    collectChangedFilesFromPatchText(patchValue, target, seen);
+    if (target.length >= 12) {
+      return;
+    }
+  }
+
   for (const nestedKey of [
     "item",
     "result",
@@ -771,6 +862,26 @@ function collectChangedFiles(value: unknown, target: string[], seen: Set<string>
       continue;
     }
     collectChangedFiles(record[nestedKey], target, seen, depth + 1);
+    if (target.length >= 12) {
+      return;
+    }
+  }
+}
+
+function collectChangedFilesFromPatchText(patchText: string, target: string[], seen: Set<string>) {
+  const applyPatchPaths = extractApplyPatchPaths(patchText);
+  if (applyPatchPaths.length > 0) {
+    for (const pathValue of applyPatchPaths) {
+      pushChangedFile(target, seen, pathValue);
+      if (target.length >= 12) {
+        return;
+      }
+    }
+    return;
+  }
+
+  for (const file of parseUnifiedDiffFiles(patchText)) {
+    pushChangedFile(target, seen, file.path);
     if (target.length >= 12) {
       return;
     }

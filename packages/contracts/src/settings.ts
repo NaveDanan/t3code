@@ -29,7 +29,12 @@ export const BusyThreadFollowupMode = Schema.Literals(["steer", "queue"]);
 export type BusyThreadFollowupMode = typeof BusyThreadFollowupMode.Type;
 export const DEFAULT_BUSY_THREAD_FOLLOWUP_MODE: BusyThreadFollowupMode = "queue";
 
+export const AppFontSize = Schema.Literals(["normal", "big", "large", "xlarge"]);
+export type AppFontSize = typeof AppFontSize.Type;
+export const DEFAULT_APP_FONT_SIZE: AppFontSize = "normal";
+
 export const ClientSettingsSchema = Schema.Struct({
+  appFontSize: AppFontSize.pipe(Schema.withDecodingDefault(() => DEFAULT_APP_FONT_SIZE)),
   busyThreadFollowupMode: BusyThreadFollowupMode.pipe(
     Schema.withDecodingDefault(() => DEFAULT_BUSY_THREAD_FOLLOWUP_MODE),
   ),

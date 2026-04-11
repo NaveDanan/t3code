@@ -63,6 +63,28 @@
 
 :root {
   color-scheme: light;
+  --app-font-size-offset: 0px;
+  --app-font-size-text-xs: 0.75rem;
+  --app-font-size-text-xs-line-height: 1rem;
+  --app-font-size-text-sm: 0.875rem;
+  --app-font-size-text-sm-line-height: 1.25rem;
+  --app-font-size-text-base: 1rem;
+  --app-font-size-text-base-line-height: 1.5rem;
+  --app-font-size-text-lg: 1.125rem;
+  --app-font-size-text-lg-line-height: 1.75rem;
+  --app-font-size-text-xl: 1.25rem;
+  --app-font-size-text-xl-line-height: 1.75rem;
+  --app-font-size-text-2xl: 1.5rem;
+  --app-font-size-text-2xl-line-height: 2rem;
+  --app-font-size-text-3xl: 1.875rem;
+  --app-font-size-text-3xl-line-height: 2.25rem;
+  --app-font-size-text-4xl: 2.25rem;
+  --app-font-size-text-4xl-line-height: 2.5rem;
+  --app-font-size-text-5xl: 3rem;
+  --app-font-size-text-6xl: 3.75rem;
+  --app-font-size-text-7xl: 4.5rem;
+  --app-font-size-text-8xl: 6rem;
+  --app-font-size-text-9xl: 8rem;
   --radius: 0.625rem;
   --background: var(--color-white);
   --foreground: var(--color-neutral-800);
@@ -117,6 +139,148 @@
     --success-foreground: var(--color-emerald-400);
     --warning: var(--color-amber-500);
     --warning-foreground: var(--color-amber-400);
+  }
+}
+
+:root[data-app-font-size="big"] {
+  --app-font-size-offset: 2px;
+}
+
+:root[data-app-font-size="large"] {
+  --app-font-size-offset: 4px;
+}
+
+:root[data-app-font-size="xlarge"] {
+  --app-font-size-offset: 6px;
+}
+
+:root[data-app-font-size] {
+  --text-xs: calc(var(--app-font-size-text-xs) + var(--app-font-size-offset));
+  --text-xs--line-height: calc(
+    var(--app-font-size-text-xs-line-height) + var(--app-font-size-offset)
+  );
+  --text-sm: calc(var(--app-font-size-text-sm) + var(--app-font-size-offset));
+  --text-sm--line-height: calc(
+    var(--app-font-size-text-sm-line-height) + var(--app-font-size-offset)
+  );
+  --text-base: calc(var(--app-font-size-text-base) + var(--app-font-size-offset));
+  --text-base--line-height: calc(
+    var(--app-font-size-text-base-line-height) + var(--app-font-size-offset)
+  );
+  --text-lg: calc(var(--app-font-size-text-lg) + var(--app-font-size-offset));
+  --text-lg--line-height: calc(
+    var(--app-font-size-text-lg-line-height) + var(--app-font-size-offset)
+  );
+  --text-xl: calc(var(--app-font-size-text-xl) + var(--app-font-size-offset));
+  --text-xl--line-height: calc(
+    var(--app-font-size-text-xl-line-height) + var(--app-font-size-offset)
+  );
+  --text-2xl: calc(var(--app-font-size-text-2xl) + var(--app-font-size-offset));
+  --text-2xl--line-height: calc(
+    var(--app-font-size-text-2xl-line-height) + var(--app-font-size-offset)
+  );
+  --text-3xl: calc(var(--app-font-size-text-3xl) + var(--app-font-size-offset));
+  --text-3xl--line-height: calc(
+    var(--app-font-size-text-3xl-line-height) + var(--app-font-size-offset)
+  );
+  --text-4xl: calc(var(--app-font-size-text-4xl) + var(--app-font-size-offset));
+  --text-4xl--line-height: calc(
+    var(--app-font-size-text-4xl-line-height) + var(--app-font-size-offset)
+  );
+  --text-5xl: calc(var(--app-font-size-text-5xl) + var(--app-font-size-offset));
+  --text-6xl: calc(var(--app-font-size-text-6xl) + var(--app-font-size-offset));
+  --text-7xl: calc(var(--app-font-size-text-7xl) + var(--app-font-size-offset));
+  --text-8xl: calc(var(--app-font-size-text-8xl) + var(--app-font-size-offset));
+  --text-9xl: calc(var(--app-font-size-text-9xl) + var(--app-font-size-offset));
+}
+
+:root[data-app-font-size] :where(.text-\[8px\]) {
+  font-size: calc(8px + var(--app-font-size-offset));
+}
+
+:root[data-app-font-size] :where(.text-\[9px\]) {
+  font-size: calc(9px + var(--app-font-size-offset));
+}
+
+:root[data-app-font-size] :where(.text-\[10px\]) {
+  font-size: calc(10px + var(--app-font-size-offset));
+}
+
+:root[data-app-font-size] :where(.text-\[11px\]) {
+  font-size: calc(11px + var(--app-font-size-offset));
+}
+
+:root[data-app-font-size] :where(.text-\[12px\]) {
+  font-size: calc(12px + var(--app-font-size-offset));
+}
+
+:root[data-app-font-size] :where(.text-\[13px\]) {
+  font-size: calc(13px + var(--app-font-size-offset));
+}
+
+:root[data-app-font-size] :where(.text-\[14px\]) {
+  font-size: calc(14px + var(--app-font-size-offset));
+}
+
+:root[data-app-font-size] .app-font-size-reset {
+  --text-xs: var(--app-font-size-text-xs);
+  --text-xs--line-height: var(--app-font-size-text-xs-line-height);
+  --text-sm: var(--app-font-size-text-sm);
+  --text-sm--line-height: var(--app-font-size-text-sm-line-height);
+  --text-base: var(--app-font-size-text-base);
+  --text-base--line-height: var(--app-font-size-text-base-line-height);
+  --text-lg: var(--app-font-size-text-lg);
+  --text-lg--line-height: var(--app-font-size-text-lg-line-height);
+  --text-xl: var(--app-font-size-text-xl);
+  --text-xl--line-height: var(--app-font-size-text-xl-line-height);
+  --text-2xl: var(--app-font-size-text-2xl);
+  --text-2xl--line-height: var(--app-font-size-text-2xl-line-height);
+  --text-3xl: var(--app-font-size-text-3xl);
+  --text-3xl--line-height: var(--app-font-size-text-3xl-line-height);
+  --text-4xl: var(--app-font-size-text-4xl);
+  --text-4xl--line-height: var(--app-font-size-text-4xl-line-height);
+  --text-5xl: var(--app-font-size-text-5xl);
+  --text-6xl: var(--app-font-size-text-6xl);
+  --text-7xl: var(--app-font-size-text-7xl);
+  --text-8xl: var(--app-font-size-text-8xl);
+  --text-9xl: var(--app-font-size-text-9xl);
+}
+
+:root[data-app-font-size] .app-font-size-reset :where(.text-\[8px\]) {
+  font-size: 8px;
+}
+
+:root[data-app-font-size] .app-font-size-reset :where(.text-\[9px\]) {
+  font-size: 9px;
+}
+
+:root[data-app-font-size] .app-font-size-reset :where(.text-\[10px\]) {
+  font-size: 10px;
+}
+
+:root[data-app-font-size] .app-font-size-reset :where(.text-\[11px\]) {
+  font-size: 11px;
+}
+
+:root[data-app-font-size] .app-font-size-reset :where(.text-\[12px\]) {
+  font-size: 12px;
+}
+
+:root[data-app-font-size] .app-font-size-reset :where(.text-\[13px\]) {
+  font-size: 13px;
+}
+
+:root[data-app-font-size] .app-font-size-reset :where(.text-\[14px\]) {
+  font-size: 14px;
+}
+
+@media (min-width: 40rem) {
+  :root[data-app-font-size] :where(.sm\:text-\[\.625rem\]) {
+    font-size: calc(0.625rem + var(--app-font-size-offset));
+  }
+
+  :root[data-app-font-size] .app-font-size-reset :where(.sm\:text-\[\.625rem\]) {
+    font-size: 0.625rem;
   }
 }
 

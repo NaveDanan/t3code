@@ -1,4 +1,5 @@
 import { type MessageId } from "@t3tools/contracts";
+import { parseUnifiedDiffFiles } from "@t3tools/shared/diff";
 import { type TimelineEntry, type WorkLogEntry } from "../../session-logic";
 import { buildTurnDiffTree, type TurnDiffTreeNode } from "../../lib/turnDiffTree";
 import { type ChatMessage, type ProposedPlan, type TurnDiffSummary } from "../../types";
@@ -169,9 +170,13 @@ function estimateWorkRowHeight(
     hasOverflow && !isExpanded ? MAX_VISIBLE_WORK_LOG_ENTRIES : row.groupedEntries.length;
   const onlyToolEntries = row.groupedEntries.every((entry) => entry.tone === "tool");
   const showHeader = hasOverflow || !onlyToolEntries;
+  const reviewCardsHeight = row.groupedEntries
+    .slice(hasOverflow && !isExpanded ? -MAX_VISIBLE_WORK_LOG_ENTRIES : 0)
+    .slice(0, visibleEntries)
+    .reduce((total, entry) => total + estimateWorkEntryReviewHeight(entry), 0);
 
   // Card chrome, optional header, and one compact work-entry row per visible entry.
-  return 28 + (showHeader ? 26 : 0) + visibleEntries * 32;
+  return 28 + (showHeader ? 26 : 0) + visibleEntries * 32 + reviewCardsHeight;
 }
 
 function estimateTimelineProposedPlanHeight(proposedPlan: ProposedPlan): number {
@@ -185,6 +190,39 @@ function estimateChangedFilesCardHeight(turnDiffSummary: TurnDiffSummary): numbe
 
   // Card chrome: top/bottom padding, header row, and tree spacing.
   return 60 + visibleNodeCount * 25;
+}
+
+function estimateWorkEntryReviewHeight(entry: WorkLogEntry): number {
+  const diffFileCount = countDiffFiles(entry.unifiedDiff);
+  if (diffFileCount === 1) {
+    return 260;
+  }
+  if (diffFileCount > 1) {
+    return 56 + Math.min(diffFileCount, 6) * 42;
+  }
+  const changedFileCount = entry.changedFiles?.length ?? 0;
+  if (changedFileCount > 0) {
+    return 56 + Math.min(changedFileCount, 6) * 34;
+  }
+  if (typeof entry.unifiedDiff === "string" && entry.unifiedDiff.trim().length > 0) {
+    const headerCount = entry.unifiedDiff.match(/^diff --git /gm)?.length ?? 0;
+    if (headerCount > 0) {
+      return 56 + Math.min(headerCount, 6) * 42;
+    }
+    return 92;
+  }
+  return 0;
+}
+
+function countDiffFiles(unifiedDiff: string | undefined): number {
+  if (typeof unifiedDiff !== "string" || unifiedDiff.trim().length === 0) {
+    return 0;
+  }
+  try {
+    return parseUnifiedDiffFiles(unifiedDiff).length;
+  } catch {
+    return 0;
+  }
 }
 
 function countTurnDiffTreeNodes(nodes: ReadonlyArray<TurnDiffTreeNode>): number {

@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./diff": {
+      "types": "./src/diff.ts",
+      "import": "./src/diff.ts"
+    },
     "./model": {
       "types": "./src/model.ts",
       "import": "./src/model.ts"
@@ -59,6 +63,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@pierre/diffs": "^1.1.0-beta.16",
     "@t3tools/contracts": "workspace:*",
     "effect": "catalog:"
   },

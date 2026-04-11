@@ -19,6 +19,7 @@ import type { MenuItemConstructorOptions } from "electron";
 import * as Effect from "effect/Effect";
 import type {
   DesktopTheme,
+  DesktopWindowState,
   DesktopUpdateActionResult,
   DesktopUpdateCheckResult,
   DesktopUpdateState,
@@ -60,6 +61,11 @@ const UPDATE_DOWNLOAD_CHANNEL = "desktop:update-download";
 const UPDATE_INSTALL_CHANNEL = "desktop:update-install";
 const UPDATE_CHECK_CHANNEL = "desktop:update-check";
 const GET_WS_URL_CHANNEL = "desktop:get-ws-url";
+const MINIMIZE_WINDOW_CHANNEL = "desktop:window-minimize";
+const TOGGLE_MAXIMIZE_WINDOW_CHANNEL = "desktop:window-toggle-maximize";
+const CLOSE_WINDOW_CHANNEL = "desktop:window-close";
+const GET_WINDOW_STATE_CHANNEL = "desktop:window-state-get";
+const WINDOW_STATE_CHANNEL = "desktop:window-state";
 const BASE_DIR = process.env.T3CODE_HOME?.trim() || Path.join(OS.homedir(), ".t3");
 const STATE_DIR = Path.join(BASE_DIR, "userdata");
 const DESKTOP_SCHEME = "t3";
@@ -783,6 +789,22 @@ function emitUpdateState(): void {
   }
 }
 
+function resolveEventWindow(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  return window && !window.isDestroyed() ? window : null;
+}
+
+function toWindowState(window: BrowserWindow): DesktopWindowState {
+  return {
+    maximized: window.isMaximized(),
+  };
+}
+
+function emitWindowState(window: BrowserWindow): void {
+  if (window.isDestroyed()) return;
+  window.webContents.send(WINDOW_STATE_CHANNEL, toWindowState(window));
+}
+
 function setUpdateState(patch: Partial<DesktopUpdateState>): void {
   updateState = { ...updateState, ...patch };
   emitUpdateState();
@@ -1196,6 +1218,44 @@ function registerIpcHandlers(): void {
     event.returnValue = backendWsUrl;
   });
 
+  ipcMain.removeHandler(MINIMIZE_WINDOW_CHANNEL);
+  ipcMain.handle(MINIMIZE_WINDOW_CHANNEL, async (event) => {
+    resolveEventWindow(event)?.minimize();
+  });
+
+  ipcMain.removeHandler(TOGGLE_MAXIMIZE_WINDOW_CHANNEL);
+  ipcMain.handle(TOGGLE_MAXIMIZE_WINDOW_CHANNEL, async (event) => {
+    const window = resolveEventWindow(event);
+    if (!window) {
+      return { maximized: false } satisfies DesktopWindowState;
+    }
+
+    if (window.isMaximized()) {
+      window.unmaximize();
+    } else {
+      window.maximize();
+    }
+
+    const nextState = toWindowState(window);
+    emitWindowState(window);
+    return nextState;
+  });
+
+  ipcMain.removeHandler(CLOSE_WINDOW_CHANNEL);
+  ipcMain.handle(CLOSE_WINDOW_CHANNEL, async (event) => {
+    resolveEventWindow(event)?.close();
+  });
+
+  ipcMain.removeHandler(GET_WINDOW_STATE_CHANNEL);
+  ipcMain.handle(GET_WINDOW_STATE_CHANNEL, async (event) => {
+    const window = resolveEventWindow(event);
+    if (!window) {
+      return { maximized: false } satisfies DesktopWindowState;
+    }
+
+    return toWindowState(window);
+  });
+
   ipcMain.removeHandler(PICK_FOLDER_CHANNEL);
   ipcMain.handle(PICK_FOLDER_CHANNEL, async () => {
     const owner = BrowserWindow.getFocusedWindow() ?? mainWindow;
@@ -1371,8 +1431,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     ...getIconOption(),
     title: APP_DISPLAY_NAME,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 18 },
+    frame: false,
     webPreferences: {
       preload: Path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -1424,6 +1483,13 @@ function createWindow(): BrowserWindow {
   window.webContents.on("did-finish-load", () => {
     window.setTitle(APP_DISPLAY_NAME);
     emitUpdateState();
+    emitWindowState(window);
+  });
+  window.on("maximize", () => {
+    emitWindowState(window);
+  });
+  window.on("unmaximize", () => {
+    emitWindowState(window);
   });
   window.once("ready-to-show", () => {
     window.show();

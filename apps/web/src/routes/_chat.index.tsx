@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { DesktopTitleBar } from "../components/DesktopTitleBar";
 import { isElectron } from "../env";
 import { SidebarTrigger } from "../components/ui/sidebar";
 
@@ -16,9 +17,13 @@ function ChatIndexRouteView() {
       )}
 
       {isElectron && (
-        <div className="drag-region flex h-[52px] shrink-0 items-center border-b border-border px-5">
-          <span className="text-xs text-muted-foreground/50">No active thread</span>
-        </div>
+        <DesktopTitleBar
+          title="Threads"
+          subtitle="No active thread"
+          contextLabel="Workspace"
+          contextValue="Threads"
+          showContextChip={false}
+        />
       )}
 
       <div className="flex flex-1 items-center justify-center">

@@ -141,6 +141,7 @@
       "name": "@t3tools/shared",
       "version": "0.0.0-alpha.1",
       "dependencies": {
+        "@pierre/diffs": "^1.1.0-beta.16",
         "@t3tools/contracts": "workspace:*",
         "effect": "catalog:",
       },

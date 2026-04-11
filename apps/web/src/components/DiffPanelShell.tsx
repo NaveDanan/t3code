@@ -3,16 +3,13 @@ import type { ReactNode } from "react";
 import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
 
+import { DesktopTitleBar } from "./DesktopTitleBar";
 import { Skeleton } from "./ui/skeleton";
 
 export type DiffPanelMode = "inline" | "sheet" | "sidebar";
 
-function getDiffPanelHeaderRowClassName(mode: DiffPanelMode) {
-  const shouldUseDragRegion = isElectron && mode !== "sheet";
-  return cn(
-    "flex items-center justify-between gap-2 px-4",
-    shouldUseDragRegion ? "drag-region h-[52px] border-b border-border" : "h-12",
-  );
+function getDiffPanelHeaderRowClassName() {
+  return cn("flex h-12 items-center justify-between gap-2 px-4");
 }
 
 export function DiffPanelShell(props: {
@@ -20,7 +17,7 @@ export function DiffPanelShell(props: {
   header: ReactNode;
   children: ReactNode;
 }) {
-  const shouldUseDragRegion = isElectron && props.mode !== "sheet";
+  const shouldUseCustomTitleBar = isElectron && props.mode !== "sheet";
 
   return (
     <div
@@ -31,11 +28,17 @@ export function DiffPanelShell(props: {
           : "w-full",
       )}
     >
-      {shouldUseDragRegion ? (
-        <div className={getDiffPanelHeaderRowClassName(props.mode)}>{props.header}</div>
+      {shouldUseCustomTitleBar ? (
+        <DesktopTitleBar
+          title="Diff"
+          contextLabel="Panel"
+          contextValue="Diff"
+          trailing={<div className="min-w-0 max-w-[60vw]">{props.header}</div>}
+          showWindowControls={false}
+        />
       ) : (
         <div className="border-b border-border">
-          <div className={getDiffPanelHeaderRowClassName(props.mode)}>{props.header}</div>
+          <div className={getDiffPanelHeaderRowClassName()}>{props.header}</div>
         </div>
       )}
       {props.children}

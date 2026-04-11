@@ -19,6 +19,7 @@ import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 import { normalizeModelSlug } from "@t3tools/shared/model";
 import { Equal } from "effect";
 import { APP_VERSION } from "../../branding";
+import { APP_FONT_SIZE_OPTIONS } from "../../appFontSize";
 import {
   canCheckForUpdate,
   getDesktopUpdateButtonTooltip,
@@ -476,6 +477,7 @@ export function useSettingsRestore(onRestored?: () => void) {
   const changedSettingLabels = useMemo(
     () => [
       ...(theme !== "system" ? ["Theme"] : []),
+      ...(settings.appFontSize !== DEFAULT_UNIFIED_SETTINGS.appFontSize ? ["Font size"] : []),
       ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat
         ? ["Time format"]
         : []),
@@ -502,6 +504,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       isGitWritingModelDirty,
       settings.confirmThreadArchive,
       settings.confirmThreadDelete,
+      settings.appFontSize,
       settings.defaultThreadEnvMode,
       settings.diffWordWrap,
       settings.enableAssistantStreaming,
@@ -858,6 +861,55 @@ export function GeneralSettingsPanel() {
                 {THEME_OPTIONS.map((option) => (
                   <SelectItem hideIndicator key={option.value} value={option.value}>
                     {option.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          }
+        />
+
+        <SettingsRow
+          title="Font size"
+          description="Scale text across the app. Desktop title bars stay at the default size."
+          resetAction={
+            settings.appFontSize !== DEFAULT_UNIFIED_SETTINGS.appFontSize ? (
+              <SettingResetButton
+                label="font size"
+                onClick={() =>
+                  updateSettings({
+                    appFontSize: DEFAULT_UNIFIED_SETTINGS.appFontSize,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.appFontSize}
+              onValueChange={(value) => {
+                if (
+                  value === "normal" ||
+                  value === "big" ||
+                  value === "large" ||
+                  value === "xlarge"
+                ) {
+                  updateSettings({ appFontSize: value });
+                }
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-44" aria-label="App font size">
+                <SelectValue>
+                  {APP_FONT_SIZE_OPTIONS.find((option) => option.value === settings.appFontSize)
+                    ?.label ?? "Normal"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {APP_FONT_SIZE_OPTIONS.map((option) => (
+                  <SelectItem hideIndicator key={option.value} value={option.value}>
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span>{option.label}</span>
+                      <span className="text-xs text-muted-foreground">{option.offsetLabel}</span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectPopup>

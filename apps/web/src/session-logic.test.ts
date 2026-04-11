@@ -816,6 +816,67 @@ describe("deriveWorkLogEntries", () => {
     expect(entry?.changedFiles).toEqual(["apps/web/src/components/ChatView.tsx"]);
   });
 
+  it("extracts changed file paths from apply_patch marker text", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "patch-tool",
+        kind: "tool.completed",
+        summary: "Apply patch",
+        payload: {
+          itemType: "file_change",
+          data: {
+            patchText: [
+              "*** Begin Patch",
+              "*** Add File: src/new-file.ts",
+              "+export const value = 1;",
+              "*** Update File: src/old.ts",
+              "*** Move to: src/new.ts",
+              "*** Delete File: src/obsolete.ts",
+              "*** End Patch",
+            ].join("\n"),
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.changedFiles).toEqual(["src/new-file.ts", "src/new.ts", "src/obsolete.ts"]);
+  });
+
+  it("extracts changed file paths from unified diff payload text", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "diff-tool",
+        kind: "tool.completed",
+        summary: "Apply patch",
+        payload: {
+          itemType: "file_change",
+          data: {
+            diff: [
+              "diff --git a/src/alpha.ts b/src/alpha.ts",
+              "index 1111111..2222222 100644",
+              "--- a/src/alpha.ts",
+              "+++ b/src/alpha.ts",
+              "@@ -1 +1 @@",
+              "-old",
+              "+new",
+              "diff --git a/src/created.ts b/src/created.ts",
+              "new file mode 100644",
+              "--- /dev/null",
+              "+++ b/src/created.ts",
+              "@@ -0,0 +1 @@",
+              "+created",
+              "",
+            ].join("\n"),
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.changedFiles).toEqual(["src/alpha.ts", "src/created.ts"]);
+  });
+
   it("collapses repeated lifecycle updates for the same tool call into one entry", () => {
     const activities: OrchestrationThreadActivity[] = [
       makeActivity({
@@ -966,6 +1027,59 @@ describe("deriveWorkLogEntries", () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0]?.id).toBe("a-complete-same-timestamp");
+  });
+
+  it("attaches a live turn diff to the last file-change entry in the turn", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "file-tool-1",
+        createdAt: "2026-02-23T00:00:01.000Z",
+        kind: "tool.completed",
+        summary: "Apply patch",
+        turnId: "turn-1",
+        payload: {
+          itemType: "file_change",
+          data: {
+            item: {
+              changes: [{ path: "apps/web/src/session-logic.ts" }],
+            },
+          },
+        },
+      }),
+      makeActivity({
+        id: "file-tool-2",
+        createdAt: "2026-02-23T00:00:02.000Z",
+        kind: "tool.completed",
+        summary: "Apply patch",
+        turnId: "turn-1",
+        payload: {
+          itemType: "file_change",
+          data: {
+            item: {
+              changes: [{ path: "apps/web/src/components/ChatView.tsx" }],
+            },
+          },
+        },
+      }),
+      makeActivity({
+        id: "turn-diff",
+        createdAt: "2026-02-23T00:00:03.000Z",
+        kind: "turn.diff.updated",
+        summary: "Turn diff updated",
+        tone: "info",
+        turnId: "turn-1",
+        payload: {
+          unifiedDiff:
+            "diff --git a/apps/web/src/components/ChatView.tsx b/apps/web/src/components/ChatView.tsx\n+hello\n",
+        },
+      }),
+    ];
+
+    const entries = deriveWorkLogEntries(activities, undefined);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]?.unifiedDiff).toBeUndefined();
+    expect(entries[1]?.unifiedDiff).toContain("diff --git");
   });
 });
 

@@ -103,6 +103,10 @@ export interface DesktopUpdateCheckResult {
   state: DesktopUpdateState;
 }
 
+export interface DesktopWindowState {
+  maximized: boolean;
+}
+
 export interface DesktopBridge {
   getWsUrl: () => string | null;
   pickFolder: () => Promise<string | null>;
@@ -119,6 +123,11 @@ export interface DesktopBridge {
   downloadUpdate: () => Promise<DesktopUpdateActionResult>;
   installUpdate: () => Promise<DesktopUpdateActionResult>;
   onUpdateState: (listener: (state: DesktopUpdateState) => void) => () => void;
+  minimizeWindow: () => Promise<void>;
+  toggleMaximizeWindow: () => Promise<DesktopWindowState>;
+  closeWindow: () => Promise<void>;
+  getWindowState: () => Promise<DesktopWindowState>;
+  onWindowState: (listener: (state: DesktopWindowState) => void) => () => void;
 }
 
 export interface NativeApi {

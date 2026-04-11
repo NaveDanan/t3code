@@ -2004,7 +2004,7 @@ export default function Sidebar() {
   return (
     <>
       {isElectron ? (
-        <SidebarHeader className="drag-region h-[52px] flex-row items-center gap-2 px-4 py-0 pl-[90px]">
+        <SidebarHeader className="drag-region h-[52px] flex-row items-center gap-2 px-4 py-0">
           {wordmark}
         </SidebarHeader>
       ) : (

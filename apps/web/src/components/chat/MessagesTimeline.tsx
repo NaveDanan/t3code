@@ -40,6 +40,7 @@ import { ProposedPlanCard } from "./ProposedPlanCard";
 import { ChangedFilesTree } from "./ChangedFilesTree";
 import { DiffStatLabel, hasNonZeroStat } from "./DiffStatLabel";
 import { MessageCopyButton } from "./MessageCopyButton";
+import { WorkEntryDiffReview } from "./WorkEntryDiffReview";
 import {
   MAX_VISIBLE_WORK_LOG_ENTRIES,
   deriveMessagesTimelineRows,
@@ -249,13 +250,15 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     };
   }, [rowVirtualizer]);
   const pendingMeasureFrameRef = useRef<number | null>(null);
-  const onTimelineImageLoad = useCallback(() => {
+  const queueTimelineMeasure = useCallback(() => {
     if (pendingMeasureFrameRef.current !== null) return;
     pendingMeasureFrameRef.current = window.requestAnimationFrame(() => {
       pendingMeasureFrameRef.current = null;
       rowVirtualizer.measure();
     });
   }, [rowVirtualizer]);
+  const onTimelineImageLoad = queueTimelineMeasure;
+  const onTimelineLayoutChange = queueTimelineMeasure;
   useEffect(() => {
     return () => {
       const frame = pendingMeasureFrameRef.current;
@@ -346,7 +349,13 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               )}
               <div className="space-y-0.5">
                 {visibleEntries.map((workEntry) => (
-                  <SimpleWorkEntryRow key={`work-row:${workEntry.id}`} workEntry={workEntry} />
+                  <SimpleWorkEntryRow
+                    key={`work-row:${workEntry.id}`}
+                    workEntry={workEntry}
+                    resolvedTheme={resolvedTheme}
+                    onOpenTurnDiff={onOpenTurnDiff}
+                    onLayoutChange={onTimelineLayoutChange}
+                  />
                 ))}
               </div>
             </div>
@@ -836,14 +845,18 @@ function toolWorkEntryHeading(workEntry: TimelineWorkEntry): string {
 
 const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
   workEntry: TimelineWorkEntry;
+  resolvedTheme: "light" | "dark";
+  onOpenTurnDiff: (turnId: TurnId, filePath?: string) => void;
+  onLayoutChange?: () => void;
 }) {
   const { workEntry } = props;
   const iconConfig = workToneIcon(workEntry.tone);
   const EntryIcon = workEntryIcon(workEntry);
   const heading = toolWorkEntryHeading(workEntry);
-  const preview = workEntryPreview(workEntry);
-  const displayText = preview ? `${heading} - ${preview}` : heading;
   const hasChangedFiles = (workEntry.changedFiles?.length ?? 0) > 0;
+  const showDiffReview = hasChangedFiles || typeof workEntry.unifiedDiff === "string";
+  const preview = showDiffReview ? null : workEntryPreview(workEntry);
+  const displayText = preview ? `${heading} - ${preview}` : heading;
   const previewIsChangedFiles = hasChangedFiles && !workEntry.command && !workEntry.detail;
 
   return (
@@ -870,7 +883,7 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
           </p>
         </div>
       </div>
-      {hasChangedFiles && !previewIsChangedFiles && (
+      {hasChangedFiles && !previewIsChangedFiles && !showDiffReview && (
         <div className="mt-1 flex flex-wrap gap-1 pl-6">
           {workEntry.changedFiles?.slice(0, 4).map((filePath) => (
             <span
@@ -886,6 +899,16 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
               +{(workEntry.changedFiles?.length ?? 0) - 4}
             </span>
           )}
+        </div>
+      )}
+      {showDiffReview && (
+        <div className="pl-6">
+          <WorkEntryDiffReview
+            entry={workEntry}
+            resolvedTheme={props.resolvedTheme}
+            onOpenTurnDiff={props.onOpenTurnDiff}
+            {...(props.onLayoutChange ? { onLayoutChange: props.onLayoutChange } : {})}
+          />
         </div>
       )}
     </div>

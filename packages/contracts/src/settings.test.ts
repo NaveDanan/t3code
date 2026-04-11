@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_SERVER_SETTINGS, DEFAULT_UNIFIED_SETTINGS } from "./settings";
+import {
+  DEFAULT_CLIENT_SETTINGS,
+  DEFAULT_SERVER_SETTINGS,
+  DEFAULT_UNIFIED_SETTINGS,
+} from "./settings";
 
 describe("default provider settings", () => {
   it("enables OpenCode by default for fresh app startups", () => {
@@ -17,5 +21,10 @@ describe("default provider settings", () => {
 
   it("defaults busy thread follow-ups to queue", () => {
     expect(DEFAULT_UNIFIED_SETTINGS.busyThreadFollowupMode).toBe("queue");
+  });
+
+  it("defaults app font size to normal", () => {
+    expect(DEFAULT_CLIENT_SETTINGS.appFontSize).toBe("normal");
+    expect(DEFAULT_UNIFIED_SETTINGS.appFontSize).toBe("normal");
   });
 });

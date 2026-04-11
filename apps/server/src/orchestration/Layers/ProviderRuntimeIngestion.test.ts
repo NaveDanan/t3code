@@ -2150,6 +2150,9 @@ describe("ProviderRuntimeIngestion", () => {
         entry.activities.some(
           (activity: ProviderRuntimeTestActivity) => activity.kind === "runtime.warning",
         ) &&
+        entry.activities.some(
+          (activity: ProviderRuntimeTestActivity) => activity.kind === "turn.diff.updated",
+        ) &&
         entry.checkpoints.some(
           (checkpoint: ProviderRuntimeTestCheckpoint) => checkpoint.turnId === "turn-p1",
         ),
@@ -2194,6 +2197,16 @@ describe("ProviderRuntimeIngestion", () => {
     expect(checkpoint?.status).toBe("missing");
     expect(checkpoint?.assistantMessageId).toBe("assistant:item-p1-assistant");
     expect(checkpoint?.checkpointRef).toBe("provider-diff:evt-turn-diff-updated");
+
+    const turnDiffActivity = thread.activities.find(
+      (activity: ProviderRuntimeTestActivity) => activity.id === "evt-turn-diff-updated",
+    );
+    const turnDiffPayload =
+      turnDiffActivity?.payload && typeof turnDiffActivity.payload === "object"
+        ? (turnDiffActivity.payload as Record<string, unknown>)
+        : undefined;
+    expect(turnDiffActivity?.kind).toBe("turn.diff.updated");
+    expect(turnDiffPayload?.unifiedDiff).toBe("diff --git a/file.txt b/file.txt\n+hello\n");
   });
 
   it("skips diff checkpoints when git is unavailable for a git workspace", async () => {

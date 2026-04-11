@@ -5,10 +5,12 @@ describe("buildLegacyClientSettingsMigrationPatch", () => {
   it("migrates archive confirmation from legacy local settings", () => {
     expect(
       buildLegacyClientSettingsMigrationPatch({
+        appFontSize: "large",
         confirmThreadArchive: true,
         confirmThreadDelete: false,
       }),
     ).toEqual({
+      appFontSize: "large",
       confirmThreadArchive: true,
       confirmThreadDelete: false,
     });

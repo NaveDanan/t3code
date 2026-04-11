@@ -156,6 +156,7 @@ import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "./Compose
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import { ChatHeader } from "./chat/ChatHeader";
+import { DesktopTitleBar } from "./DesktopTitleBar";
 import { ContextWindowMeter } from "./chat/ContextWindowMeter";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
@@ -4050,9 +4051,13 @@ export default function ChatView({ threadId }: ChatViewProps) {
           </header>
         )}
         {isElectron && (
-          <div className="drag-region flex h-[52px] shrink-0 items-center border-b border-border px-5">
-            <span className="text-xs text-muted-foreground/50">No active thread</span>
-          </div>
+          <DesktopTitleBar
+            title="Threads"
+            subtitle="No active thread"
+            contextLabel="Workspace"
+            contextValue="Threads"
+            showContextChip={false}
+          />
         )}
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
@@ -4065,13 +4070,17 @@ export default function ChatView({ threadId }: ChatViewProps) {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-background">
+      {isElectron && (
+        <DesktopTitleBar
+          title={activeThread.title}
+          contextLabel="Project"
+          contextValue={activeProject?.name ?? "None"}
+          showContextChip={false}
+          {...(activeProject?.name ? { subtitle: activeProject.name } : {})}
+        />
+      )}
       {/* Top bar */}
-      <header
-        className={cn(
-          "border-b border-border px-3 sm:px-5",
-          isElectron ? "drag-region flex h-[52px] items-center" : "py-2 sm:py-3",
-        )}
-      >
+      <header className={cn("border-b border-border px-3 sm:px-5", "py-2 sm:py-3")}>
         <ChatHeader
           activeThreadId={activeThread.id}
           activeThreadTitle={activeThread.title}
