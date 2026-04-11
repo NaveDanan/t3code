@@ -214,9 +214,6 @@ function directoryAncestorsOf(relativePath: string): string[] {
   return directories;
 }
 
-const processErrorDetail = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String(cause);
-
 export const makeWorkspaceEntries = Effect.gen(function* () {
   const path = yield* Path.Path;
   const gitOption = yield* Effect.serviceOption(GitCore);
@@ -319,7 +316,7 @@ export const makeWorkspaceEntries = Effect.gen(function* () {
         new WorkspaceEntriesError({
           cwd,
           operation: "workspaceEntries.readDirectoryEntries",
-          detail: processErrorDetail(cause),
+          detail: cause instanceof Error ? cause.message : String(cause),
           cause,
         }),
     }).pipe(
@@ -430,12 +427,14 @@ export const makeWorkspaceEntries = Effect.gen(function* () {
     return yield* buildWorkspaceIndexFromFilesystem(cwd);
   });
 
-  const workspaceIndexCache = yield* Cache.makeWith<string, WorkspaceIndex, WorkspaceEntriesError>({
-    capacity: WORKSPACE_CACHE_MAX_KEYS,
-    lookup: buildWorkspaceIndex,
-    timeToLive: (exit) =>
-      Exit.isSuccess(exit) ? Duration.millis(WORKSPACE_CACHE_TTL_MS) : Duration.zero,
-  });
+  const workspaceIndexCache = yield* Cache.makeWith<string, WorkspaceIndex, WorkspaceEntriesError>(
+    buildWorkspaceIndex,
+    {
+      capacity: WORKSPACE_CACHE_MAX_KEYS,
+      timeToLive: (exit) =>
+        Exit.isSuccess(exit) ? Duration.millis(WORKSPACE_CACHE_TTL_MS) : Duration.zero,
+    },
+  );
 
   const normalizeWorkspaceRoot = Effect.fn("WorkspaceEntries.normalizeWorkspaceRoot")(function* (
     cwd: string,

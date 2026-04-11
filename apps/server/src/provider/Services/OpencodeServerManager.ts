@@ -5,7 +5,7 @@ import type {
   ProviderAuthMethod,
   ProviderListResponse,
 } from "@opencode-ai/sdk/v2";
-import { Effect, Schema, ServiceMap } from "effect";
+import { Context, Effect, Schema } from "effect";
 import type { Stream } from "effect";
 
 export type OpencodeConfiguredProvider = ConfigProvidersResponse["providers"][number];
@@ -54,7 +54,7 @@ export interface OpencodeServerManagerShape {
   readonly stop: Effect.Effect<void>;
 }
 
-export class OpencodeServerManager extends ServiceMap.Service<
+export class OpencodeServerManager extends Context.Service<
   OpencodeServerManager,
   OpencodeServerManagerShape
 >()("t3/provider/Services/OpencodeServerManager") {}

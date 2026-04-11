@@ -67,6 +67,7 @@ function mockHandle(result: { stdout: string; stderr: string; code: number }) {
     exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(result.code)),
     isRunning: Effect.succeed(false),
     kill: () => Effect.void,
+    unref: Effect.succeed(Effect.void),
     stdin: Sink.drain,
     stdout: Stream.make(encoder.encode(result.stdout)),
     stderr: Stream.make(encoder.encode(result.stderr)),
@@ -127,6 +128,7 @@ function hangingCommandSpawnerLayer() {
           exitCode: Effect.never,
           isRunning: Effect.succeed(true),
           kill: () => Effect.void,
+          unref: Effect.succeed(Effect.void),
           stdin: Sink.drain,
           stdout: Stream.empty,
           stderr: Stream.empty,
@@ -185,7 +187,9 @@ function makeMutableServerSettingsService(
           yield* PubSub.publish(changes, next);
           return next;
         }),
-      streamChanges: Stream.fromPubSub(changes),
+      get streamChanges() {
+        return Stream.fromPubSub(changes);
+      },
     } satisfies ServerSettingsShape;
   });
 }
@@ -645,7 +649,13 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             { value: "high", label: "High" },
             { value: "xhigh", label: "Extra High" },
           ]);
-          assert.strictEqual(status.models[1]?.capabilities, null);
+          assert.deepStrictEqual(status.models[1]?.capabilities, {
+            reasoningEffortLevels: [],
+            supportsFastMode: false,
+            supportsThinkingToggle: false,
+            contextWindowOptions: [],
+            promptInjectedEffortLevels: [],
+          });
         }).pipe(
           Effect.provide(
             Layer.mergeAll(
@@ -1493,7 +1503,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
     });
 
     describe("checkForgeProviderStatus", () => {
-      it.effect(
+      const isWindows = process.platform === "win32";
+
+      it.effect.skipIf(!isWindows)(
         "returns ready when forge is installed and an upstream provider is authenticated",
         () =>
           Effect.gen(function* () {
@@ -1555,20 +1567,49 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
               status.models.map((model) => model.slug),
               ["openai/gpt-5.4"],
             );
-          }).pipe(Effect.ensuring(Effect.sync(() => setForgeProviderProcessRunnerForTests(null)))),
+          }).pipe(
+            Effect.ensuring(Effect.sync(() => setForgeProviderProcessRunnerForTests(null))),
+            Effect.provide(
+              ServerSettingsService.layerTest({
+                providers: {
+                  forgecode: {
+                    enabled: true,
+                    executionBackend: "wsl",
+                  },
+                },
+              }),
+            ),
+          ),
       );
 
-      it.effect("returns an error instead of hanging when forge version checks time out", () =>
-        Effect.gen(function* () {
-          const fiber = yield* Effect.forkScoped(checkForgeProviderStatus);
-          yield* TestClock.adjust("5 seconds");
-          const status = yield* Fiber.join(fiber);
-          assert.strictEqual(status.provider, "forgecode");
-          assert.strictEqual(status.status, "error");
-          assert.strictEqual(status.installed, false);
-          assert.strictEqual(status.auth.status, "unknown");
-          assert.strictEqual(status.message, "Timed out while querying WSL status.");
-        }).pipe(Effect.provide(Layer.mergeAll(TestClock.layer(), hangingCommandSpawnerLayer()))),
+      it.effect.skipIf(!isWindows)(
+        "returns an error instead of hanging when forge version checks time out",
+        () =>
+          Effect.gen(function* () {
+            const fiber = yield* Effect.forkScoped(checkForgeProviderStatus);
+            yield* TestClock.adjust("5 seconds");
+            const status = yield* Fiber.join(fiber);
+            assert.strictEqual(status.provider, "forgecode");
+            assert.strictEqual(status.status, "error");
+            assert.strictEqual(status.installed, false);
+            assert.strictEqual(status.auth.status, "unknown");
+            assert.strictEqual(status.message, "Timed out while querying WSL status.");
+          }).pipe(
+            Effect.provide(
+              Layer.mergeAll(
+                TestClock.layer(),
+                hangingCommandSpawnerLayer(),
+                ServerSettingsService.layerTest({
+                  providers: {
+                    forgecode: {
+                      enabled: true,
+                      executionBackend: "wsl",
+                    },
+                  },
+                }),
+              ),
+            ),
+          ),
       );
     });
 

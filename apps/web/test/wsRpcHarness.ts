@@ -1,6 +1,6 @@
 import { Effect, Exit, PubSub, Scope, Stream } from "effect";
 import { WS_METHODS, WsRpcGroup } from "@t3tools/contracts";
-import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { RpcMessage, RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 type RpcServerInstance = RpcServer.RpcServer<any>;
 
@@ -24,6 +24,7 @@ interface BrowserWsRpcHarnessOptions {
 
 const STREAM_METHODS = new Set<string>([
   WS_METHODS.gitRunStackedAction,
+  WS_METHODS.subscribeGitStatus,
   WS_METHODS.subscribeOrchestrationDomainEvents,
   WS_METHODS.subscribeTerminalEvents,
   WS_METHODS.subscribeServerConfig,
@@ -108,10 +109,17 @@ export class BrowserWsRpcHarness {
   async onMessage(rawData: string): Promise<void> {
     const server = await this.serverReady;
     if (!server) {
-      throw new Error("RPC test server is not connected");
+      return;
     }
     const messages = this.parser.decode(rawData);
     for (const message of messages) {
+      if (message && typeof message === "object" && "_tag" in message && message._tag === "Ping") {
+        const encoded = this.parser.encode(RpcMessage.constPong);
+        if (typeof encoded === "string") {
+          this.client?.send(encoded);
+        }
+        continue;
+      }
       await Effect.runPromise(server.write(0, message as never));
     }
   }

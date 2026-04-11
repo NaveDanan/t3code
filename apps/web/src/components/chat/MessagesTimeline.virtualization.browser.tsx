@@ -19,6 +19,7 @@ const DEFAULT_VIEWPORT = {
   height: 1_100,
 };
 const MARKDOWN_CWD = "/repo/project";
+const ACTIVE_THREAD_ENVIRONMENT_ID = "environment-local" as never;
 
 interface RowMeasurement {
   actualHeightPx: number;
@@ -31,7 +32,10 @@ interface RowMeasurement {
 interface VirtualizationScenario {
   name: string;
   targetRowId: string;
-  props: Omit<ComponentProps<typeof MessagesTimeline>, "scrollContainer">;
+  props: Omit<
+    ComponentProps<typeof MessagesTimeline>,
+    "scrollContainer" | "activeThreadEnvironmentId"
+  >;
   maxEstimateDeltaPx: number;
 }
 
@@ -48,12 +52,18 @@ interface VirtualizerSnapshot {
 }
 
 function MessagesTimelineBrowserHarness(
-  props: Omit<ComponentProps<typeof MessagesTimeline>, "scrollContainer">,
+  props: Omit<
+    ComponentProps<typeof MessagesTimeline>,
+    "scrollContainer" | "activeThreadEnvironmentId"
+  >,
 ) {
   const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
   const [expandedWorkGroups, setExpandedWorkGroups] = useState<Record<string, boolean>>(
     () => props.expandedWorkGroups,
   );
+  const [changedFilesExpandedByTurnId, setChangedFilesExpandedByTurnId] = useState<
+    Record<string, boolean>
+  >(() => props.changedFilesExpandedByTurnId);
   const handleToggleWorkGroup = useCallback(
     (groupId: string) => {
       setExpandedWorkGroups((current) => ({
@@ -61,6 +71,16 @@ function MessagesTimelineBrowserHarness(
         [groupId]: !(current[groupId] ?? false),
       }));
       props.onToggleWorkGroup(groupId);
+    },
+    [props],
+  );
+  const handleSetChangedFilesExpanded = useCallback(
+    (turnId: TurnId, expanded: boolean) => {
+      setChangedFilesExpandedByTurnId((current) => ({
+        ...current,
+        [turnId]: expanded,
+      }));
+      props.onSetChangedFilesExpanded(turnId, expanded);
     },
     [props],
   );
@@ -73,9 +93,12 @@ function MessagesTimelineBrowserHarness(
     >
       <MessagesTimeline
         {...props}
+        activeThreadEnvironmentId={ACTIVE_THREAD_ENVIRONMENT_ID}
         scrollContainer={scrollContainer}
         expandedWorkGroups={expandedWorkGroups}
         onToggleWorkGroup={handleToggleWorkGroup}
+        changedFilesExpandedByTurnId={changedFilesExpandedByTurnId}
+        onSetChangedFilesExpanded={handleSetChangedFilesExpanded}
       />
     </div>
   );
@@ -93,7 +116,7 @@ function createMessage(input: {
   attachments?: ChatMessage["attachments"];
 }): ChatMessage {
   return {
-    id: MessageId.makeUnsafe(input.id),
+    id: MessageId.make(input.id),
     role: input.role,
     text: input.text,
     ...(input.attachments ? { attachments: input.attachments } : {}),
@@ -143,7 +166,7 @@ function createBaseTimelineProps(input: {
   completionDividerBeforeEntryId?: string | null;
   turnDiffSummaryByAssistantMessageId?: Map<MessageId, TurnDiffSummary>;
   onVirtualizerSnapshot?: ComponentProps<typeof MessagesTimeline>["onVirtualizerSnapshot"];
-}): Omit<ComponentProps<typeof MessagesTimeline>, "scrollContainer"> {
+}): Omit<ComponentProps<typeof MessagesTimeline>, "scrollContainer" | "activeThreadEnvironmentId"> {
   return {
     hasMessages: true,
     isWorking: false,
@@ -160,6 +183,8 @@ function createBaseTimelineProps(input: {
     nowIso: isoAt(10_000),
     expandedWorkGroups: input.expandedWorkGroups ?? {},
     onToggleWorkGroup: () => {},
+    changedFilesExpandedByTurnId: {},
+    onSetChangedFilesExpanded: () => {},
     onOpenTurnDiff: () => {},
     revertTurnCountByUserMessageId: new Map(),
     onRevertUserMessage: () => {},
@@ -481,7 +506,10 @@ async function waitForElement<T extends Element>(
 
 async function measureTimelineRow(input: {
   host: HTMLElement;
-  props: Omit<ComponentProps<typeof MessagesTimeline>, "scrollContainer">;
+  props: Omit<
+    ComponentProps<typeof MessagesTimeline>,
+    "scrollContainer" | "activeThreadEnvironmentId"
+  >;
   targetRowId: string;
 }): Promise<RowMeasurement> {
   const scrollContainer = await waitForElement(
@@ -550,7 +578,10 @@ async function measureTimelineRow(input: {
 }
 
 async function mountMessagesTimeline(input: {
-  props: Omit<ComponentProps<typeof MessagesTimeline>, "scrollContainer">;
+  props: Omit<
+    ComponentProps<typeof MessagesTimeline>,
+    "scrollContainer" | "activeThreadEnvironmentId"
+  >;
   viewport?: { width: number; height: number };
 }) {
   const viewport = input.viewport ?? DEFAULT_VIEWPORT;
@@ -576,7 +607,10 @@ async function mountMessagesTimeline(input: {
   return {
     host,
     rerender: async (
-      nextProps: Omit<ComponentProps<typeof MessagesTimeline>, "scrollContainer">,
+      nextProps: Omit<
+        ComponentProps<typeof MessagesTimeline>,
+        "scrollContainer" | "activeThreadEnvironmentId"
+      >,
     ) => {
       await screen.rerender(<MessagesTimelineBrowserHarness {...nextProps} />);
       await waitForLayout();

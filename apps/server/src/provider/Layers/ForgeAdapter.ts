@@ -102,15 +102,15 @@ function nowIso(): string {
 }
 
 function eventId() {
-  return EventId.makeUnsafe(crypto.randomUUID());
+  return EventId.make(crypto.randomUUID());
 }
 
 function runtimeItemId(value: string) {
-  return RuntimeItemId.makeUnsafe(value);
+  return RuntimeItemId.make(value);
 }
 
 function forgeTurnId(conversationId: string, index: number): TurnId {
-  return TurnId.makeUnsafe(`forgecode-turn:${conversationId}:${index}`);
+  return TurnId.make(`forgecode-turn:${conversationId}:${index}`);
 }
 
 function trimString(value: unknown): string | undefined {
@@ -384,7 +384,7 @@ const FORGE_LIVE_ASSISTANT_POLL_INTERVAL = "250 millis";
 const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
   options?: ForgeAdapterLiveOptions,
 ) {
-  const services = yield* Effect.services();
+  const services = yield* Effect.context<never>();
   const runFork = Effect.runForkWith(services);
   const serverSettingsService = yield* ServerSettingsService;
   const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();

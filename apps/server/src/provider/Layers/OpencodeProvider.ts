@@ -66,6 +66,14 @@ function buildOpencodeReasoningCapabilities(
 
 const OPENCODE_REASONING_CAPABILITIES: ModelCapabilities = buildOpencodeReasoningCapabilities();
 
+const EMPTY_CAPABILITIES: ModelCapabilities = {
+  reasoningEffortLevels: [],
+  supportsFastMode: false,
+  supportsThinkingToggle: false,
+  contextWindowOptions: [],
+  promptInjectedEffortLevels: [],
+};
+
 function resolveOpencodeReasoningVariants(input: {
   readonly providerId: string;
   readonly modelId: string;
@@ -145,7 +153,12 @@ function resolveOpencodeModels(input: {
     )
     .toSorted((left, right) => left.slug.localeCompare(right.slug));
 
-  return providerModelsFromSettings(discoveredModels, PROVIDER, input.customModels);
+  return providerModelsFromSettings(
+    discoveredModels,
+    PROVIDER,
+    input.customModels,
+    EMPTY_CAPABILITIES,
+  );
 }
 
 function resolveOpenCodeAuth(input: {
@@ -218,6 +231,7 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
     BUILT_IN_MODELS,
     PROVIDER,
     opencodeSettings.customModels,
+    EMPTY_CAPABILITIES,
   );
 
   if (!opencodeSettings.enabled) {

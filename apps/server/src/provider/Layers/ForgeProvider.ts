@@ -527,6 +527,7 @@ function fallbackModelsFromSettings(
     buildBuiltInModels(preferredProviderId),
     PROVIDER,
     forgeSettings.customModels,
+    EMPTY_CAPABILITIES,
   );
 }
 
@@ -688,7 +689,12 @@ export const checkForgeProviderStatus = Effect.gen(function* () {
       : [];
   const models =
     discoveredModels.length > 0
-      ? providerModelsFromSettings(discoveredModels, PROVIDER, forgeSettings.customModels)
+      ? providerModelsFromSettings(
+          discoveredModels,
+          PROVIDER,
+          forgeSettings.customModels,
+          EMPTY_CAPABILITIES,
+        )
       : dynamicFallbackModels;
   const messageParts = [authResolution.message, modelCatalogWarning].filter(
     (value): value is string => value !== undefined && value.length > 0,

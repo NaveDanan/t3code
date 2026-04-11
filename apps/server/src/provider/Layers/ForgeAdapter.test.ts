@@ -30,7 +30,7 @@ vi.mock("../forgecode.ts", async () => {
   };
 });
 
-const THREAD_ID = ThreadId.makeUnsafe("forge-thread-1");
+const THREAD_ID = ThreadId.make("forge-thread-1");
 const CONVERSATION_ID = "forge-conversation-1";
 const MODEL_CATALOG_OUTPUT = [
   "MODEL            PROVIDER           PROVIDER ID        ID                  CONTEXT WINDOW  TOOLS  IMAGE",

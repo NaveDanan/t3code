@@ -1,4 +1,6 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { ExecutionEnvironmentDescriptor } from "./environment";
+import { ServerAuthDescriptor } from "./auth";
 import {
   IsoDateTime,
   NonNegativeInt,
@@ -78,7 +80,7 @@ export type ServerProviderBusyFollowupMode = typeof ServerProviderBusyFollowupMo
 
 export const ServerProviderRuntimeCapabilities = Schema.Struct({
   busyFollowupMode: ServerProviderBusyFollowupMode.pipe(
-    Schema.withDecodingDefault(() => "queue-only" as const),
+    Schema.withDecodingDefault(Effect.succeed("queue-only" as const)),
   ),
 });
 export type ServerProviderRuntimeCapabilities = typeof ServerProviderRuntimeCapabilities.Type;
@@ -96,9 +98,11 @@ export const ServerProvider = Schema.Struct({
   upstreamProviders: Schema.optional(Schema.Array(UpstreamProvider)),
   executionBackends: Schema.optional(Schema.Array(ServerProviderExecutionBackend)),
   runtimeCapabilities: ServerProviderRuntimeCapabilities.pipe(
-    Schema.withDecodingDefault(() => ({
-      busyFollowupMode: "queue-only" as const,
-    })),
+    Schema.withDecodingDefault(
+      Effect.succeed({
+        busyFollowupMode: "queue-only" as const,
+      }),
+    ),
   ),
 });
 export type ServerProvider = typeof ServerProvider.Type;
@@ -117,6 +121,8 @@ export const ServerObservability = Schema.Struct({
 export type ServerObservability = typeof ServerObservability.Type;
 
 export const ServerConfig = Schema.Struct({
+  environment: ExecutionEnvironmentDescriptor,
+  auth: ServerAuthDescriptor,
   cwd: TrimmedNonEmptyString,
   keybindingsConfigPath: TrimmedNonEmptyString,
   keybindings: ResolvedKeybindingsConfig,
@@ -201,10 +207,12 @@ export type ServerConfigStreamEvent = typeof ServerConfigStreamEvent.Type;
 
 export const ServerLifecycleReadyPayload = Schema.Struct({
   at: IsoDateTime,
+  environment: ExecutionEnvironmentDescriptor,
 });
 export type ServerLifecycleReadyPayload = typeof ServerLifecycleReadyPayload.Type;
 
 export const ServerLifecycleWelcomePayload = Schema.Struct({
+  environment: ExecutionEnvironmentDescriptor,
   cwd: TrimmedNonEmptyString,
   projectName: TrimmedNonEmptyString,
   bootstrapProjectId: Schema.optional(ProjectId),

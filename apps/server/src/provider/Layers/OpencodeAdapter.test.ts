@@ -24,9 +24,9 @@ import {
 } from "../Services/OpencodeServerManager.ts";
 import { makeOpencodeAdapterLive } from "./OpencodeAdapter.ts";
 
-const THREAD_ID = ThreadId.makeUnsafe("thread-opencode-1");
-const APPROVAL_REQUEST_ID = ApprovalRequestId.makeUnsafe("permission-request-1");
-const USER_INPUT_REQUEST_ID = ApprovalRequestId.makeUnsafe("question-request-1");
+const THREAD_ID = ThreadId.make("thread-opencode-1");
+const APPROVAL_REQUEST_ID = ApprovalRequestId.make("permission-request-1");
+const USER_INPUT_REQUEST_ID = ApprovalRequestId.make("question-request-1");
 const opencodeTurnId = (messageId: string) => `opencode-turn:${messageId}`;
 
 const flushAsyncWork = Effect.promise(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));

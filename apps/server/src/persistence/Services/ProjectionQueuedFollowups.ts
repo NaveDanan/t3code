@@ -9,7 +9,7 @@ import {
   ProviderInteractionMode,
   OrchestrationProposedPlanId,
 } from "@t3tools/contracts";
-import { Option, Schema, ServiceMap } from "effect";
+import { Context, Option, Schema } from "effect";
 import type { Effect } from "effect";
 
 import type { ProjectionRepositoryError } from "../Errors.ts";
@@ -59,7 +59,7 @@ export interface ProjectionQueuedFollowupRepositoryShape {
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 }
 
-export class ProjectionQueuedFollowupRepository extends ServiceMap.Service<
+export class ProjectionQueuedFollowupRepository extends Context.Service<
   ProjectionQueuedFollowupRepository,
   ProjectionQueuedFollowupRepositoryShape
 >()("t3/persistence/Services/ProjectionQueuedFollowups/ProjectionQueuedFollowupRepository") {}

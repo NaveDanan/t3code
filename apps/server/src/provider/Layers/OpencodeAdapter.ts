@@ -227,7 +227,7 @@ function createOpencodeMessageId(): string {
 }
 
 function turnIdFromOpencodeMessageId(messageId: string): TurnId {
-  return TurnId.makeUnsafe(`opencode-turn:${messageId}`);
+  return TurnId.make(`opencode-turn:${messageId}`);
 }
 
 function toIsoDateFromMillis(
@@ -344,15 +344,15 @@ function mergeThreadTokenUsageSnapshots(
 }
 
 function asRuntimeItemId(value: string): RuntimeItemId {
-  return RuntimeItemId.makeUnsafe(value);
+  return RuntimeItemId.make(value);
 }
 
 function asRuntimeRequestId(value: string): RuntimeRequestId {
-  return RuntimeRequestId.makeUnsafe(value);
+  return RuntimeRequestId.make(value);
 }
 
 function asProviderItemId(value: string): ProviderItemId {
-  return ProviderItemId.makeUnsafe(value);
+  return ProviderItemId.make(value);
 }
 
 function readResumeCursor(resumeCursor: unknown): OpencodeResumeCursor | undefined {
@@ -866,7 +866,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
   let subscribedBinaryPath: string | undefined = undefined;
 
   const makeEventStamp = () => ({
-    eventId: EventId.makeUnsafe(crypto.randomUUID()),
+    eventId: EventId.make(crypto.randomUUID()),
     createdAt: nowIso(),
   });
 
@@ -2943,7 +2943,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
       );
     }
 
-    const turnId = TurnId.makeUnsafe(crypto.randomUUID());
+    const turnId = TurnId.make(crypto.randomUUID());
     const providerUserMessageId = createOpencodeMessageId();
     const turnState: OpencodeTurnState = {
       turnId,

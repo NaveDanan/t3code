@@ -1,4 +1,4 @@
-import { ServiceMap } from "effect";
+import { Context } from "effect";
 
 import type { ProviderAdapterError } from "../Errors.ts";
 import type { ProviderAdapterShape } from "./ProviderAdapter.ts";
@@ -7,6 +7,6 @@ export interface ForgeAdapterShape extends ProviderAdapterShape<ProviderAdapterE
   readonly provider: "forgecode";
 }
 
-export class ForgeAdapter extends ServiceMap.Service<ForgeAdapter, ForgeAdapterShape>()(
+export class ForgeAdapter extends Context.Service<ForgeAdapter, ForgeAdapterShape>()(
   "t3/provider/Services/ForgeAdapter",
 ) {}
