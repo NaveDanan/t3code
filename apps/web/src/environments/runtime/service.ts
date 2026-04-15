@@ -28,7 +28,7 @@ import { collectActiveTerminalThreadIds } from "~/lib/terminalStateCleanup";
 import { deriveOrchestrationBatchEffects } from "~/orchestrationEventEffects";
 import { projectQueryKeys } from "~/lib/projectReactQuery";
 import { providerQueryKeys } from "~/lib/providerReactQuery";
-import { getPrimaryKnownEnvironment } from "../primary";
+import { getPrimaryKnownEnvironment, resolvePrimaryWebSocketConnectionUrl } from "../primary";
 import {
   bootstrapRemoteBearerSession,
   fetchRemoteEnvironmentDescriptor,
@@ -308,7 +308,9 @@ function createPrimaryEnvironmentClient(
     );
   }
 
-  return createWsRpcClient(new WsTransport(wsBaseUrl));
+  return createWsRpcClient(
+    new WsTransport(() => resolvePrimaryWebSocketConnectionUrl().catch(() => wsBaseUrl)),
+  );
 }
 
 function createSavedEnvironmentClient(

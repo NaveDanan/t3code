@@ -763,6 +763,119 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         ),
       );
 
+      it.effect("derives OpenCode effort variants from provider-reported Anthropic variants", () =>
+        Effect.gen(function* () {
+          const status = yield* checkOpencodeProviderStatus;
+          assert.strictEqual(status.models[0]?.slug, "anthropic/claude-sonnet-4-5");
+          assert.deepStrictEqual(status.models[0]?.capabilities?.reasoningEffortLevels, [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium", isDefault: true },
+            { value: "high", label: "High" },
+          ]);
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              ServerSettingsService.layerTest({
+                providers: {
+                  opencode: {
+                    enabled: true,
+                  },
+                },
+              }),
+              fakeOpencodeServerManagerLayer({
+                probe: () =>
+                  Effect.succeed({
+                    server: {
+                      binaryPath: "opencode",
+                      url: "http://127.0.0.1:4196",
+                      client: {} as never,
+                      version: "1.3.15",
+                    },
+                    configuredProviders: [
+                      {
+                        id: "anthropic",
+                        name: "Anthropic",
+                        source: "api",
+                        env: [],
+                        options: {},
+                        models: {
+                          "claude-sonnet-4-5": {
+                            id: "claude-sonnet-4-5",
+                            providerID: "anthropic",
+                            api: {
+                              id: "anthropic",
+                              url: "https://api.anthropic.com",
+                              npm: "@anthropic-ai/sdk",
+                            },
+                            name: "Claude Sonnet 4.5",
+                            capabilities: {
+                              temperature: false,
+                              reasoning: false,
+                              attachment: true,
+                              toolcall: true,
+                              input: {
+                                text: true,
+                                audio: false,
+                                image: true,
+                                video: false,
+                                pdf: true,
+                              },
+                              output: {
+                                text: true,
+                                audio: false,
+                                image: false,
+                                video: false,
+                                pdf: false,
+                              },
+                              interleaved: false,
+                            },
+                            cost: {
+                              input: 1,
+                              output: 2,
+                              cache: {
+                                read: 0,
+                                write: 0,
+                              },
+                            },
+                            limit: {
+                              context: 200_000,
+                              output: 8_000,
+                            },
+                            status: "active",
+                            options: {},
+                            variants: {
+                              low: {},
+                              medium: {},
+                              high: {},
+                            },
+                            headers: {},
+                            release_date: "2025-01-01",
+                          },
+                        },
+                      },
+                    ],
+                    knownProviders: [
+                      {
+                        id: "anthropic",
+                        name: "Anthropic",
+                        env: [],
+                        models: {
+                          "claude-sonnet-4-5": opencodeProviderListModel,
+                        },
+                      },
+                    ],
+                    connectedProviderIds: ["anthropic"],
+                    authMethodsByProviderId: {
+                      anthropic: [{ type: "api", label: "API Key" }],
+                    },
+                    defaultModelByProviderId: { anthropic: "claude-sonnet-4-5" },
+                  }),
+              }),
+            ),
+          ),
+        ),
+      );
+
       it.effect("reports OpenCode as missing when the CLI is not installed", () =>
         Effect.gen(function* () {
           const status = yield* checkOpencodeProviderStatus;

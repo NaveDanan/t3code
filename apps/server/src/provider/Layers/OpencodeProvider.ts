@@ -77,13 +77,18 @@ const EMPTY_CAPABILITIES: ModelCapabilities = {
 function resolveOpencodeReasoningVariants(input: {
   readonly providerId: string;
   readonly modelId: string;
+  readonly supportsReasoning: boolean;
   readonly variants?: Readonly<Record<string, unknown>>;
 }): ReadonlyArray<string> {
   const configuredVariants = input.variants ? Object.keys(input.variants) : [];
   if (configuredVariants.length > 0) {
     return configuredVariants;
   }
-  if (input.providerId === "openai" && input.modelId.startsWith("gpt-5")) {
+  if (
+    input.supportsReasoning &&
+    input.providerId === "openai" &&
+    input.modelId.startsWith("gpt-5")
+  ) {
     return DEFAULT_OPENCODE_REASONING_VARIANTS;
   }
   return [];
@@ -95,11 +100,12 @@ function resolveOpencodeModelCapabilities(input: {
   readonly supportsReasoning: boolean;
   readonly variants?: Readonly<Record<string, unknown>>;
 }): ModelCapabilities | null {
-  if (!input.supportsReasoning) {
+  const variants = resolveOpencodeReasoningVariants(input);
+  if (!input.supportsReasoning && variants.length === 0) {
     return null;
   }
 
-  return buildOpencodeReasoningCapabilities(resolveOpencodeReasoningVariants(input));
+  return buildOpencodeReasoningCapabilities(variants);
 }
 
 const BUILT_IN_MODELS: ReadonlyArray<ServerProviderModel> = [

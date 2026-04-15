@@ -95,6 +95,7 @@ import {
 } from "lucide-react";
 import { proposedPlanTitle } from "../../proposedPlan";
 import { resolveSelectableProvider, getProviderModels } from "../../providerModels";
+import { getCustomModelOptionsByProvider } from "../../modelSelection";
 import type { UnifiedSettings } from "@t3tools/contracts/settings";
 import type { SessionPhase, Thread } from "../../types";
 import type { PendingUserInputDraftAnswer } from "../../pendingUserInput";
@@ -585,19 +586,15 @@ export const ChatComposer = memo(
       [selectedModel, selectedModelOptionsForDispatch, selectedProvider],
     );
     const selectedModelForPicker = selectedModel;
-    const modelOptionsByProvider = useMemo<
-      Record<ProviderKind, ReadonlyArray<ServerProvider["models"][number]>>
-    >(
-      () => ({
-        codex: providerStatuses.find((provider) => provider.provider === "codex")?.models ?? [],
-        claudeAgent:
-          providerStatuses.find((provider) => provider.provider === "claudeAgent")?.models ?? [],
-        opencode:
-          providerStatuses.find((provider) => provider.provider === "opencode")?.models ?? [],
-        forgecode:
-          providerStatuses.find((provider) => provider.provider === "forgecode")?.models ?? [],
-      }),
-      [providerStatuses],
+    const modelOptionsByProvider = useMemo(
+      () =>
+        getCustomModelOptionsByProvider(
+          settings,
+          providerStatuses,
+          selectedProvider,
+          selectedModelForPicker,
+        ),
+      [providerStatuses, selectedModelForPicker, selectedProvider, settings],
     );
     const selectedModelForPickerWithCustomFallback = useMemo(() => {
       const currentOptions = modelOptionsByProvider[selectedProvider];

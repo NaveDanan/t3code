@@ -61,6 +61,7 @@ import {
   reduceDesktopUpdateStateOnUpdateAvailable,
 } from "./updateMachine";
 import { isArm64HostRunningIntelBuild, resolveDesktopRuntimeInfo } from "./runtimeArch";
+import { isBackendReadinessAborted, waitForHttpReady } from "./backendReadiness";
 
 syncShellEnvironment();
 
@@ -114,6 +115,7 @@ const APP_RUN_ID = Crypto.randomBytes(6).toString("hex");
 const SERVER_SETTINGS_PATH = Path.join(STATE_DIR, "settings.json");
 const AUTO_UPDATE_STARTUP_DELAY_MS = 15_000;
 const AUTO_UPDATE_POLL_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const DESKTOP_BACKEND_READY_TIMEOUT_MS = 30_000;
 const DESKTOP_UPDATE_CHANNEL = "latest";
 const DESKTOP_UPDATE_ALLOW_PRERELEASE = false;
 const DESKTOP_LOOPBACK_HOST = "127.0.0.1";
@@ -565,6 +567,36 @@ function handleFatalStartupError(stage: string, error: unknown): void {
   stopBackend();
   restoreStdIoCapture?.();
   app.quit();
+}
+
+function toRendererLoadFailureMessage(details: {
+  readonly errorCode: number;
+  readonly errorDescription: string;
+  readonly validatedURL: string;
+}): string {
+  return [
+    `Renderer failed to load (${details.errorCode}).`,
+    details.errorDescription.trim() || "Unknown load error.",
+    `URL: ${details.validatedURL}`,
+  ].join(" ");
+}
+
+function logRendererConsoleMessage(details: {
+  readonly level: number;
+  readonly message: string;
+  readonly line: number;
+  readonly sourceId: string;
+}): void {
+  const trimmedMessage = details.message.trim();
+  if (trimmedMessage.length === 0) {
+    return;
+  }
+
+  const levelLabel = details.level >= 2 ? "error" : details.level === 1 ? "warning" : "info";
+  const sourceLabel = details.sourceId.trim().length > 0 ? details.sourceId.trim() : "unknown";
+  writeDesktopLogHeader(
+    `renderer console ${levelLabel} source=${sanitizeLogValue(sourceLabel)} line=${details.line} message=${sanitizeLogValue(trimmedMessage)}`,
+  );
 }
 
 function registerDesktopProtocol(): void {
@@ -1614,6 +1646,42 @@ function getIconOption(): { icon: string } | Record<string, never> {
   return iconPath ? { icon: iconPath } : {};
 }
 
+async function loadWindowContent(window: BrowserWindow): Promise<void> {
+  const abortController = new AbortController();
+  const abortReadinessWait = () => {
+    abortController.abort();
+  };
+
+  window.once("closed", abortReadinessWait);
+
+  try {
+    await waitForHttpReady(backendHttpUrl, {
+      timeoutMs: DESKTOP_BACKEND_READY_TIMEOUT_MS,
+      signal: abortController.signal,
+    });
+  } catch (error) {
+    if (!isBackendReadinessAborted(error)) {
+      const message = `backend readiness wait failed; loading renderer anyway (${formatErrorMessage(error)})`;
+      writeDesktopLogHeader(message);
+      console.warn(`[desktop] ${message}`);
+    }
+  } finally {
+    window.removeListener("closed", abortReadinessWait);
+  }
+
+  if (window.isDestroyed()) {
+    return;
+  }
+
+  if (isDevelopment) {
+    await window.loadURL(process.env.VITE_DEV_SERVER_URL as string);
+    window.webContents.openDevTools({ mode: "detach" });
+    return;
+  }
+
+  await window.loadURL(`${DESKTOP_SCHEME}://app/index.html`);
+}
+
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1100,
@@ -1673,7 +1741,55 @@ function createWindow(): BrowserWindow {
     event.preventDefault();
     window.setTitle(APP_DISPLAY_NAME);
   });
+  window.webContents.on(
+    "did-fail-load",
+    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame || isQuitting || window.isDestroyed()) {
+        return;
+      }
+
+      handleFatalStartupError(
+        "renderer-load",
+        new Error(
+          toRendererLoadFailureMessage({
+            errorCode,
+            errorDescription,
+            validatedURL,
+          }),
+        ),
+      );
+    },
+  );
+  window.webContents.on("preload-error", (_event, preloadPath, error) => {
+    if (isQuitting || window.isDestroyed()) {
+      return;
+    }
+
+    handleFatalStartupError(
+      "preload",
+      new Error(`Preload failed at ${preloadPath}: ${formatErrorMessage(error)}`),
+    );
+  });
+  window.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    logRendererConsoleMessage({
+      level,
+      message,
+      line,
+      sourceId,
+    });
+  });
+  window.webContents.on("render-process-gone", (_event, details) => {
+    if (isQuitting || window.isDestroyed()) {
+      return;
+    }
+
+    handleFatalStartupError(
+      "renderer-process",
+      new Error(`Renderer process exited (${details.reason}, exitCode=${details.exitCode}).`),
+    );
+  });
   window.webContents.on("did-finish-load", () => {
+    writeDesktopLogHeader("window finished load");
     window.setTitle(APP_DISPLAY_NAME);
     emitUpdateState();
     emitWindowState(window);
@@ -1688,12 +1804,7 @@ function createWindow(): BrowserWindow {
     window.show();
   });
 
-  if (isDevelopment) {
-    void window.loadURL(process.env.VITE_DEV_SERVER_URL as string);
-    window.webContents.openDevTools({ mode: "detach" });
-  } else {
-    void window.loadURL(`${DESKTOP_SCHEME}://app/index.html`);
-  }
+  void loadWindowContent(window);
 
   window.on("closed", () => {
     if (mainWindow === window) {

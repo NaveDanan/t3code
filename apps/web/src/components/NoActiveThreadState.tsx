@@ -27,12 +27,10 @@ export function NoActiveThreadState() {
 
         <Empty className="flex-1">
           <div className="w-full max-w-lg rounded-3xl border border-border/55 bg-card/20 px-8 py-12 shadow-sm/5">
-            <EmptyHeader className="max-w-none">
-              <EmptyTitle className="text-foreground text-xl">Pick a thread to continue</EmptyTitle>
-              <EmptyDescription className="mt-2 text-sm text-muted-foreground/78">
-                Select an existing thread or create a new one to get started.
-              </EmptyDescription>
-            </EmptyHeader>
+            <EmptyTitle className="text-foreground text-xl">Pick a thread to continue</EmptyTitle>
+            <EmptyDescription className="mt-2 text-sm text-muted-foreground/78">
+              Select an existing thread or create a new one to get started.
+            </EmptyDescription>
           </div>
         </Empty>
       </div>

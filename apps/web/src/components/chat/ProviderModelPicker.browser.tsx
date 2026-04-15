@@ -155,6 +155,7 @@ async function mountPicker(props: {
   model: string;
   lockedProvider: ProviderKind | null;
   providers?: ReadonlyArray<ServerProvider>;
+  settings?: typeof DEFAULT_UNIFIED_SETTINGS;
   triggerVariant?: "ghost" | "outline";
 }) {
   const host = document.createElement("div");
@@ -162,7 +163,7 @@ async function mountPicker(props: {
   const onProviderModelChange = vi.fn();
   const providers = props.providers ?? TEST_PROVIDERS;
   const modelOptionsByProvider = getCustomModelOptionsByProvider(
-    DEFAULT_UNIFIED_SETTINGS,
+    props.settings ?? DEFAULT_UNIFIED_SETTINGS,
     providers,
     props.provider,
     props.model,
@@ -383,6 +384,37 @@ describe("ProviderModelPicker", () => {
         "claudeAgent",
         "claude-sonnet-4-6",
       );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("hides settings-hidden models from the chat picker", async () => {
+    const mounted = await mountPicker({
+      provider: "claudeAgent",
+      model: "claude-opus-4-6",
+      lockedProvider: "claudeAgent",
+      settings: {
+        ...DEFAULT_UNIFIED_SETTINGS,
+        providers: {
+          ...DEFAULT_UNIFIED_SETTINGS.providers,
+          claudeAgent: {
+            ...DEFAULT_UNIFIED_SETTINGS.providers.claudeAgent,
+            hiddenModels: ["claude-sonnet-4-6"],
+          },
+        },
+      },
+    });
+
+    try {
+      await page.getByRole("button").click();
+
+      await vi.waitFor(() => {
+        const text = document.body.textContent ?? "";
+        expect(text).toContain("Claude Opus 4.6");
+        expect(text).toContain("Claude Haiku 4.5");
+        expect(text).not.toContain("Claude Sonnet 4.6");
+      });
     } finally {
       await mounted.cleanup();
     }

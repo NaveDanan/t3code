@@ -6,11 +6,17 @@ import {
 import type { EnvironmentId, ExecutionEnvironmentDescriptor } from "@t3tools/contracts";
 import { create } from "zustand";
 
-import { BootstrapHttpError, retryTransientBootstrap } from "./auth";
+import {
+  BootstrapHttpError,
+  BootstrapTimeoutError,
+  logBootstrapDebug,
+  retryTransientBootstrap,
+} from "./auth";
 
 import { readPrimaryEnvironmentTarget, resolvePrimaryEnvironmentHttpUrl } from "./target";
 
 const SERVER_ENVIRONMENT_DESCRIPTOR_PATH = "/.well-known/t3/environment";
+const ENVIRONMENT_DESCRIPTOR_FETCH_TIMEOUT_MS = 10_000;
 
 interface PrimaryEnvironmentBootstrapState {
   readonly descriptor: ExecutionEnvironmentDescriptor | null;
@@ -48,9 +54,31 @@ function createPrimaryKnownEnvironment(input: {
 
 async function fetchPrimaryEnvironmentDescriptor(): Promise<ExecutionEnvironmentDescriptor> {
   return retryTransientBootstrap(async () => {
-    const response = await fetch(
-      resolvePrimaryEnvironmentHttpUrl(SERVER_ENVIRONMENT_DESCRIPTOR_PATH),
-    );
+    const descriptorUrl = resolvePrimaryEnvironmentHttpUrl(SERVER_ENVIRONMENT_DESCRIPTOR_PATH);
+    logBootstrapDebug(`loading environment descriptor url=${descriptorUrl}`);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, ENVIRONMENT_DESCRIPTOR_FETCH_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(descriptorUrl, {
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (timedOut && error instanceof DOMException && error.name === "AbortError") {
+        throw new BootstrapTimeoutError({
+          message: `Timed out loading server environment descriptor (${ENVIRONMENT_DESCRIPTOR_FETCH_TIMEOUT_MS}ms).`,
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+
     if (!response.ok) {
       throw new BootstrapHttpError({
         message: `Failed to load server environment descriptor (${response.status}).`,
@@ -59,6 +87,9 @@ async function fetchPrimaryEnvironmentDescriptor(): Promise<ExecutionEnvironment
     }
 
     const descriptor = (await response.json()) as ExecutionEnvironmentDescriptor;
+    logBootstrapDebug(
+      `environment descriptor loaded environmentId=${descriptor.environmentId} label=${descriptor.label}`,
+    );
     writePrimaryEnvironmentDescriptor(descriptor);
     return descriptor;
   });

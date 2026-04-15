@@ -11,8 +11,15 @@ import { getRouter } from "./router";
 import { APP_DISPLAY_NAME } from "./branding";
 import { applyAppFontSize, readStoredAppFontSize } from "./appFontSize";
 
-// Electron loads the app from a file-backed shell, so hash history avoids path resolution issues.
-const history = isElectron ? createHashHistory() : createBrowserHistory();
+const shouldUseHashHistory =
+  isElectron ||
+  (typeof window !== "undefined" &&
+    window.location.protocol !== "http:" &&
+    window.location.protocol !== "https:");
+
+// Packaged desktop builds load from the custom t3:// shell, so hash history
+// keeps route resolution stable even if the preload bridge fails to initialize.
+const history = shouldUseHashHistory ? createHashHistory() : createBrowserHistory();
 
 const router = getRouter(history);
 

@@ -890,7 +890,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
   );
 
   it.effect(
-    "responds to remote auth websocket-token preflight requests with authorization CORS headers",
+    "responds to trusted desktop auth websocket-token preflight requests with authorization CORS headers",
     () =>
       Effect.gen(function* () {
         yield* buildAppUnderTest();
@@ -900,7 +900,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
           fetch(wsTokenUrl, {
             method: "OPTIONS",
             headers: {
-              origin: "http://192.168.86.35:3773",
+              origin: "t3://app",
               "access-control-request-method": "POST",
               "access-control-request-headers": "authorization",
             },
@@ -908,7 +908,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         );
 
         assert.equal(response.status, 204);
-        assert.equal(response.headers.get("access-control-allow-origin"), "*");
+        assert.equal(response.headers.get("access-control-allow-origin"), "t3://app");
+        assert.equal(response.headers.get("access-control-allow-credentials"), "true");
         assert.deepEqual(splitHeaderTokens(response.headers.get("access-control-allow-methods")), [
           "GET",
           "OPTIONS",
@@ -923,7 +924,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("includes CORS headers on remote websocket-token auth failures", () =>
+  it.effect("includes CORS headers on trusted desktop websocket-token auth failures", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -932,7 +933,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         fetch(wsTokenUrl, {
           method: "POST",
           headers: {
-            origin: "http://192.168.86.35:3773",
+            origin: "t3://app",
           },
         }),
       );
@@ -941,8 +942,77 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       };
 
       assert.equal(response.status, 401);
-      assert.equal(response.headers.get("access-control-allow-origin"), "*");
+      assert.equal(response.headers.get("access-control-allow-origin"), "t3://app");
+      assert.equal(response.headers.get("access-control-allow-credentials"), "true");
       assert.equal(body.error, "Authentication required.");
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect(
+    "responds to trusted desktop auth bootstrap preflight requests with JSON CORS headers",
+    () =>
+      Effect.gen(function* () {
+        yield* buildAppUnderTest();
+
+        const bootstrapUrl = yield* getHttpServerUrl("/api/auth/bootstrap");
+        const response = yield* Effect.promise(() =>
+          fetch(bootstrapUrl, {
+            method: "OPTIONS",
+            headers: {
+              origin: "t3://app",
+              "access-control-request-method": "POST",
+              "access-control-request-headers": "content-type",
+            },
+          }),
+        );
+
+        assert.equal(response.status, 204);
+        assert.equal(response.headers.get("access-control-allow-origin"), "t3://app");
+        assert.equal(response.headers.get("access-control-allow-credentials"), "true");
+        assert.deepEqual(splitHeaderTokens(response.headers.get("access-control-allow-headers")), [
+          "authorization",
+          "b3",
+          "content-type",
+          "traceparent",
+        ]);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("includes credentialed CORS headers on trusted desktop auth session requests", () =>
+    Effect.gen(function* () {
+      yield* buildAppUnderTest();
+
+      const url = yield* getHttpServerUrl("/api/auth/session");
+      const response = yield* Effect.promise(() =>
+        fetch(url, {
+          headers: {
+            origin: "t3://app",
+          },
+        }),
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("access-control-allow-origin"), "t3://app");
+      assert.equal(response.headers.get("access-control-allow-credentials"), "true");
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("does not emit browser API CORS headers for untrusted origins", () =>
+    Effect.gen(function* () {
+      yield* buildAppUnderTest();
+
+      const url = yield* getHttpServerUrl("/api/auth/session");
+      const response = yield* Effect.promise(() =>
+        fetch(url, {
+          headers: {
+            origin: "http://192.168.86.35:3773",
+          },
+        }),
+      );
+
+      assert.equal(response.status, 200);
+      assert.isNull(response.headers.get("access-control-allow-origin"));
+      assert.equal(response.headers.get("access-control-allow-credentials"), "true");
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
@@ -1534,7 +1604,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       });
 
       assert.equal(response.status, 204);
-      assert.equal(response.headers["access-control-allow-origin"], "*");
+      assert.equal(response.headers["access-control-allow-origin"], "http://localhost:5733");
+      assert.equal(response.headers["access-control-allow-credentials"], "true");
       assert.deepEqual(localTraceRecords, [
         {
           type: "otlp-span",
@@ -1599,7 +1670,8 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       );
 
       assert.equal(response.status, 204);
-      assert.equal(response.headers.get("access-control-allow-origin"), "*");
+      assert.equal(response.headers.get("access-control-allow-origin"), "http://localhost:5733");
+      assert.equal(response.headers.get("access-control-allow-credentials"), "true");
       assert.deepEqual(splitHeaderTokens(response.headers.get("access-control-allow-methods")), [
         "GET",
         "OPTIONS",

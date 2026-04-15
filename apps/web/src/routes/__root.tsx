@@ -19,6 +19,7 @@ import {
   WebSocketConnectionSurface,
 } from "../components/WebSocketConnectionSurface";
 import { Button } from "../components/ui/button";
+import { Spinner } from "../components/ui/spinner";
 import { AnchoredToastProvider, ToastProvider, toastManager } from "../components/ui/toast";
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
 import { useSettings } from "../hooks/useSettings";
@@ -60,6 +61,9 @@ export const Route = createRootRouteWithContext<{
   },
   component: RootRouteView,
   errorComponent: RootRouteErrorView,
+  pendingComponent: RootRoutePendingView,
+  pendingMs: 0,
+  pendingMinMs: 400,
   head: () => ({
     meta: [{ name: "title", content: APP_DISPLAY_NAME }],
   }),
@@ -102,6 +106,28 @@ function RootRouteView() {
         </WebSocketConnectionSurface>
       </AnchoredToastProvider>
     </ToastProvider>
+  );
+}
+
+function RootRoutePendingView() {
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10 text-foreground sm:px-6">
+      <div className="pointer-events-none absolute inset-0 opacity-80">
+        <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(44rem_16rem_at_top,color-mix(in_srgb,var(--color-cyan-500)_16%,transparent),transparent)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(145deg,color-mix(in_srgb,var(--background)_90%,var(--color-black))_0%,var(--background)_55%)]" />
+      </div>
+
+      <section className="relative flex w-full max-w-xl flex-col items-center rounded-2xl border border-border/80 bg-card/90 px-6 py-8 text-center shadow-2xl shadow-black/20 backdrop-blur-md sm:px-8">
+        <p className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
+          {APP_DISPLAY_NAME}
+        </p>
+        <Spinner className="mt-5 size-8 text-foreground/80" />
+        <h1 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">Starting app…</h1>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+          Connecting to the local desktop backend and restoring your workspace state.
+        </p>
+      </section>
+    </div>
   );
 }
 

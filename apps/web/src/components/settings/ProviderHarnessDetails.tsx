@@ -172,9 +172,10 @@ function ModelRow({
 }) {
   const caps = model.capabilities;
   const capLabels: string[] = [];
+  const effortVariants = caps?.reasoningEffortLevels.map((level) => level.label) ?? [];
   if (caps?.supportsFastMode) capLabels.push("Fast mode");
   if (caps?.supportsThinkingToggle) capLabels.push("Thinking");
-  if (caps?.reasoningEffortLevels && caps.reasoningEffortLevels.length > 0) {
+  if (effortVariants.length > 0) {
     capLabels.push("Reasoning");
   }
   const hasDetails = capLabels.length > 0 || model.name !== model.slug;
@@ -218,6 +219,11 @@ function ModelRow({
           <TooltipPopup side="top" className="max-w-56">
             <div className="space-y-1">
               <code className="block text-[11px] text-foreground">{model.slug}</code>
+              {effortVariants.length > 0 ? (
+                <div className="text-[10px] text-muted-foreground">
+                  Effort: {effortVariants.join(", ")}
+                </div>
+              ) : null}
               {capLabels.length > 0 ? (
                 <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                   {capLabels.map((label) => (
