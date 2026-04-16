@@ -5,6 +5,7 @@ import {
   type ClaudeModelOptions,
   type CodexModelOptions,
   type ForgeCodeModelOptions,
+  type GitHubCopilotModelOptions,
   type ModelCapabilities,
   type ModelSelection,
   type OpencodeModelOptions,
@@ -135,6 +136,18 @@ export function normalizeForgeCodeModelOptionsWithCapabilities(
   _modelOptions: ForgeCodeModelOptions | null | undefined,
 ): ForgeCodeModelOptions | undefined {
   return undefined;
+}
+
+export function normalizeGitHubCopilotModelOptionsWithCapabilities(
+  caps: ModelCapabilities,
+  modelOptions: GitHubCopilotModelOptions | null | undefined,
+): GitHubCopilotModelOptions | undefined {
+  const reasoningEffort = resolveEffort(caps, modelOptions?.reasoningEffort);
+  if (!reasoningEffort) return undefined;
+  const nextOptions: GitHubCopilotModelOptions = {
+    reasoningEffort: reasoningEffort as GitHubCopilotModelOptions["reasoningEffort"],
+  };
+  return nextOptions;
 }
 
 export function isClaudeUltrathinkPrompt(text: string | null | undefined): boolean {

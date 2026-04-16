@@ -18,7 +18,16 @@ import {
   MenuSubTrigger,
   MenuTrigger,
 } from "../ui/menu";
-import { ClaudeAI, CursorIcon, ForgeCodeIcon, Gemini, Icon, OpenAI, OpenCodeIcon } from "../Icons";
+import {
+  ClaudeAI,
+  CursorIcon,
+  ForgeCodeIcon,
+  Gemini,
+  GitHubIcon,
+  Icon,
+  OpenAI,
+  OpenCodeIcon,
+} from "../Icons";
 import { cn } from "~/lib/utils";
 import { getProviderSnapshot } from "../../providerModels";
 
@@ -35,6 +44,7 @@ const PROVIDER_ICON_BY_PROVIDER: Record<ProviderPickerKind, Icon> = {
   claudeAgent: ClaudeAI,
   opencode: OpenCodeIcon,
   forgecode: ForgeCodeIcon,
+  githubCopilot: GitHubIcon,
   cursor: CursorIcon,
 };
 
@@ -54,6 +64,9 @@ function providerIconClassName(
   }
   if (provider === "forgecode") {
     return "text-[#c76d3a]";
+  }
+  if (provider === "githubCopilot") {
+    return "text-[#8b949e]";
   }
   return fallbackClassName;
 }

@@ -3,12 +3,13 @@
  *
  * @module ProviderRegistryLive
  */
-import type { ProviderKind, ServerProvider } from "@t3tools/contracts";
+import type { HarnessUpdateResult, ProviderKind, ServerProvider } from "@t3tools/contracts";
 import { Effect, Equal, Layer, PubSub, Ref, Stream } from "effect";
 
 import { ClaudeProviderLive } from "./ClaudeProvider";
 import { CodexProviderLive } from "./CodexProvider";
 import { ForgeProviderLive } from "./ForgeProvider";
+import { GitHubCopilotProviderLive } from "./GitHubCopilotProvider";
 import { OpencodeProviderLive } from "./OpencodeProvider";
 import type { ClaudeProviderShape } from "../Services/ClaudeProvider";
 import { ClaudeProvider } from "../Services/ClaudeProvider";
@@ -16,6 +17,8 @@ import type { CodexProviderShape } from "../Services/CodexProvider";
 import { CodexProvider } from "../Services/CodexProvider";
 import type { ForgeProviderShape } from "../Services/ForgeProvider";
 import { ForgeProvider } from "../Services/ForgeProvider";
+import type { GitHubCopilotProviderShape } from "../Services/GitHubCopilotProvider";
+import { GitHubCopilotProvider } from "../Services/GitHubCopilotProvider";
 import type { OpencodeProviderShape } from "../Services/OpencodeProvider";
 import { OpencodeProvider } from "../Services/OpencodeProvider";
 import { ProviderRegistry, type ProviderRegistryShape } from "../Services/ProviderRegistry";
@@ -25,13 +28,17 @@ const loadProviders = (
   claudeProvider: ClaudeProviderShape,
   forgeProvider: ForgeProviderShape,
   opencodeProvider: OpencodeProviderShape,
-): Effect.Effect<readonly [ServerProvider, ServerProvider, ServerProvider, ServerProvider]> =>
+  githubCopilotProvider: GitHubCopilotProviderShape,
+): Effect.Effect<
+  readonly [ServerProvider, ServerProvider, ServerProvider, ServerProvider, ServerProvider]
+> =>
   Effect.all(
     [
       codexProvider.getSnapshot,
       claudeProvider.getSnapshot,
       forgeProvider.getSnapshot,
       opencodeProvider.getSnapshot,
+      githubCopilotProvider.getSnapshot,
     ],
     {
       concurrency: "unbounded",
@@ -50,12 +57,19 @@ export const ProviderRegistryLive = Layer.effect(
     const claudeProvider = yield* ClaudeProvider;
     const forgeProvider = yield* ForgeProvider;
     const opencodeProvider = yield* OpencodeProvider;
+    const githubCopilotProvider = yield* GitHubCopilotProvider;
     const changesPubSub = yield* Effect.acquireRelease(
       PubSub.unbounded<ReadonlyArray<ServerProvider>>(),
       PubSub.shutdown,
     );
     const providersRef = yield* Ref.make<ReadonlyArray<ServerProvider>>(
-      yield* loadProviders(codexProvider, claudeProvider, forgeProvider, opencodeProvider),
+      yield* loadProviders(
+        codexProvider,
+        claudeProvider,
+        forgeProvider,
+        opencodeProvider,
+        githubCopilotProvider,
+      ),
     );
 
     const syncProviders = Effect.fn("syncProviders")(function* (options?: {
@@ -67,6 +81,7 @@ export const ProviderRegistryLive = Layer.effect(
         claudeProvider,
         forgeProvider,
         opencodeProvider,
+        githubCopilotProvider,
       );
       yield* Ref.set(providersRef, providers);
 
@@ -89,6 +104,9 @@ export const ProviderRegistryLive = Layer.effect(
     yield* Stream.runForEach(opencodeProvider.streamChanges, () => syncProviders()).pipe(
       Effect.forkScoped,
     );
+    yield* Stream.runForEach(githubCopilotProvider.streamChanges, () => syncProviders()).pipe(
+      Effect.forkScoped,
+    );
 
     const refresh = Effect.fn("refresh")(function* (provider?: ProviderKind) {
       switch (provider) {
@@ -104,6 +122,9 @@ export const ProviderRegistryLive = Layer.effect(
         case "opencode":
           yield* opencodeProvider.refresh;
           break;
+        case "githubCopilot":
+          yield* githubCopilotProvider.refresh;
+          break;
         default:
           yield* Effect.all(
             [
@@ -111,6 +132,7 @@ export const ProviderRegistryLive = Layer.effect(
               claudeProvider.refresh,
               forgeProvider.refresh,
               opencodeProvider.refresh,
+              githubCopilotProvider.refresh,
             ],
             {
               concurrency: "unbounded",
@@ -131,6 +153,20 @@ export const ProviderRegistryLive = Layer.effect(
           Effect.tapError(Effect.logError),
           Effect.orElseSucceed(() => []),
         ),
+      updateAll: Effect.all(
+        [
+          codexProvider.update,
+          claudeProvider.update,
+          forgeProvider.update,
+          opencodeProvider.update,
+          githubCopilotProvider.update,
+        ],
+        { concurrency: "unbounded" },
+      ).pipe(
+        Effect.tap(() => syncProviders()),
+        Effect.tapError(Effect.logError),
+        Effect.orElseSucceed((): ReadonlyArray<HarnessUpdateResult> => []),
+      ),
       get streamChanges() {
         return Stream.fromPubSub(changesPubSub);
       },
@@ -140,5 +176,6 @@ export const ProviderRegistryLive = Layer.effect(
   Layer.provideMerge(CodexProviderLive),
   Layer.provideMerge(ClaudeProviderLive),
   Layer.provideMerge(ForgeProviderLive),
+  Layer.provideMerge(GitHubCopilotProviderLive),
   Layer.provideMerge(OpencodeProviderLive),
 );

@@ -11,6 +11,7 @@ import { TextGeneration, type TextGenerationShape } from "../Services/TextGenera
 import { CodexTextGenerationLive } from "./CodexTextGeneration.ts";
 import { ClaudeTextGenerationLive } from "./ClaudeTextGeneration.ts";
 import { ForgeTextGenerationLive } from "./ForgeTextGeneration.ts";
+import { GitHubCopilotTextGenerationLive } from "./GitHubCopilotTextGeneration.ts";
 import { OpencodeTextGenerationLive } from "./OpencodeTextGeneration.ts";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,10 @@ class OpencodeTextGen extends Context.Service<OpencodeTextGen, TextGenerationSha
   "t3/git/Layers/RoutingTextGeneration/OpencodeTextGen",
 ) {}
 
+class GitHubCopilotTextGen extends Context.Service<GitHubCopilotTextGen, TextGenerationShape>()(
+  "t3/git/Layers/RoutingTextGeneration/GitHubCopilotTextGen",
+) {}
+
 // ---------------------------------------------------------------------------
 // Routing implementation
 // ---------------------------------------------------------------------------
@@ -42,6 +47,7 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
   const claude = yield* ClaudeTextGen;
   const forge = yield* ForgeTextGen;
   const opencode = yield* OpencodeTextGen;
+  const githubCopilot = yield* GitHubCopilotTextGen;
 
   return {
     generateCommitMessage: (input) => {
@@ -54,6 +60,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return forge.generateCommitMessage(input);
         case "opencode":
           return opencode.generateCommitMessage(input);
+        case "githubCopilot":
+          return githubCopilot.generateCommitMessage(input);
       }
     },
     generatePrContent: (input) => {
@@ -66,6 +74,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return forge.generatePrContent(input);
         case "opencode":
           return opencode.generatePrContent(input);
+        case "githubCopilot":
+          return githubCopilot.generatePrContent(input);
       }
     },
     generateBranchName: (input) => {
@@ -78,6 +88,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return forge.generateBranchName(input);
         case "opencode":
           return opencode.generateBranchName(input);
+        case "githubCopilot":
+          return githubCopilot.generateBranchName(input);
       }
     },
     generateThreadTitle: (input) => {
@@ -90,6 +102,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return forge.generateThreadTitle(input);
         case "opencode":
           return opencode.generateThreadTitle(input);
+        case "githubCopilot":
+          return githubCopilot.generateThreadTitle(input);
       }
     },
   } satisfies TextGenerationShape;
@@ -127,6 +141,14 @@ const InternalOpencodeLayer = Layer.effect(
   }),
 ).pipe(Layer.provide(OpencodeTextGenerationLive));
 
+const InternalGitHubCopilotLayer = Layer.effect(
+  GitHubCopilotTextGen,
+  Effect.gen(function* () {
+    const svc = yield* TextGeneration;
+    return svc;
+  }),
+).pipe(Layer.provide(GitHubCopilotTextGenerationLive));
+
 export const RoutingTextGenerationLive = Layer.effect(
   TextGeneration,
   makeRoutingTextGeneration,
@@ -135,4 +157,5 @@ export const RoutingTextGenerationLive = Layer.effect(
   Layer.provide(InternalClaudeLayer),
   Layer.provide(InternalForgeLayer),
   Layer.provide(InternalOpencodeLayer),
+  Layer.provide(InternalGitHubCopilotLayer),
 );

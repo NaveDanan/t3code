@@ -14,6 +14,7 @@ import {
   TerminalCwdError,
   TerminalError,
   TerminalHistoryError,
+  type TerminalLaunchProfile,
   TerminalNotRunningError,
   TerminalOpenInput,
   TerminalResizeInput,
@@ -70,6 +71,11 @@ export interface TerminalStartInput extends TerminalOpenInput {
  * TerminalManagerShape - Service API for terminal session lifecycle operations.
  */
 export interface TerminalManagerShape {
+  /**
+   * List launchable shell profiles for this environment.
+   */
+  readonly listProfiles: () => Effect.Effect<ReadonlyArray<TerminalLaunchProfile>, TerminalError>;
+
   /**
    * Open or attach to a terminal session.
    *

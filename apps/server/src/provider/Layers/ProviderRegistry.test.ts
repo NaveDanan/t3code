@@ -33,6 +33,12 @@ import {
 } from "./CodexProvider";
 import { checkClaudeProviderStatus, parseClaudeAuthStatusFromOutput } from "./ClaudeProvider";
 import { checkForgeProviderStatus, setForgeProviderProcessRunnerForTests } from "./ForgeProvider";
+import {
+  checkGitHubCopilotProviderStatus,
+  resolveGitHubCopilotSdkLaunchConfig,
+  setGitHubCopilotProviderProcessRunnerForTests,
+  setGitHubCopilotProviderRuntimeProbeForTests,
+} from "./GitHubCopilotProvider";
 import { checkOpencodeProviderStatus } from "./OpencodeProvider";
 import { haveProvidersChanged, ProviderRegistryLive } from "./ProviderRegistry";
 import { ServerSettingsService, type ServerSettingsShape } from "../../serverSettings";
@@ -467,7 +473,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
           assert.strictEqual(status.auth.status, "unknown");
           assert.strictEqual(
             status.message,
-            "Codex CLI v0.36.0 is too old for T3 Code. Upgrade to v0.37.0 or newer and restart T3 Code.",
+            "Codex CLI v0.36.0 is too old for NJ Code. Upgrade to v0.37.0 or newer and restart NJ Code.",
           );
         }).pipe(
           Effect.provide(
@@ -606,7 +612,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
           assert.strictEqual(status.enabled, false);
           assert.strictEqual(status.status, "disabled");
           assert.strictEqual(status.installed, false);
-          assert.strictEqual(status.message, "OpenCode is disabled in T3 Code settings.");
+          assert.strictEqual(status.message, "OpenCode is disabled in NJ Code settings.");
         }).pipe(
           Effect.provide(
             Layer.mergeAll(
@@ -874,6 +880,117 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
             ),
           ),
         ),
+      );
+
+      it.effect(
+        "assigns default reasoning variants to Anthropic models with reasoning capability but no explicit variants",
+        () =>
+          Effect.gen(function* () {
+            const status = yield* checkOpencodeProviderStatus;
+            assert.strictEqual(status.models[0]?.slug, "anthropic/claude-sonnet-4-5");
+            assert.deepStrictEqual(status.models[0]?.capabilities?.reasoningEffortLevels, [
+              { value: "low", label: "Low" },
+              { value: "medium", label: "Medium", isDefault: true },
+              { value: "high", label: "High" },
+            ]);
+          }).pipe(
+            Effect.provide(
+              Layer.mergeAll(
+                ServerSettingsService.layerTest({
+                  providers: {
+                    opencode: {
+                      enabled: true,
+                    },
+                  },
+                }),
+                fakeOpencodeServerManagerLayer({
+                  probe: () =>
+                    Effect.succeed({
+                      server: {
+                        binaryPath: "opencode",
+                        url: "http://127.0.0.1:4196",
+                        client: {} as never,
+                        version: "1.3.15",
+                      },
+                      configuredProviders: [
+                        {
+                          id: "anthropic",
+                          name: "Anthropic",
+                          source: "api",
+                          env: [],
+                          options: {},
+                          models: {
+                            "claude-sonnet-4-5": {
+                              id: "claude-sonnet-4-5",
+                              providerID: "anthropic",
+                              api: {
+                                id: "anthropic",
+                                url: "https://api.anthropic.com",
+                                npm: "@anthropic-ai/sdk",
+                              },
+                              name: "Claude Sonnet 4.5",
+                              reasoning: true,
+                              capabilities: {
+                                temperature: false,
+                                reasoning: false,
+                                attachment: true,
+                                toolcall: true,
+                                input: {
+                                  text: true,
+                                  audio: false,
+                                  image: true,
+                                  video: false,
+                                  pdf: true,
+                                },
+                                output: {
+                                  text: true,
+                                  audio: false,
+                                  image: false,
+                                  video: false,
+                                  pdf: false,
+                                },
+                                interleaved: false,
+                              },
+                              cost: {
+                                input: 1,
+                                output: 2,
+                                cache: {
+                                  read: 0,
+                                  write: 0,
+                                },
+                              },
+                              limit: {
+                                context: 200_000,
+                                output: 8_000,
+                              },
+                              status: "active",
+                              options: {},
+                              headers: {},
+                              release_date: "2025-01-01",
+                            },
+                          },
+                        },
+                      ],
+                      knownProviders: [
+                        {
+                          id: "anthropic",
+                          name: "Anthropic",
+                          env: [],
+                          models: {
+                            "claude-sonnet-4-5": opencodeProviderListModel,
+                          },
+                        },
+                      ],
+                      connectedProviderIds: ["anthropic"],
+                      authMethodsByProviderId: {
+                        anthropic: [{ type: "api", label: "API Key" }],
+                      },
+                      defaultModelByProviderId: { anthropic: "claude-sonnet-4-5" },
+                    }),
+                }),
+              ),
+            ),
+          ),
       );
 
       it.effect("reports OpenCode as missing when the CLI is not installed", () =>
@@ -1196,7 +1313,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
           assert.strictEqual(status.enabled, false);
           assert.strictEqual(status.status, "disabled");
           assert.strictEqual(status.installed, false);
-          assert.strictEqual(status.message, "Codex is disabled in T3 Code settings.");
+          assert.strictEqual(status.message, "Codex is disabled in NJ Code settings.");
         }),
       );
     });
@@ -1615,6 +1732,108 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
       );
     });
 
+    describe("checkGitHubCopilotProviderStatus", () => {
+      const resetGitHubCopilotProviderTestDoubles = Effect.sync(() => {
+        setGitHubCopilotProviderProcessRunnerForTests(null);
+        setGitHubCopilotProviderRuntimeProbeForTests(null);
+      });
+
+      it("routes the bundled SDK CLI through node.exe in Windows Electron", () => {
+        const launchConfig = resolveGitHubCopilotSdkLaunchConfig("copilot", {
+          bundledCliPath: "C:\\sdk\\copilot\\index.js",
+          pathValue: "C:\\Program Files\\nodejs;C:\\Tools",
+          platform: "win32",
+          runningInElectron: true,
+        });
+
+        assert.deepStrictEqual(launchConfig, {
+          cliPath: "C:\\Program Files\\nodejs\\node.exe",
+          cliArgs: ["C:\\sdk\\copilot\\index.js"],
+        });
+      });
+
+      it("keeps the SDK default launch outside the Windows Electron runtime", () => {
+        const launchConfig = resolveGitHubCopilotSdkLaunchConfig("copilot", {
+          bundledCliPath: "C:\\sdk\\copilot\\index.js",
+          pathValue: "C:\\Program Files\\nodejs;C:\\Tools",
+          platform: "win32",
+          runningInElectron: false,
+        });
+
+        assert.deepStrictEqual(launchConfig, {});
+      });
+
+      it.effect("returns ready when the Copilot runtime reports an authenticated user", () =>
+        Effect.gen(function* () {
+          setGitHubCopilotProviderProcessRunnerForTests(async (_command, args) => {
+            const joined = args.join(" ");
+            if (joined === "--version") {
+              return {
+                stdout: "GitHub Copilot CLI 1.0.27.\n",
+                stderr: "",
+                code: 0,
+              };
+            }
+            throw new Error(`Unexpected args: ${joined}`);
+          });
+          setGitHubCopilotProviderRuntimeProbeForTests(async () => ({
+            auth: {
+              isAuthenticated: true,
+              authType: "user",
+              login: "NAVED_aicahub",
+              statusMessage: "NAVED_aicahub",
+            },
+            models: [
+              {
+                slug: "gpt-5.4",
+                name: "GPT-5.4",
+                isCustom: false,
+                capabilities: null,
+              },
+            ],
+          }));
+
+          const status = yield* checkGitHubCopilotProviderStatus;
+          assert.strictEqual(status.provider, "githubCopilot");
+          assert.strictEqual(status.status, "ready");
+          assert.strictEqual(status.installed, true);
+          assert.strictEqual(status.auth.status, "authenticated");
+          assert.strictEqual(status.auth.label, "NAVED_aicahub");
+        }).pipe(Effect.ensuring(resetGitHubCopilotProviderTestDoubles)),
+      );
+
+      it.effect("treats environment-token auth as authenticated", () =>
+        Effect.gen(function* () {
+          setGitHubCopilotProviderProcessRunnerForTests(async (_command, args) => {
+            const joined = args.join(" ");
+            if (joined === "--version") {
+              return {
+                stdout: "GitHub Copilot CLI 1.0.27.\n",
+                stderr: "",
+                code: 0,
+              };
+            }
+            throw new Error(`Unexpected args: ${joined}`);
+          });
+          setGitHubCopilotProviderRuntimeProbeForTests(async () => ({
+            auth: {
+              isAuthenticated: true,
+              authType: "env",
+              statusMessage: "Authenticated via GH_TOKEN",
+            },
+            models: [],
+          }));
+
+          const status = yield* checkGitHubCopilotProviderStatus;
+          assert.strictEqual(status.provider, "githubCopilot");
+          assert.strictEqual(status.status, "ready");
+          assert.strictEqual(status.auth.status, "authenticated");
+          assert.strictEqual(status.auth.label, "Environment Token");
+          assert.strictEqual(status.auth.type, "Environment Token");
+        }).pipe(Effect.ensuring(resetGitHubCopilotProviderTestDoubles)),
+      );
+    });
+
     describe("checkForgeProviderStatus", () => {
       const isWindows = process.platform === "win32";
 
@@ -1721,6 +1940,81 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
                   },
                 }),
               ),
+            ),
+          ),
+      );
+
+      it.effect.skipIf(!isWindows)(
+        "does not probe WSL when Git Bash is the selected Forge backend",
+        () =>
+          Effect.gen(function* () {
+            let sawWslProbe = false;
+
+            setForgeProviderProcessRunnerForTests(async (command, args) => {
+              const joined = args.join(" ");
+
+              if (command === "wsl.exe") {
+                sawWslProbe = true;
+                throw new Error(`WSL should not be probed for Git Bash: ${joined}`);
+              }
+
+              if (command.toLowerCase().endsWith("bash.exe")) {
+                if (joined === "--version") {
+                  return {
+                    stdout: "GNU bash, version 5.2.37(1)-release\n",
+                    stderr: "",
+                    code: 0,
+                  };
+                }
+                if (joined.includes("'--version'")) {
+                  return {
+                    stdout: "forge 1.0.0\n",
+                    stderr: "",
+                    code: 0,
+                  };
+                }
+                if (joined.includes("'provider' 'list' '--porcelain'")) {
+                  return {
+                    stdout:
+                      "NAME    ID      HOST              LOGGED IN\nOpenAI  openai  api.openai.com      [yes]\n",
+                    stderr: "",
+                    code: 0,
+                  };
+                }
+                if (joined.includes("'list' 'model' '--porcelain'")) {
+                  return {
+                    stdout:
+                      "ID       MODEL    PROVIDER  PROVIDER ID\ngpt-5.4  GPT-5.4  OpenAI    openai\n",
+                    stderr: "",
+                    code: 0,
+                  };
+                }
+              }
+
+              throw new Error(`Unexpected command: ${command} ${joined}`);
+            });
+
+            const status = yield* checkForgeProviderStatus;
+            assert.strictEqual(sawWslProbe, false);
+            assert.strictEqual(status.provider, "forgecode");
+            assert.strictEqual(status.status, "ready");
+            assert.strictEqual(status.installed, true);
+            assert.strictEqual(status.auth.status, "authenticated");
+            assert.deepStrictEqual(
+              status.executionBackends?.map((backend) => backend.id),
+              ["wsl", "gitbash"],
+            );
+          }).pipe(
+            Effect.ensuring(Effect.sync(() => setForgeProviderProcessRunnerForTests(null))),
+            Effect.provide(
+              ServerSettingsService.layerTest({
+                providers: {
+                  forgecode: {
+                    enabled: true,
+                    executionBackend: "gitbash",
+                  },
+                },
+              }),
             ),
           ),
       );

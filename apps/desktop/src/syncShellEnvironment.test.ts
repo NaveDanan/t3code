@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { syncShellEnvironment } from "./syncShellEnvironment";
 
+const noRegistryPath = () => undefined;
+
 describe("syncShellEnvironment", () => {
   it("hydrates PATH and missing SSH_AUTH_SOCK from the login shell on macOS", () => {
     const env: NodeJS.ProcessEnv = {
@@ -106,6 +108,7 @@ describe("syncShellEnvironment", () => {
       syncShellEnvironment(env, {
         platform: "win32",
         readEnvironment,
+        readRegistryPath: noRegistryPath,
       });
 
       expect(readEnvironment).not.toHaveBeenCalled();
@@ -130,10 +133,51 @@ describe("syncShellEnvironment", () => {
     syncShellEnvironment(env, {
       platform: "win32",
       readEnvironment,
+      readRegistryPath: noRegistryPath,
     });
 
     expect(readEnvironment).not.toHaveBeenCalled();
     expect(env.PATH).toBe("C:\\Windows\\System32");
     expect(env.SSH_AUTH_SOCK).toBe("/tmp/inherited.sock");
+  });
+
+  it("merges new PATH entries from the Windows registry", () => {
+    const readRegistryPath = (key: string) => {
+      if (key.includes("HKCU")) {
+        return "C:\\Users\\test\\.npm-global;C:\\Windows\\System32";
+      }
+      if (key.includes("HKLM")) {
+        return "C:\\Windows\\System32;C:\\ProgramData\\copilot";
+      }
+      return undefined;
+    };
+
+    const env: NodeJS.ProcessEnv = {
+      PATH: "C:\\Windows\\System32",
+    };
+
+    syncShellEnvironment(env, { platform: "win32", readRegistryPath });
+
+    expect(env.PATH).toBe(
+      "C:\\Windows\\System32;C:\\Users\\test\\.npm-global;C:\\ProgramData\\copilot",
+    );
+  });
+
+  it("expands %VAR% references in Windows registry PATH values", () => {
+    const readRegistryPath = (key: string) => {
+      if (key.includes("HKCU")) {
+        return "%USERPROFILE%\\.local\\bin";
+      }
+      return undefined;
+    };
+
+    const env: NodeJS.ProcessEnv = {
+      USERPROFILE: "C:\\Users\\dev",
+      PATH: "C:\\Windows\\System32",
+    };
+
+    syncShellEnvironment(env, { platform: "win32", readRegistryPath });
+
+    expect(env.PATH).toBe("C:\\Windows\\System32;C:\\Users\\dev\\.local\\bin");
   });
 });

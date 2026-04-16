@@ -469,6 +469,32 @@ it.layer(NodeServices.layer, { excludeTestServices: true })("TerminalManager", (
     }),
   );
 
+  it.effect("propagates launch profile metadata through snapshots and started events", () =>
+    Effect.gen(function* () {
+      const { manager, getEvents } = yield* createManager();
+      const launchProfile = {
+        id: "pwsh",
+        label: "PowerShell",
+        shell: process.platform === "win32" ? "pwsh.exe" : "/bin/bash",
+      } as const;
+
+      const startedSnapshot = yield* manager.open(
+        openInput({
+          launchProfile,
+        }),
+      );
+
+      assert.deepEqual(startedSnapshot.launchProfile, launchProfile);
+
+      const events = yield* getEvents;
+      const startedEvent = events.find(
+        (event): event is Extract<TerminalEvent, { type: "started" }> => event.type === "started",
+      );
+
+      assert.deepEqual(startedEvent?.snapshot.launchProfile, launchProfile);
+    }),
+  );
+
   it.effect("preserves worktree metadata when reopening an exited session", () =>
     Effect.gen(function* () {
       const { manager, ptyAdapter, getEvents, baseDir } = yield* createManager();
@@ -853,6 +879,100 @@ it.layer(NodeServices.layer, { excludeTestServices: true })("TerminalManager", (
     }),
   );
 
+  it.effect("lists launchable terminal profiles", () =>
+    Effect.gen(function* () {
+      const { manager } = yield* createManager(5, {
+        shellResolver: () => (process.platform === "win32" ? "pwsh.exe" : "/bin/zsh"),
+      });
+
+      const profiles = yield* manager.listProfiles();
+
+      expect(profiles.length).toBeGreaterThan(0);
+      expect(profiles[0]?.id.length).toBeGreaterThan(0);
+      expect(profiles[0]?.label.length).toBeGreaterThan(0);
+      expect(profiles[0]?.shell.length).toBeGreaterThan(0);
+    }),
+  );
+
+  it.effect("prefers PowerShell-compatible shells before Command Prompt on Windows", () =>
+    Effect.gen(function* () {
+      if (process.platform !== "win32") {
+        return;
+      }
+
+      const { manager, ptyAdapter } = yield* createManager();
+
+      yield* manager.open(openInput());
+
+      expect(ptyAdapter.spawnInputs[0]?.shell).toBe("pwsh.exe");
+    }),
+  );
+
+  it.effect(
+    "includes Git Bash in launchable terminal profiles when Git for Windows is installed",
+    () =>
+      Effect.gen(function* () {
+        if (process.platform !== "win32") {
+          return;
+        }
+
+        const localAppData = process.env.LOCALAPPDATA;
+        if (!localAppData) {
+          return;
+        }
+
+        const fs = yield* Effect.service(FileSystem.FileSystem);
+        const gitRoot = path.join(localAppData, "Programs", "Git");
+        const gitCmdDir = path.join(gitRoot, "cmd");
+        const gitBinDir = path.join(gitRoot, "bin");
+        const gitExePath = path.join(gitCmdDir, "git.exe");
+        const bashExePath = path.join(gitBinDir, "bash.exe");
+
+        yield* fs.makeDirectory(gitCmdDir, { recursive: true });
+        yield* fs.makeDirectory(gitBinDir, { recursive: true });
+        yield* fs.writeFileString(gitExePath, "git");
+        yield* fs.writeFileString(bashExePath, "bash");
+
+        const originalPath = process.env.Path;
+        process.env.Path = [gitCmdDir, originalPath].filter(Boolean).join(path.delimiter);
+
+        try {
+          const { manager } = yield* createManager(5, {
+            shellResolver: () => "pwsh.exe",
+          });
+
+          const profiles = yield* manager.listProfiles();
+          const gitBashProfile = profiles.find((profile) => profile.label === "Git Bash");
+
+          expect(gitBashProfile).toBeDefined();
+          expect(gitBashProfile?.shell).toBe(bashExePath);
+        } finally {
+          process.env.Path = originalPath;
+        }
+      }),
+  );
+
+  it.effect("opens a terminal using the selected launch profile", () =>
+    Effect.gen(function* () {
+      const { manager, ptyAdapter } = yield* createManager();
+
+      yield* manager.open(
+        openInput({
+          launchProfile: {
+            id: "custom-shell",
+            label: "Custom Shell",
+            shell: process.platform === "win32" ? "powershell.exe" : "/bin/bash",
+          },
+        }),
+      );
+
+      expect(ptyAdapter.spawnInputs[0]?.shell).toBe(
+        process.platform === "win32" ? "powershell.exe" : "/bin/bash",
+      );
+      expect(ptyAdapter.spawnInputs).toHaveLength(1);
+    }),
+  );
+
   it.effect("filters app runtime env variables from terminal sessions", () =>
     Effect.gen(function* () {
       const originalValues = new Map<string, string | undefined>();
@@ -931,7 +1051,7 @@ it.layer(NodeServices.layer, { excludeTestServices: true })("TerminalManager", (
       expect(spawnInput).toBeDefined();
       if (!spawnInput) return;
 
-      expect(spawnInput.args).toEqual(["-o", "nopromptsp"]);
+      expect(spawnInput.args).toEqual(["-l", "-o", "nopromptsp"]);
     }),
   );
 

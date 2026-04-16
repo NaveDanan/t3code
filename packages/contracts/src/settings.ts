@@ -7,6 +7,7 @@ import {
   CodexModelOptions,
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
   ForgeCodeModelOptions,
+  GitHubCopilotModelOptions,
   OpencodeModelOptions,
 } from "./model";
 import { ModelSelection } from "./orchestration";
@@ -33,6 +34,10 @@ export const AppFontSize = Schema.Literals(["normal", "big", "large", "xlarge"])
 export type AppFontSize = typeof AppFontSize.Type;
 export const DEFAULT_APP_FONT_SIZE: AppFontSize = "normal";
 
+export const DEFAULT_TERMINAL_FONT_FAMILY =
+  '"CaskaydiaCove Nerd Font", "CaskaydiaMono Nerd Font", "MesloLGS NF", "FiraCode Nerd Font", "Hack Nerd Font", "JetBrainsMono Nerd Font", "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace';
+export const DEFAULT_TERMINAL_FONT_SIZE = 13;
+
 export const ClientSettingsSchema = Schema.Struct({
   appFontSize: AppFontSize.pipe(Schema.withDecodingDefault(Effect.succeed(DEFAULT_APP_FONT_SIZE))),
   busyThreadFollowupMode: BusyThreadFollowupMode.pipe(
@@ -46,6 +51,12 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   sidebarThreadSortOrder: SidebarThreadSortOrder.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_SIDEBAR_THREAD_SORT_ORDER)),
+  ),
+  terminalFontFamily: Schema.String.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_TERMINAL_FONT_FAMILY)),
+  ),
+  terminalFontSize: Schema.Number.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_TERMINAL_FONT_SIZE)),
   ),
   timestampFormat: TimestampFormat.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_TIMESTAMP_FORMAT)),
@@ -128,6 +139,14 @@ export const ForgeCodeSettings = Schema.Struct({
 });
 export type ForgeCodeSettings = typeof ForgeCodeSettings.Type;
 
+export const GitHubCopilotSettings = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  binaryPath: makeBinaryPathSetting("copilot"),
+  customModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  hiddenModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+});
+export type GitHubCopilotSettings = typeof GitHubCopilotSettings.Type;
+
 export const ObservabilitySettings = Schema.Struct({
   otlpTracesUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   otlpMetricsUrl: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
@@ -154,6 +173,7 @@ export const ServerSettings = Schema.Struct({
     claudeAgent: ClaudeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     opencode: OpencodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     forgecode: ForgeCodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+    githubCopilot: GitHubCopilotSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   }).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
 });
@@ -204,6 +224,10 @@ const ForgeCodeModelOptionsPatch = Schema.Struct({
   ...ForgeCodeModelOptions.fields,
 });
 
+const GitHubCopilotModelOptionsPatch = Schema.Struct({
+  ...GitHubCopilotModelOptions.fields,
+});
+
 const ModelSelectionPatch = Schema.Union([
   Schema.Struct({
     provider: Schema.optionalKey(Schema.Literal("codex")),
@@ -224,6 +248,11 @@ const ModelSelectionPatch = Schema.Union([
     provider: Schema.optionalKey(Schema.Literal("forgecode")),
     model: Schema.optionalKey(TrimmedNonEmptyString),
     options: Schema.optionalKey(ForgeCodeModelOptionsPatch),
+  }),
+  Schema.Struct({
+    provider: Schema.optionalKey(Schema.Literal("githubCopilot")),
+    model: Schema.optionalKey(TrimmedNonEmptyString),
+    options: Schema.optionalKey(GitHubCopilotModelOptionsPatch),
   }),
 ]);
 
@@ -257,6 +286,13 @@ const ForgeCodeSettingsPatch = Schema.Struct({
   hiddenModels: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
+const GitHubCopilotSettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(Schema.String),
+  customModels: Schema.optionalKey(Schema.Array(Schema.String)),
+  hiddenModels: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+
 export const ServerSettingsPatch = Schema.Struct({
   enableAssistantStreaming: Schema.optionalKey(Schema.Boolean),
   defaultThreadEnvMode: Schema.optionalKey(ThreadEnvMode),
@@ -273,6 +309,7 @@ export const ServerSettingsPatch = Schema.Struct({
       claudeAgent: Schema.optionalKey(ClaudeSettingsPatch),
       opencode: Schema.optionalKey(OpencodeSettingsPatch),
       forgecode: Schema.optionalKey(ForgeCodeSettingsPatch),
+      githubCopilot: Schema.optionalKey(GitHubCopilotSettingsPatch),
     }),
   ),
 });

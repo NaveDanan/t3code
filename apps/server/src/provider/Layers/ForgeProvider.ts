@@ -1,6 +1,7 @@
 import type {
   ForgeCodeSettings,
   ForgeExecutionBackend,
+  HarnessUpdateResult,
   ModelCapabilities,
   ServerProviderExecutionBackend,
   ServerProviderModel,
@@ -91,6 +92,20 @@ function buildBackendStatus(input: {
     isDefault: input.id === defaultForgeExecutionBackendForHost(),
     ...(input.reason ? { reason: input.reason } : {}),
   };
+}
+
+function supportedExecutionBackends(): ReadonlyArray<ForgeExecutionBackend> {
+  return process.platform === "win32" ? ["wsl", "gitbash"] : ["native"];
+}
+
+function buildExecutionBackends(
+  selectedProbe?: ForgeBackendProbeResult | null,
+): ReadonlyArray<ServerProviderExecutionBackend> {
+  return supportedExecutionBackends().map((backend) =>
+    selectedProbe?.status.id === backend
+      ? selectedProbe.status
+      : buildBackendStatus({ id: backend, available: true }),
+  );
 }
 
 function buildBuiltInModels(preferredProviderId?: string): ReadonlyArray<ServerProviderModel> {
@@ -472,18 +487,17 @@ const probeWslBackend = Effect.fn("probeWslBackend")(function* (): Effect.fn.Ret
   };
 });
 
-const probeExecutionBackends = Effect.fn("probeExecutionBackends")(function* (): Effect.fn.Return<
-  ReadonlyArray<ForgeBackendProbeResult>,
-  never
-> {
-  if (process.platform === "win32") {
-    return yield* Effect.all([probeWslBackend(), probeGitBashBackend()], {
-      concurrency: "unbounded",
-    });
+const probeSelectedBackend = Effect.fn("probeSelectedBackend")(function* (
+  executionBackend: ForgeExecutionBackend,
+): Effect.fn.Return<ForgeBackendProbeResult | null, never> {
+  switch (executionBackend) {
+    case "native":
+      return process.platform === "win32" ? null : yield* probeNativeBackend();
+    case "gitbash":
+      return process.platform === "win32" ? yield* probeGitBashBackend() : null;
+    case "wsl":
+      return process.platform === "win32" ? yield* probeWslBackend() : null;
   }
-  return yield* Effect.all([probeNativeBackend()], {
-    concurrency: "unbounded",
-  });
 });
 
 const runForgeCommand = Effect.fn("runForgeCommand")(function* (input: {
@@ -537,8 +551,6 @@ export const checkForgeProviderStatus = Effect.gen(function* () {
     Effect.map((settings) => settings.providers.forgecode),
   );
   const checkedAt = new Date().toISOString();
-  const backendProbes = yield* probeExecutionBackends();
-  const executionBackends = backendProbes.map((probe) => probe.status);
   const fallbackModels = fallbackModelsFromSettings(forgeSettings);
 
   if (!forgeSettings.enabled) {
@@ -547,19 +559,19 @@ export const checkForgeProviderStatus = Effect.gen(function* () {
       enabled: false,
       checkedAt,
       models: fallbackModels,
-      executionBackends,
+      executionBackends: buildExecutionBackends(),
       probe: {
         installed: false,
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "ForgeCode is disabled in T3 Code settings.",
+        message: "ForgeCode is disabled in NJ Code settings.",
       },
     });
   }
 
-  const selectedBackend =
-    backendProbes.find((probe) => probe.status.id === forgeSettings.executionBackend) ?? null;
+  const selectedBackend = yield* probeSelectedBackend(forgeSettings.executionBackend);
+  const executionBackends = buildExecutionBackends(selectedBackend);
   if (!selectedBackend) {
     return buildServerProvider({
       provider: PROVIDER,
@@ -730,6 +742,42 @@ export const ForgeProviderLive = Layer.effect(
       Effect.provideService(ServerSettingsService, serverSettings),
     );
 
+    const updateProvider = Effect.gen(function* () {
+      const forgeSettings = yield* serverSettings.getSettings.pipe(
+        Effect.map((settings) => settings.providers.forgecode),
+      );
+      const selectedBackend = yield* probeSelectedBackend(forgeSettings.executionBackend);
+      if (!selectedBackend?.executionTarget) {
+        return {
+          provider: "forgecode" as const,
+          success: false,
+          message: `ForgeCode backend '${forgeSettings.executionBackend}' is not available.`,
+        };
+      }
+      const result = yield* runForgeCommand({
+        binaryPath: forgeSettings.binaryPath,
+        executionTarget: selectedBackend.executionTarget,
+        args: ["update"],
+      }).pipe(Effect.timeout("120 seconds"));
+      return {
+        provider: "forgecode" as const,
+        success: result.code === 0,
+        message:
+          result.code === 0
+            ? result.stdout.trim() || "Update completed."
+            : result.stderr.trim() || result.stdout.trim() || `Exited with code ${result.code}.`,
+      } satisfies HarnessUpdateResult;
+    }).pipe(
+      Effect.provideService(ServerSettingsService, serverSettings),
+      Effect.catch(() =>
+        Effect.succeed({
+          provider: "forgecode" as const,
+          success: false,
+          message: "Update command failed.",
+        }),
+      ),
+    );
+
     return yield* makeManagedServerProvider<ForgeCodeSettings>({
       getSettings: serverSettings.getSettings.pipe(
         Effect.map((settings) => settings.providers.forgecode),
@@ -740,6 +788,7 @@ export const ForgeProviderLive = Layer.effect(
       ),
       haveSettingsChanged: (previous, next) => !Equal.equals(previous, next),
       checkProvider,
+      updateProvider,
     });
   }),
 );

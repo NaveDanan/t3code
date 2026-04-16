@@ -1,0 +1,67 @@
+$ turbo run typecheck
+• turbo 2.8.17
+• Packages in scope: @t3tools/client-runtime, @t3tools/contracts, @t3tools/desktop, @t3tools/marketing, @t3tools/scripts, @t3tools/shared, @t3tools/web, t3
+• Running typecheck in 8 packages
+• Remote caching disabled
+@t3tools/contracts:typecheck: cache bypass, force executing db9cd831e6437b6a
+@t3tools/marketing:typecheck: cache bypass, force executing 6403c3cd0594311a
+@t3tools/contracts:typecheck: $ tsc --noEmit
+@t3tools/marketing:typecheck: $ node ../../scripts/ensure-zod-locales-index.mjs && astro check
+@t3tools/marketing:typecheck: [2m04:16:08[22m [34m[types][39m Generated [2m57ms[22m
+@t3tools/marketing:typecheck: [2m04:16:08[22m [34m[check][39m Getting diagnostics for Astro files in D:\Projects\t3code\apps\marketing...
+@t3tools/client-runtime:typecheck: cache bypass, force executing 6cbff0b8a70885a0
+@t3tools/shared:typecheck: cache bypass, force executing 631cb483a801ea33
+@t3tools/client-runtime:typecheck: $ tsc --noEmit
+@t3tools/shared:typecheck: $ tsc --noEmit
+@t3tools/marketing:typecheck: Result (6 files): 
+@t3tools/marketing:typecheck: - 0 errors
+@t3tools/marketing:typecheck: - 0 warnings
+@t3tools/marketing:typecheck: - 0 hints
+@t3tools/marketing:typecheck: 
+@t3tools/scripts:typecheck: cache bypass, force executing 849fd397075e0fa8
+@t3tools/web:typecheck: cache bypass, force executing 237966b3fb89af02
+@t3tools/desktop:typecheck: cache bypass, force executing a1e06423f684316f
+@t3tools/scripts:typecheck: $ tsc --noEmit
+@t3tools/web:typecheck: $ tsc --noEmit
+@t3tools/desktop:typecheck: $ tsc --noEmit
+t3:typecheck: cache bypass, force executing be1b312c6565628b
+t3:typecheck: $ tsc --noEmit
+t3:typecheck: src/project/Layers/ProjectSetupScriptRunner.test.ts(52,46): error TS2345: Argument of type '{ open: Mock<Procedure>; write: Mock<Procedure>; resize: () => Effect.Effect<void, never, never>; clear: () => Effect.Effect<void, never, never>; restart: () => Effect.Effect<...>; close: () => Effect.Effect<...>; subscribe: () => Effect.Effect<...>; }' is not assignable to parameter of type 'TerminalManagerShape'.
+t3:typecheck:   Property 'listProfiles' is missing in type '{ open: Mock<Procedure>; write: Mock<Procedure>; resize: () => Effect.Effect<void, never, never>; clear: () => Effect.Effect<void, never, never>; restart: () => Effect.Effect<...>; close: () => Effect.Effect<...>; subscribe: () => Effect.Effect<...>; }' but required in type 'TerminalManagerShape'.
+t3:typecheck: src/project/Layers/ProjectSetupScriptRunner.test.ts(120,46): error TS2345: Argument of type '{ open: Mock<() => Effect.Effect<{ threadId: string; terminalId: string; cwd: string; worktreePath: string; status: "running"; pid: number; history: string; exitCode: null; exitSignal: null; updatedAt: string; }, never, never>>; ... 5 more ...; subscribe: () => Effect.Effect<...>; }' is not assignable to parameter of type 'TerminalManagerShape'.
+t3:typecheck:   Property 'listProfiles' is missing in type '{ open: Mock<() => Effect.Effect<{ threadId: string; terminalId: string; cwd: string; worktreePath: string; status: "running"; pid: number; history: string; exitCode: null; exitSignal: null; updatedAt: string; }, never, never>>; ... 5 more ...; subscribe: () => Effect.Effect<...>; }' but required in type 'TerminalManagerShape'.
+t3:typecheck: src/provider/githubCopilot.ts(180,14): error TS18049: 'value' is possibly 'null' or 'undefined'.
+t3:typecheck: src/provider/Layers/GitHubCopilotProvider.ts(206,72): error TS2379: Argument of type '{ bundledCliPath: string | undefined; pathValue: any; }' is not assignable to parameter of type '{ readonly bundledCliPath?: string; readonly pathValue?: string; readonly platform?: Platform; readonly runningInElectron?: boolean; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+t3:typecheck:   Types of property 'bundledCliPath' are incompatible.
+t3:typecheck:     Type 'string | undefined' is not assignable to type 'string'.
+t3:typecheck:       Type 'undefined' is not assignable to type 'string'.
+t3:typecheck: src/provider/Layers/GitHubCopilotProvider.ts(208,20): error TS2339: Property 'PATH' does not exist on type '{ COPILOT_AUTO_UPDATE: string; NODE_NO_WARNINGS: string; NODE_ENV?: string; TZ?: string; }'.
+t3:typecheck: src/provider/Layers/GitHubCopilotProvider.ts(212,30): error TS2379: Argument of type '{ autoStart: false; logLevel: "none"; env: { COPILOT_AUTO_UPDATE: string; NODE_NO_WARNINGS: string; NODE_ENV?: string; TZ?: string; }; cliPath?: string; cliArgs?: ReadonlyArray<string>; }' is not assignable to parameter of type 'CopilotClientOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+t3:typecheck:   Types of property 'cliArgs' are incompatible.
+t3:typecheck:     The type 'readonly string[]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+t3:typecheck: src/provider/Layers/GitHubCopilotProvider.ts(265,10): warning TS36: The 'catch' callback in Effect.tryPromise returns global 'Error', which loses type safety as untagged errors merge together. Consider using a tagged error and optionally wrapping the original in a 'cause' property.    effect(globalErrorInEffectCatch)
+t3:typecheck: src/provider/Layers/GitHubCopilotProvider.ts(375,37): warning TS36: The 'catch' callback in Effect.tryPromise returns global 'Error', which loses type safety as untagged errors merge together. Consider using a tagged error and optionally wrapping the original in a 'cause' property.    effect(globalErrorInEffectCatch)
+t3:typecheck: src/provider/Layers/GitHubCopilotProvider.ts(391,29): error TS2379: Argument of type '{ authenticated: boolean; user: string | undefined; authType: "env" | "user" | "gh-cli" | "hmac" | "api-key" | "token" | undefined; statusMessage: string | undefined; }' is not assignable to parameter of type '{ readonly authenticated?: boolean; readonly user?: string | null; readonly authType?: string | null; readonly error?: string | null; readonly statusMessage?: string | null; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+t3:typecheck:   Types of property 'user' are incompatible.
+t3:typecheck:     Type 'string | undefined' is not assignable to type 'string | null'.
+t3:typecheck:       Type 'undefined' is not assignable to type 'string | null'.
+t3:typecheck: src/provider/Layers/OpencodeProvider.ts(341,29): warning TS31: The 'catch' callback in Effect.tryPromise returns 'unknown'. The catch callback should be used to provide typed errors.
+t3:typecheck:     Consider wrapping unknown errors into Effect's Data.TaggedError for example, or narrow down the type to the specific error raised.    effect(unknownInEffectCatch)
+t3:typecheck: src/provider/Layers/OpencodeProvider.ts(341,29): warning TS28: This has unknown in the error channel which is not recommended.
+t3:typecheck: Having an unknown or any error type is not useful. Consider instead using specific error types baked by Data.TaggedError for example.    effect(anyUnknownInErrorContext)
+t3:typecheck: src/terminal/Layers/Manager.ts(2071,13): error TS2741: Property 'launchProfile' is missing in type '{ threadId: string; terminalId: string; cwd: string; worktreePath: string | null; executionBackend: "native" | "wsl" | "gitbash" | undefined; status: "starting"; pid: null; history: string; ... 13 more ...; runtimeEnv: Record<...> | null; }' but required in type 'TerminalSessionState'.
+t3:typecheck: src/workspace/Layers/WorkspaceEntries.ts(649,14): message TS29: This Effect.fail call uses a yieldable error type as argument. You can yield* the error directly instead.    effect(unnecessaryFailYieldableError)
+t3:typecheck: src/workspace/Layers/WorkspaceFileSystem.ts(40,16): message TS29: This Effect.fail call uses a yieldable error type as argument. You can yield* the error directly instead.    effect(unnecessaryFailYieldableError)
+t3:typecheck: src/workspace/Layers/WorkspaceFileSystem.ts(51,16): message TS29: This Effect.fail call uses a yieldable error type as argument. You can yield* the error directly instead.    effect(unnecessaryFailYieldableError)
+t3:typecheck: src/workspace/Layers/WorkspaceFileSystem.ts(75,16): message TS29: This Effect.fail call uses a yieldable error type as argument. You can yield* the error directly instead.    effect(unnecessaryFailYieldableError)
+t3:typecheck: error: script "typecheck" exited with code 1
+t3:typecheck: ERROR: command finished with error: command (D:\Projects\t3code\apps\server) C:\Users\naved\.bun\bin\bun.exe run typecheck exited (1)
+t3#typecheck: command (D:\Projects\t3code\apps\server) C:\Users\naved\.bun\bin\bun.exe run typecheck exited (1)
+
+ Tasks:    7 successful, 8 total
+Cached:    0 cached, 8 total
+  Time:    14.862s 
+Failed:    t3#typecheck
+
+ ERROR  run failed: command  exited (1)
+error: script "typecheck" exited with code 1

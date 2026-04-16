@@ -3,9 +3,15 @@ import type { Dirent } from "node:fs";
 
 import { Cache, Duration, Effect, Exit, Layer, Option, Path } from "effect";
 
-import { type ProjectEntry } from "@t3tools/contracts";
+import type {
+  ProjectEntry,
+  ProjectSearchTextFileResult,
+  ProjectSearchTextMatch,
+  ProjectSearchTextResult,
+} from "@t3tools/contracts";
 
 import { GitCore } from "../../git/Services/GitCore.ts";
+import { runProcess } from "../../processRunner.ts";
 import {
   WorkspaceEntries,
   WorkspaceEntriesError,
@@ -17,6 +23,9 @@ const WORKSPACE_CACHE_TTL_MS = 15_000;
 const WORKSPACE_CACHE_MAX_KEYS = 4;
 const WORKSPACE_INDEX_MAX_ENTRIES = 25_000;
 const WORKSPACE_SCAN_READDIR_CONCURRENCY = 32;
+const CONTENT_SEARCH_MAX_MATCHES_PER_FILE = 3;
+const CONTENT_SEARCH_MAX_FILE_BYTES = 1024 * 1024;
+const CONTENT_SEARCH_MAX_BUFFER_BYTES = 16 * 1024 * 1024;
 const IGNORED_DIRECTORY_NAMES = new Set([
   ".git",
   ".convex",
@@ -43,6 +52,22 @@ interface SearchableWorkspaceEntry extends ProjectEntry {
 interface RankedWorkspaceEntry {
   entry: SearchableWorkspaceEntry;
   score: number;
+}
+
+interface RgJsonMatchRecord {
+  type?: string;
+  data?: {
+    path?: { text?: string };
+    lines?: { text?: string };
+    line_number?: number;
+    matches?: Array<{
+      start: number;
+      end: number;
+      line_before?: string;
+      match: string;
+      line_after?: string;
+    }>;
+  };
 }
 
 function toPosixPath(input: string): string {
@@ -212,6 +237,96 @@ function directoryAncestorsOf(relativePath: string): string[] {
     directories.push(segments.slice(0, index).join("/"));
   }
   return directories;
+}
+
+function buildIgnoredGlobArgs(): string[] {
+  return [...IGNORED_DIRECTORY_NAMES].flatMap((directoryName) => ["--glob", `!${directoryName}`]);
+}
+
+function createEmptyTextSearchResult(): ProjectSearchTextResult {
+  return {
+    files: [],
+    truncated: false,
+  };
+}
+
+function trimLineText(value: string): string {
+  return value.replace(/\r?\n$/, "");
+}
+
+function projectTextSearchResultFromMap(
+  filesByPath: Map<string, ProjectSearchTextMatch[]>,
+  truncated: boolean,
+): ProjectSearchTextResult {
+  return {
+    files: [...filesByPath.entries()].map(
+      ([path, matches]): ProjectSearchTextFileResult => ({
+        path,
+        matches,
+      }),
+    ),
+    truncated,
+  };
+}
+
+function collectTextSearchMatchesFromRipgrep(
+  stdout: string,
+  limit: number,
+  truncated: boolean,
+): ProjectSearchTextResult {
+  const filesByPath = new Map<string, ProjectSearchTextMatch[]>();
+  let nextTruncated = truncated;
+
+  for (const line of stdout.split(/\r?\n/)) {
+    if (line.trim().length === 0) {
+      continue;
+    }
+
+    let record: RgJsonMatchRecord;
+    try {
+      record = JSON.parse(line) as RgJsonMatchRecord;
+    } catch {
+      continue;
+    }
+
+    if (record.type !== "match") {
+      continue;
+    }
+
+    const pathValue = record.data?.path?.text ? toPosixPath(record.data.path.text) : null;
+    const lineNumber = record.data?.line_number;
+    const lineText = record.data?.lines?.text;
+    const matches = record.data?.matches;
+    if (!pathValue || typeof lineNumber !== "number" || typeof lineText !== "string") {
+      continue;
+    }
+
+    const submatches = matches?.map((m) => ({
+      start: m.start,
+      end: m.end,
+    }));
+
+    if (!filesByPath.has(pathValue)) {
+      if (filesByPath.size >= limit) {
+        nextTruncated = true;
+        continue;
+      }
+      filesByPath.set(pathValue, []);
+    }
+
+    const fileMatches = filesByPath.get(pathValue);
+    if (!fileMatches || fileMatches.length >= CONTENT_SEARCH_MAX_MATCHES_PER_FILE) {
+      continue;
+    }
+
+    fileMatches.push({
+      lineNumber,
+      lineText: trimLineText(lineText),
+      submatches: submatches && submatches.length > 0 ? submatches : undefined,
+    });
+  }
+
+  return projectTextSearchResultFromMap(filesByPath, nextTruncated);
 }
 
 export const makeWorkspaceEntries = Effect.gen(function* () {
@@ -493,9 +608,166 @@ export const makeWorkspaceEntries = Effect.gen(function* () {
     },
   );
 
+  const searchTextWithRipgrep = Effect.fn("WorkspaceEntries.searchTextWithRipgrep")(function* (
+    cwd: string,
+    query: string,
+    limit: number,
+  ): Effect.fn.Return<ProjectSearchTextResult, WorkspaceEntriesError> {
+    const result = yield* Effect.tryPromise({
+      try: () =>
+        runProcess(
+          "rg",
+          [
+            "--json",
+            "--line-number",
+            "--smart-case",
+            "--fixed-strings",
+            "--hidden",
+            "--max-count",
+            String(CONTENT_SEARCH_MAX_MATCHES_PER_FILE),
+            ...buildIgnoredGlobArgs(),
+            query,
+            ".",
+          ],
+          {
+            cwd,
+            allowNonZeroExit: true,
+            maxBufferBytes: CONTENT_SEARCH_MAX_BUFFER_BYTES,
+            outputMode: "truncate",
+          },
+        ),
+      catch: (cause) =>
+        new WorkspaceEntriesError({
+          cwd,
+          operation: "workspaceEntries.searchText.ripgrep",
+          detail: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
+
+    if ((result.code ?? 0) > 1) {
+      return yield* Effect.fail(
+        new WorkspaceEntriesError({
+          cwd,
+          operation: "workspaceEntries.searchText.ripgrep",
+          detail:
+            result.stderr.trim().length > 0
+              ? result.stderr.trim()
+              : `ripgrep exited with code ${result.code ?? "null"}`,
+        }),
+      );
+    }
+
+    if (result.code === 1) {
+      return createEmptyTextSearchResult();
+    }
+
+    return collectTextSearchMatchesFromRipgrep(
+      result.stdout,
+      limit,
+      Boolean(result.stdoutTruncated || result.stderrTruncated),
+    );
+  });
+
+  const searchTextByScanningIndex = Effect.fn("WorkspaceEntries.searchTextByScanningIndex")(
+    function* (
+      cwd: string,
+      index: WorkspaceIndex,
+      query: string,
+      limit: number,
+    ): Effect.fn.Return<ProjectSearchTextResult, WorkspaceEntriesError> {
+      if (query.length === 0) {
+        return createEmptyTextSearchResult();
+      }
+
+      const filesByPath = new Map<string, ProjectSearchTextMatch[]>();
+      let truncated = index.truncated;
+      const normalizedQuery = query.toLowerCase();
+
+      for (const entry of index.entries) {
+        if (entry.kind !== "file") {
+          continue;
+        }
+
+        const matches = yield* Effect.tryPromise({
+          try: async () => {
+            const absolutePath = path.join(cwd, entry.path);
+            const stat = await fsPromises.stat(absolutePath);
+            if (stat.size > CONTENT_SEARCH_MAX_FILE_BYTES) {
+              return [] as ProjectSearchTextMatch[];
+            }
+
+            const contents = await fsPromises.readFile(absolutePath, "utf8");
+            if (contents.includes("\u0000")) {
+              return [] as ProjectSearchTextMatch[];
+            }
+
+            const collectedMatches: ProjectSearchTextMatch[] = [];
+            const lines = contents.split(/\r?\n/);
+            for (let index = 0; index < lines.length; index += 1) {
+              const line = lines[index];
+              if (!line || !line.toLowerCase().includes(normalizedQuery)) {
+                continue;
+              }
+              const lowerLine = line.toLowerCase();
+              const queryStart = lowerLine.indexOf(normalizedQuery);
+              collectedMatches.push({
+                lineNumber: index + 1,
+                lineText: line,
+                submatches: [{ start: queryStart, end: queryStart + query.length }],
+              });
+              if (collectedMatches.length >= CONTENT_SEARCH_MAX_MATCHES_PER_FILE) {
+                break;
+              }
+            }
+
+            return collectedMatches;
+          },
+          catch: (cause) =>
+            new WorkspaceEntriesError({
+              cwd,
+              operation: "workspaceEntries.searchText.scan",
+              detail: cause instanceof Error ? cause.message : String(cause),
+              cause,
+            }),
+        }).pipe(Effect.catch(() => Effect.succeed([] as ProjectSearchTextMatch[])));
+
+        if (matches.length === 0) {
+          continue;
+        }
+
+        if (filesByPath.size >= limit) {
+          truncated = true;
+          continue;
+        }
+
+        filesByPath.set(entry.path, matches);
+      }
+
+      return projectTextSearchResultFromMap(filesByPath, truncated);
+    },
+  );
+
+  const searchText: WorkspaceEntriesShape["searchText"] = Effect.fn("WorkspaceEntries.searchText")(
+    function* (input) {
+      const normalizedCwd = yield* normalizeWorkspaceRoot(input.cwd);
+      const query = input.query.trim();
+      const limit = Math.max(0, Math.floor(input.limit));
+      if (query.length === 0 || limit === 0) {
+        return createEmptyTextSearchResult();
+      }
+
+      const index = yield* Cache.get(workspaceIndexCache, normalizedCwd);
+      return yield* searchTextWithRipgrep(normalizedCwd, query, limit).pipe(
+        Effect.catch(() => searchTextByScanningIndex(normalizedCwd, index, query, limit)),
+      );
+    },
+  );
+
   return {
     invalidate,
     search,
+    searchText,
   } satisfies WorkspaceEntriesShape;
 });
 

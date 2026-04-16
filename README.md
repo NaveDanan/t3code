@@ -1,11 +1,11 @@
-# T3 Code
+# NJ Code
 
-T3 Code is a minimal web GUI for coding agents (currently Codex and Claude, more coming soon).
+NJ Code is a minimal web GUI for coding agents (currently Codex and Claude, more coming soon).
 
 ## Installation
 
 > [!WARNING]
-> T3 Code currently supports Codex and Claude.
+> NJ Code currently supports Codex and Claude.
 > Install and authenticate at least one provider before use:
 >
 > - Codex: install [Codex CLI](https://github.com/openai/codex) and run `codex login`

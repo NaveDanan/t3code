@@ -1,9 +1,17 @@
 import { FitAddon } from "@xterm/addon-fit";
-import { Plus, SquareSplitHorizontal, TerminalSquare, Trash2, XIcon } from "lucide-react";
+import {
+  ChevronDown,
+  Plus,
+  SquareSplitHorizontal,
+  TerminalSquare,
+  Trash2,
+  XIcon,
+} from "lucide-react";
 import {
   type ForgeExecutionBackend,
   type ScopedThreadRef,
   type TerminalEvent,
+  type TerminalLaunchProfile,
   type TerminalSessionSnapshot,
   type ThreadId,
 } from "@t3tools/contracts";
@@ -18,8 +26,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "~/components/ui/menu";
 import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
 import { type TerminalContextSelection } from "~/lib/terminalContext";
+import { useSettings } from "~/hooks/useSettings";
 import { openInPreferredEditor } from "../editorPreferences";
 import {
   extractTerminalLinks,
@@ -36,6 +46,7 @@ import {
 import { readEnvironmentApi } from "~/environmentApi";
 import { readLocalApi } from "~/localApi";
 import { selectTerminalEventEntries, useTerminalStateStore } from "../terminalStateStore";
+import { buildTerminalLabelById } from "../terminalLabels";
 
 const MIN_DRAWER_HEIGHT = 180;
 const MAX_DRAWER_HEIGHT_RATIO = 0.75;
@@ -243,6 +254,7 @@ interface TerminalViewportProps {
   cwd: string;
   worktreePath?: string | null;
   executionBackend?: ForgeExecutionBackend;
+  launchProfile?: TerminalLaunchProfile;
   runtimeEnv?: Record<string, string>;
   onSessionExited: () => void;
   onAddTerminalContext: (selection: TerminalContextSelection) => void;
@@ -260,6 +272,7 @@ export function TerminalViewport({
   cwd,
   worktreePath,
   executionBackend,
+  launchProfile,
   runtimeEnv,
   onSessionExited,
   onAddTerminalContext,
@@ -287,6 +300,10 @@ export function TerminalViewport({
     onAddTerminalContext(selection);
   });
   const readTerminalLabel = useEffectEvent(() => terminalLabel);
+  const terminalFontFamily = useSettings((s) => s.terminalFontFamily);
+  const terminalFontSize = useSettings((s) => s.terminalFontSize);
+  const readTerminalFontFamily = useEffectEvent(() => terminalFontFamily);
+  const readTerminalFontSize = useEffectEvent(() => terminalFontSize);
 
   useEffect(() => {
     const mount = containerRef.current;
@@ -301,9 +318,9 @@ export function TerminalViewport({
     const terminal = new Terminal({
       cursorBlink: true,
       lineHeight: 1.2,
-      fontSize: 12,
+      fontSize: readTerminalFontSize(),
       scrollback: 5_000,
-      fontFamily: '"SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
+      fontFamily: readTerminalFontFamily(),
       theme: terminalThemeFromApp(mount),
     });
     terminal.loadAddon(fitAddon);
@@ -634,6 +651,7 @@ export function TerminalViewport({
           cwd,
           ...(worktreePath !== undefined ? { worktreePath } : {}),
           ...(executionBackend ? { executionBackend } : {}),
+          ...(launchProfile ? { launchProfile } : {}),
           cols: activeTerminal.cols,
           rows: activeTerminal.rows,
           ...(runtimeEnv ? { env: runtimeEnv } : {}),
@@ -749,6 +767,15 @@ export function TerminalViewport({
       window.cancelAnimationFrame(frame);
     };
   }, [drawerHeight, environmentId, resizeEpoch, terminalId, threadId]);
+
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.options.fontFamily = terminalFontFamily;
+    terminal.options.fontSize = terminalFontSize;
+    fitAddonRef.current?.fit();
+  }, [terminalFontFamily, terminalFontSize]);
+
   return (
     <div
       ref={containerRef}
@@ -763,16 +790,18 @@ interface ThreadTerminalDrawerProps {
   cwd: string;
   worktreePath?: string | null;
   executionBackend?: ForgeExecutionBackend;
+  launchProfile?: TerminalLaunchProfile;
   runtimeEnv?: Record<string, string>;
   visible?: boolean;
   height: number;
   terminalIds: string[];
+  terminalLaunchProfilesById: Readonly<Record<string, TerminalLaunchProfile | undefined>>;
   activeTerminalId: string;
   terminalGroups: ThreadTerminalGroup[];
   activeTerminalGroupId: string;
   focusRequestId: number;
   onSplitTerminal: () => void;
-  onNewTerminal: () => void;
+  onNewTerminal: (launchProfile?: TerminalLaunchProfile) => void;
   splitShortcutLabel?: string | undefined;
   newShortcutLabel?: string | undefined;
   closeShortcutLabel?: string | undefined;
@@ -811,16 +840,56 @@ function TerminalActionButton({ label, className, onClick, children }: TerminalA
   );
 }
 
+function TerminalLaunchProfileMenuButton(props: {
+  className: string;
+  label: string;
+  loading: boolean;
+  profiles: ReadonlyArray<TerminalLaunchProfile>;
+  error: string | null;
+  onLaunch: (launchProfile: TerminalLaunchProfile) => void;
+}) {
+  return (
+    <Menu>
+      <MenuTrigger
+        render={<button type="button" className={props.className} aria-label={props.label} />}
+      >
+        <ChevronDown className="size-3.25" />
+      </MenuTrigger>
+      <MenuPopup align="end" side="bottom" sideOffset={6}>
+        {props.loading ? (
+          <div className="px-2 py-1.5 text-muted-foreground text-xs">
+            Loading terminal profiles...
+          </div>
+        ) : props.error ? (
+          <div className="px-2 py-1.5 text-destructive text-xs">{props.error}</div>
+        ) : props.profiles.length === 0 ? (
+          <div className="px-2 py-1.5 text-muted-foreground text-xs">
+            No launch profiles available.
+          </div>
+        ) : (
+          props.profiles.map((launchProfile) => (
+            <MenuItem key={launchProfile.id} onClick={() => props.onLaunch(launchProfile)}>
+              {launchProfile.label}
+            </MenuItem>
+          ))
+        )}
+      </MenuPopup>
+    </Menu>
+  );
+}
+
 export default function ThreadTerminalDrawer({
   threadRef,
   threadId,
   cwd,
   worktreePath,
   executionBackend,
+  launchProfile,
   runtimeEnv,
   visible = true,
   height,
   terminalIds,
+  terminalLaunchProfilesById,
   activeTerminalId,
   terminalGroups,
   activeTerminalGroupId,
@@ -837,6 +906,9 @@ export default function ThreadTerminalDrawer({
 }: ThreadTerminalDrawerProps) {
   const [drawerHeight, setDrawerHeight] = useState(() => clampDrawerHeight(height));
   const [resizeEpoch, setResizeEpoch] = useState(0);
+  const [launchProfiles, setLaunchProfiles] = useState<ReadonlyArray<TerminalLaunchProfile>>([]);
+  const [launchProfilesError, setLaunchProfilesError] = useState<string | null>(null);
+  const [launchProfilesLoading, setLaunchProfilesLoading] = useState(false);
   const drawerHeightRef = useRef(drawerHeight);
   const lastSyncedHeightRef = useRef(clampDrawerHeight(height));
   const onHeightChangeRef = useRef(onHeightChange);
@@ -942,10 +1014,11 @@ export default function ThreadTerminalDrawer({
   const hasReachedSplitLimit = visibleTerminalIds.length >= MAX_TERMINALS_PER_GROUP;
   const terminalLabelById = useMemo(
     () =>
-      new Map(
-        normalizedTerminalIds.map((terminalId, index) => [terminalId, `Terminal ${index + 1}`]),
-      ),
-    [normalizedTerminalIds],
+      buildTerminalLabelById({
+        terminalIds: normalizedTerminalIds,
+        terminalLaunchProfilesById,
+      }),
+    [normalizedTerminalIds, terminalLaunchProfilesById],
   );
   const splitTerminalActionLabel = hasReachedSplitLimit
     ? `Split Terminal (max ${MAX_TERMINALS_PER_GROUP} per group)`
@@ -965,6 +1038,48 @@ export default function ThreadTerminalDrawer({
   const onNewTerminalAction = useCallback(() => {
     onNewTerminal();
   }, [onNewTerminal]);
+  const onLaunchProfileAction = useCallback(
+    (selectedLaunchProfile: TerminalLaunchProfile) => {
+      onNewTerminal(selectedLaunchProfile);
+    },
+    [onNewTerminal],
+  );
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    const api = readEnvironmentApi(threadRef.environmentId);
+    if (!api) {
+      setLaunchProfiles([]);
+      setLaunchProfilesError("Terminal profiles are unavailable.");
+      setLaunchProfilesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLaunchProfilesLoading(true);
+    setLaunchProfilesError(null);
+    void api.terminal
+      .listProfiles()
+      .then((profiles) => {
+        if (cancelled) return;
+        setLaunchProfiles(profiles);
+        setLaunchProfilesLoading(false);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setLaunchProfiles([]);
+        setLaunchProfilesError(
+          error instanceof Error ? error.message : "Failed to load terminal profiles.",
+        );
+        setLaunchProfilesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [threadRef.environmentId, visible]);
 
   useEffect(() => {
     onHeightChangeRef.current = onHeightChange;
@@ -1103,6 +1218,14 @@ export default function ThreadTerminalDrawer({
             >
               <Plus className="size-3.25" />
             </TerminalActionButton>
+            <TerminalLaunchProfileMenuButton
+              className="p-1 text-foreground/90 transition-colors hover:bg-accent"
+              label="Launch Profile"
+              loading={launchProfilesLoading}
+              profiles={launchProfiles}
+              error={launchProfilesError}
+              onLaunch={onLaunchProfileAction}
+            />
             <div className="h-4 w-px bg-border/80" />
             <TerminalActionButton
               className="p-1 text-foreground/90 transition-colors hover:bg-accent"
@@ -1146,6 +1269,7 @@ export default function ThreadTerminalDrawer({
                         cwd={cwd}
                         {...(worktreePath !== undefined ? { worktreePath } : {})}
                         {...(executionBackend ? { executionBackend } : {})}
+                        {...(launchProfile ? { launchProfile } : {})}
                         {...(runtimeEnv ? { runtimeEnv } : {})}
                         onSessionExited={() => onCloseTerminal(terminalId)}
                         onAddTerminalContext={onAddTerminalContext}
@@ -1169,6 +1293,7 @@ export default function ThreadTerminalDrawer({
                   cwd={cwd}
                   {...(worktreePath !== undefined ? { worktreePath } : {})}
                   {...(executionBackend ? { executionBackend } : {})}
+                  {...(launchProfile ? { launchProfile } : {})}
                   {...(runtimeEnv ? { runtimeEnv } : {})}
                   onSessionExited={() => onCloseTerminal(resolvedActiveTerminalId)}
                   onAddTerminalContext={onAddTerminalContext}
@@ -1203,6 +1328,14 @@ export default function ThreadTerminalDrawer({
                   >
                     <Plus className="size-3.25" />
                   </TerminalActionButton>
+                  <TerminalLaunchProfileMenuButton
+                    className="inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
+                    label="Launch Profile"
+                    loading={launchProfilesLoading}
+                    profiles={launchProfiles}
+                    error={launchProfilesError}
+                    onLaunch={onLaunchProfileAction}
+                  />
                   <TerminalActionButton
                     className="inline-flex h-full items-center border-l border-border/70 px-1 text-foreground/90 transition-colors hover:bg-accent/70"
                     onClick={() => onCloseTerminal(resolvedActiveTerminalId)}

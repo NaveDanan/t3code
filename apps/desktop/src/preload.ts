@@ -22,7 +22,6 @@ const SET_SAVED_ENVIRONMENT_SECRET_CHANNEL = "desktop:set-saved-environment-secr
 const REMOVE_SAVED_ENVIRONMENT_SECRET_CHANNEL = "desktop:remove-saved-environment-secret";
 const GET_SERVER_EXPOSURE_STATE_CHANNEL = "desktop:get-server-exposure-state";
 const SET_SERVER_EXPOSURE_MODE_CHANNEL = "desktop:set-server-exposure-mode";
-const GET_WS_URL_CHANNEL = "desktop:get-ws-url";
 const MINIMIZE_WINDOW_CHANNEL = "desktop:window-minimize";
 const TOGGLE_MAXIMIZE_WINDOW_CHANNEL = "desktop:window-toggle-maximize";
 const CLOSE_WINDOW_CHANNEL = "desktop:window-close";

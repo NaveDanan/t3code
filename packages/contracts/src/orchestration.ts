@@ -3,6 +3,7 @@ import {
   ClaudeModelOptions,
   CodexModelOptions,
   ForgeCodeModelOptions,
+  GitHubCopilotModelOptions,
   OpencodeModelOptions,
 } from "./model";
 import { RepositoryIdentity } from "./environment";
@@ -29,7 +30,13 @@ export const ORCHESTRATION_WS_METHODS = {
   replayEvents: "orchestration.replayEvents",
 } as const;
 
-export const ProviderKind = Schema.Literals(["codex", "claudeAgent", "opencode", "forgecode"]);
+export const ProviderKind = Schema.Literals([
+  "codex",
+  "claudeAgent",
+  "opencode",
+  "forgecode",
+  "githubCopilot",
+]);
 export type ProviderKind = typeof ProviderKind.Type;
 export const ProviderApprovalPolicy = Schema.Literals([
   "untrusted",
@@ -75,11 +82,19 @@ export const ForgeCodeModelSelection = Schema.Struct({
 });
 export type ForgeCodeModelSelection = typeof ForgeCodeModelSelection.Type;
 
+export const GitHubCopilotModelSelection = Schema.Struct({
+  provider: Schema.Literal("githubCopilot"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optionalKey(GitHubCopilotModelOptions),
+});
+export type GitHubCopilotModelSelection = typeof GitHubCopilotModelSelection.Type;
+
 export const ModelSelection = Schema.Union([
   CodexModelSelection,
   ClaudeModelSelection,
   OpencodeModelSelection,
   ForgeCodeModelSelection,
+  GitHubCopilotModelSelection,
 ]);
 export type ModelSelection = typeof ModelSelection.Type;
 

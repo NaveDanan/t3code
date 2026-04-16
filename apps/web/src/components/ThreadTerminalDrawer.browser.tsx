@@ -18,7 +18,10 @@ const {
   terminalDisposeSpy: vi.fn(),
   fitAddonFitSpy: vi.fn(),
   fitAddonLoadSpy: vi.fn(),
-  environmentApiById: new Map<string, { terminal: { open: ReturnType<typeof vi.fn> } }>(),
+  environmentApiById: new Map<
+    string,
+    { terminal: { listProfiles: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn> } }
+  >(),
   readEnvironmentApiMock: vi.fn((environmentId: string) => environmentApiById.get(environmentId)),
   readLocalApiMock: vi.fn<
     () =>
@@ -126,6 +129,7 @@ const THREAD_ID = ThreadId.make("thread-terminal-browser");
 function createEnvironmentApi() {
   return {
     terminal: {
+      listProfiles: vi.fn(async () => []),
       open: vi.fn(async () => ({
         threadId: THREAD_ID,
         terminalId: "default",

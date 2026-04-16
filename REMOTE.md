@@ -1,6 +1,6 @@
 # Remote Access
 
-Use this when you want to connect to a T3 Code server from another device such as a phone, tablet, or separate desktop app.
+Use this when you want to connect to a NJ Code server from another device such as a phone, tablet, or separate desktop app.
 
 ## Recommended Setup
 

@@ -19,13 +19,18 @@ import type {
   GitCreateBranchResult,
 } from "./git";
 import type {
+  ProjectReadFileInput,
+  ProjectReadFileResult,
   ProjectSearchEntriesInput,
   ProjectSearchEntriesResult,
+  ProjectSearchTextInput,
+  ProjectSearchTextResult,
   ProjectWriteFileInput,
   ProjectWriteFileResult,
 } from "./project";
 import type {
   ServerConfig,
+  ServerHarnessUpdatePayload,
   ServerProviderUpdatedPayload,
   ServerUpsertKeybindingResult,
 } from "./server";
@@ -33,6 +38,7 @@ import type {
   TerminalClearInput,
   TerminalCloseInput,
   TerminalEvent,
+  TerminalLaunchProfile,
   TerminalOpenInput,
   TerminalResizeInput,
   TerminalRestartInput,
@@ -207,6 +213,7 @@ export interface LocalApi {
   server: {
     getConfig: () => Promise<ServerConfig>;
     refreshProviders: () => Promise<ServerProviderUpdatedPayload>;
+    updateHarnesses: () => Promise<ServerHarnessUpdatePayload>;
     upsertKeybinding: (input: ServerUpsertKeybindingInput) => Promise<ServerUpsertKeybindingResult>;
     getSettings: () => Promise<ServerSettings>;
     updateSettings: (patch: ServerSettingsPatch) => Promise<ServerSettings>;
@@ -224,6 +231,7 @@ export interface LocalApi {
  */
 export interface EnvironmentApi {
   terminal: {
+    listProfiles: () => Promise<ReadonlyArray<TerminalLaunchProfile>>;
     open: (input: typeof TerminalOpenInput.Encoded) => Promise<TerminalSessionSnapshot>;
     write: (input: typeof TerminalWriteInput.Encoded) => Promise<void>;
     resize: (input: typeof TerminalResizeInput.Encoded) => Promise<void>;
@@ -233,7 +241,9 @@ export interface EnvironmentApi {
     onEvent: (callback: (event: TerminalEvent) => void) => () => void;
   };
   projects: {
+    readFile: (input: ProjectReadFileInput) => Promise<ProjectReadFileResult>;
     searchEntries: (input: ProjectSearchEntriesInput) => Promise<ProjectSearchEntriesResult>;
+    searchText: (input: ProjectSearchTextInput) => Promise<ProjectSearchTextResult>;
     writeFile: (input: ProjectWriteFileInput) => Promise<ProjectWriteFileResult>;
   };
   git: {

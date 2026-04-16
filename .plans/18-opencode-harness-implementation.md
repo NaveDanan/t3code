@@ -1,12 +1,12 @@
 # OpenCode Harness Implementation
 
-This document is the current implementation reference for OpenCode in T3 Code.
+This document is the current implementation reference for OpenCode in NJ Code.
 
 It replaces the old phase-by-phase plan. The goal here is not to track unfinished tasks. The goal is to explain how OpenCode actually works in this repository today, why it is shaped this way, which upstream facts matter, which invariants already bit us, and where the integration is still intentionally constrained.
 
 ## Current Truth
 
-- OpenCode is a real provider in T3 Code. It is not a placeholder or disabled stub anymore.
+- OpenCode is a real provider in NJ Code. It is not a placeholder or disabled stub anymore.
 - T3 does not automate the interactive OpenCode TUI and does not parse terminal transcripts.
 - T3 manages a local `opencode serve` process and talks to it through `@opencode-ai/sdk/v2`.
 - Chat uses long-lived OpenCode sessions plus the global SSE event stream.
@@ -627,7 +627,7 @@ That coverage is important because many of the hardest OpenCode bugs were not sy
 
 ## Bottom Line
 
-The right way to understand OpenCode in T3 Code is:
+The right way to understand OpenCode in NJ Code is:
 
 - OpenCode is integrated through its documented server and SDK.
 - T3 owns the local OpenCode process lifecycle.

@@ -2,6 +2,7 @@ import type {
   ClaudeModelOptions,
   CodexModelOptions,
   ForgeCodeModelOptions,
+  GitHubCopilotModelOptions,
   ModelSelection,
   OpencodeModelOptions,
   ProviderKind,
@@ -28,14 +29,29 @@ export function buildModelSelection(
   options?: ForgeCodeModelOptions,
 ): ModelSelection;
 export function buildModelSelection(
-  provider: ProviderKind,
+  provider: "githubCopilot",
   model: string,
-  options?: CodexModelOptions | ClaudeModelOptions | OpencodeModelOptions | ForgeCodeModelOptions,
+  options?: GitHubCopilotModelOptions,
 ): ModelSelection;
 export function buildModelSelection(
   provider: ProviderKind,
   model: string,
-  options?: CodexModelOptions | ClaudeModelOptions | OpencodeModelOptions | ForgeCodeModelOptions,
+  options?:
+    | CodexModelOptions
+    | ClaudeModelOptions
+    | OpencodeModelOptions
+    | ForgeCodeModelOptions
+    | GitHubCopilotModelOptions,
+): ModelSelection;
+export function buildModelSelection(
+  provider: ProviderKind,
+  model: string,
+  options?:
+    | CodexModelOptions
+    | ClaudeModelOptions
+    | OpencodeModelOptions
+    | ForgeCodeModelOptions
+    | GitHubCopilotModelOptions,
 ): ModelSelection {
   switch (provider) {
     case "codex":
@@ -53,6 +69,10 @@ export function buildModelSelection(
     case "forgecode":
       return options
         ? { provider, model, options: options as ForgeCodeModelOptions }
+        : { provider, model };
+    case "githubCopilot":
+      return options
+        ? { provider, model, options: options as GitHubCopilotModelOptions }
         : { provider, model };
   }
 }

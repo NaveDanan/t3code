@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document explains how OpenCode Desktop integrates with the OpenCode CLI in the upstream `anomalyco/opencode` repository, with emphasis on the concrete runtime boundary that matters for implementing an OpenCode harness in T3 Code.
+This document explains how OpenCode Desktop integrates with the OpenCode CLI in the upstream `anomalyco/opencode` repository, with emphasis on the concrete runtime boundary that matters for implementing an OpenCode harness in NJ Code.
 
 The key conclusion is simple:
 
@@ -13,7 +13,7 @@ The key conclusion is simple:
 
 That means the architectural boundary is not "desktop <-> CLI text protocol". It is "desktop shell <-> managed `opencode serve` sidecar <-> HTTP or SSE control plane".
 
-This is the correct mental model to carry into T3 Code.
+This is the correct mental model to carry into NJ Code.
 
 ## Short Version
 
@@ -27,7 +27,7 @@ If you only need the most important facts, these are the ones that matter:
 6. SQLite migration progress is the main thing the desktop shell still infers from sidecar logs.
 7. The server API is the canonical contract. The JS SDK is generated from the server's OpenAPI description.
 8. The same server-first contract is also used by the TUI, `run --attach`, ACP, and other programmatic integrations.
-9. For T3 Code, the right harness shape is a process manager plus HTTP or SSE client layer, not an interactive CLI transcript parser.
+9. For NJ Code, the right harness shape is a process manager plus HTTP or SSE client layer, not an interactive CLI transcript parser.
 
 ## Package Map
 
@@ -149,7 +149,7 @@ This is a major harness design insight:
 - The desktop shell treats the OpenCode runtime as an app-managed artifact.
 - The optional globally installed CLI is a separate convenience feature.
 
-For T3 Code, the equivalent is likely a managed binary path setting or a bundled binary strategy, not blind trust in PATH.
+For NJ Code, the equivalent is likely a managed binary path setting or a bundled binary strategy, not blind trust in PATH.
 
 ### Installed CLI vs bundled sidecar are separate concerns
 
@@ -667,7 +667,7 @@ Why:
 5. Desktop wants to expose credentials before health is complete.
 6. Desktop needs to translate SQLite migration log lines into UX events.
 
-That is exactly the same reason T3 Code should probably have its own OpenCode process manager instead of using the SDK's basic server helper directly.
+That is exactly the same reason NJ Code should probably have its own OpenCode process manager instead of using the SDK's basic server helper directly.
 
 ## TUI, `run --attach`, ACP, and Desktop All Confirm the Same Pattern
 
@@ -742,7 +742,7 @@ These live in `packages/app`:
 
 This three-way split is a very good reference architecture.
 
-## Critical Design Insights for T3 Code
+## Critical Design Insights for NJ Code
 
 These are the findings that matter most for implementing an OpenCode harness here.
 
@@ -933,7 +933,7 @@ These upstream files are the most useful references for implementing a harness:
 
 ## Final Takeaway
 
-If you want to reproduce OpenCode Desktop's integration style in T3 Code, the correct thing to copy is not the desktop UI or the CLI's terminal output. The thing to copy is the boundary:
+If you want to reproduce OpenCode Desktop's integration style in NJ Code, the correct thing to copy is not the desktop UI or the CLI's terminal output. The thing to copy is the boundary:
 
 - spawn a managed `opencode serve` sidecar
 - secure it with Basic Auth

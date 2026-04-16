@@ -118,7 +118,10 @@ function arraysEqual<T>(left: readonly T[], right: readonly T[]): boolean {
 }
 
 function normalizeModelSelection<
-  T extends { provider: "codex" | "claudeAgent" | "opencode" | "forgecode"; model: string },
+  T extends {
+    provider: "codex" | "claudeAgent" | "opencode" | "forgecode" | "githubCopilot";
+    model: string;
+  },
 >(selection: T): T {
   return {
     ...selection,
@@ -935,7 +938,8 @@ function toLegacyProvider(providerName: string | null): ProviderKind {
     providerName === "codex" ||
     providerName === "claudeAgent" ||
     providerName === "opencode" ||
-    providerName === "forgecode"
+    providerName === "forgecode" ||
+    providerName === "githubCopilot"
   ) {
     return providerName;
   }

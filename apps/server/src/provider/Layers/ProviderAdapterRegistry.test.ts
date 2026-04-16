@@ -7,6 +7,10 @@ import { Effect, Layer, Stream } from "effect";
 import { ClaudeAdapter, ClaudeAdapterShape } from "../Services/ClaudeAdapter.ts";
 import { CodexAdapter, CodexAdapterShape } from "../Services/CodexAdapter.ts";
 import { ForgeAdapter, ForgeAdapterShape } from "../Services/ForgeAdapter.ts";
+import {
+  GitHubCopilotAdapter,
+  GitHubCopilotAdapterShape,
+} from "../Services/GitHubCopilotAdapter.ts";
 import { OpencodeAdapter, OpencodeAdapterShape } from "../Services/OpencodeAdapter.ts";
 import { ProviderAdapterRegistry } from "../Services/ProviderAdapterRegistry.ts";
 import { ProviderAdapterRegistryLive } from "./ProviderAdapterRegistry.ts";
@@ -81,6 +85,23 @@ const fakeForgeAdapter: ForgeAdapterShape = {
   streamEvents: Stream.empty,
 };
 
+const fakeGitHubCopilotAdapter: GitHubCopilotAdapterShape = {
+  provider: "githubCopilot",
+  capabilities: { sessionModelSwitch: "in-session", busyFollowupMode: "native-steer" },
+  startSession: vi.fn(),
+  sendTurn: vi.fn(),
+  interruptTurn: vi.fn(),
+  respondToRequest: vi.fn(),
+  respondToUserInput: vi.fn(),
+  stopSession: vi.fn(),
+  listSessions: vi.fn(),
+  hasSession: vi.fn(),
+  readThread: vi.fn(),
+  rollbackThread: vi.fn(),
+  stopAll: vi.fn(),
+  streamEvents: Stream.empty,
+};
+
 const layer = it.layer(
   Layer.mergeAll(
     Layer.provide(
@@ -90,6 +111,7 @@ const layer = it.layer(
         Layer.succeed(ClaudeAdapter, fakeClaudeAdapter),
         Layer.succeed(ForgeAdapter, fakeForgeAdapter),
         Layer.succeed(OpencodeAdapter, fakeOpencodeAdapter),
+        Layer.succeed(GitHubCopilotAdapter, fakeGitHubCopilotAdapter),
       ),
     ),
     NodeServices.layer,
@@ -104,13 +126,21 @@ layer("ProviderAdapterRegistryLive", (it) => {
       const claude = yield* registry.getByProvider("claudeAgent");
       const forge = yield* registry.getByProvider("forgecode");
       const opencode = yield* registry.getByProvider("opencode");
+      const ghCopilot = yield* registry.getByProvider("githubCopilot");
       assert.equal(codex, fakeCodexAdapter);
       assert.equal(claude, fakeClaudeAdapter);
       assert.equal(forge, fakeForgeAdapter);
       assert.equal(opencode, fakeOpencodeAdapter);
+      assert.equal(ghCopilot, fakeGitHubCopilotAdapter);
 
       const providers = yield* registry.listProviders();
-      assert.deepEqual(providers, ["codex", "claudeAgent", "forgecode", "opencode"]);
+      assert.deepEqual(providers, [
+        "codex",
+        "claudeAgent",
+        "forgecode",
+        "opencode",
+        "githubCopilot",
+      ]);
     }),
   );
 

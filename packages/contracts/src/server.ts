@@ -246,3 +246,16 @@ export const ServerProviderUpdatedPayload = Schema.Struct({
   providers: ServerProviders,
 });
 export type ServerProviderUpdatedPayload = typeof ServerProviderUpdatedPayload.Type;
+
+export const HarnessUpdateResult = Schema.Struct({
+  provider: ProviderKind,
+  success: Schema.Boolean,
+  message: Schema.optional(Schema.String),
+});
+export type HarnessUpdateResult = typeof HarnessUpdateResult.Type;
+
+export const ServerHarnessUpdatePayload = Schema.Struct({
+  results: Schema.Array(HarnessUpdateResult),
+  providers: ServerProviders,
+});
+export type ServerHarnessUpdatePayload = typeof ServerHarnessUpdatePayload.Type;

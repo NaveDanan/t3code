@@ -2,6 +2,7 @@ import {
   ArchiveIcon,
   ArchiveX,
   ChevronDownIcon,
+  DownloadIcon,
   LoaderIcon,
   RefreshCwIcon,
   Undo2Icon,
@@ -143,6 +144,12 @@ const PROVIDER_SETTINGS: readonly InstallProviderSettings[] = [
     binaryPlaceholder: "forge",
     binaryDescription: "Path or command used to launch the ForgeCode binary",
   },
+  {
+    provider: "githubCopilot",
+    title: "GitHub Copilot",
+    binaryPlaceholder: "copilot",
+    binaryDescription: "Path to the GitHub Copilot CLI binary",
+  },
 ] as const;
 
 const PROVIDER_STATUS_STYLES = {
@@ -171,7 +178,7 @@ function getProviderSummary(provider: ServerProvider | undefined) {
     return {
       headline: "Disabled",
       detail:
-        provider.message ?? "This provider is installed but disabled for new sessions in T3 Code.",
+        provider.message ?? "This provider is installed but disabled for new sessions in NJ Code.",
     };
   }
   if (!provider.installed) {
@@ -453,31 +460,11 @@ export function GeneralSettingsPanel() {
     Partial<Record<"keybindings" | "logsDirectory", string | null>>
   >({});
   const [openProviderDetails, setOpenProviderDetails] = useState<Record<ProviderKind, boolean>>({
-    codex: Boolean(
-      settings.providers.codex.binaryPath !== DEFAULT_UNIFIED_SETTINGS.providers.codex.binaryPath ||
-      settings.providers.codex.homePath !== DEFAULT_UNIFIED_SETTINGS.providers.codex.homePath ||
-      settings.providers.codex.customModels.length > 0,
-    ),
-    claudeAgent: Boolean(
-      settings.providers.claudeAgent.binaryPath !==
-        DEFAULT_UNIFIED_SETTINGS.providers.claudeAgent.binaryPath ||
-      settings.providers.claudeAgent.customModels.length > 0,
-    ),
-    opencode: Boolean(
-      settings.providers.opencode.enabled !== DEFAULT_UNIFIED_SETTINGS.providers.opencode.enabled ||
-      settings.providers.opencode.binaryPath !==
-        DEFAULT_UNIFIED_SETTINGS.providers.opencode.binaryPath ||
-      settings.providers.opencode.customModels.length > 0,
-    ),
-    forgecode: Boolean(
-      settings.providers.forgecode.enabled !==
-        DEFAULT_UNIFIED_SETTINGS.providers.forgecode.enabled ||
-      settings.providers.forgecode.binaryPath !==
-        DEFAULT_UNIFIED_SETTINGS.providers.forgecode.binaryPath ||
-      settings.providers.forgecode.executionBackend !==
-        DEFAULT_UNIFIED_SETTINGS.providers.forgecode.executionBackend ||
-      settings.providers.forgecode.customModels.length > 0,
-    ),
+    codex: false,
+    claudeAgent: false,
+    opencode: false,
+    forgecode: false,
+    githubCopilot: false,
   });
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
     Record<ProviderKind, string>
@@ -486,6 +473,7 @@ export function GeneralSettingsPanel() {
     claudeAgent: "",
     opencode: "",
     forgecode: "",
+    githubCopilot: "",
   });
   const [customModelErrorByProvider, setCustomModelErrorByProvider] = useState<
     Partial<Record<ProviderKind, string | null>>
@@ -505,6 +493,45 @@ export function GeneralSettingsPanel() {
       .finally(() => {
         refreshingRef.current = false;
         setIsRefreshingProviders(false);
+      });
+  }, []);
+
+  const [isUpdatingHarnesses, setIsUpdatingHarnesses] = useState(false);
+  const updatingRef = useRef(false);
+  const updateAllHarnesses = useCallback(() => {
+    if (updatingRef.current) return;
+    updatingRef.current = true;
+    setIsUpdatingHarnesses(true);
+    void ensureLocalApi()
+      .server.updateHarnesses()
+      .then((payload) => {
+        const succeeded = payload.results.filter((r) => r.success).length;
+        const failed = payload.results.filter((r) => !r.success).length;
+        if (failed > 0) {
+          toastManager.add({
+            title: "Harness update",
+            description: `${succeeded} updated, ${failed} failed.`,
+            type: "info",
+          });
+        } else {
+          toastManager.add({
+            title: "Harness update",
+            description: `All harnesses updated successfully.`,
+            type: "success",
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        console.warn("Failed to update harnesses", error);
+        toastManager.add({
+          title: "Harness update",
+          description: "Failed to update harnesses.",
+          type: "error",
+        });
+      })
+      .finally(() => {
+        updatingRef.current = false;
+        setIsUpdatingHarnesses(false);
       });
   }, []);
 
@@ -745,7 +772,7 @@ export function GeneralSettingsPanel() {
       <SettingsSection title="General">
         <SettingsRow
           title="Theme"
-          description="Choose how T3 Code looks across the app."
+          description="Choose how NJ Code looks across the app."
           resetAction={
             theme !== "system" ? (
               <SettingResetButton label="theme" onClick={() => setTheme("system")} />
@@ -822,6 +849,64 @@ export function GeneralSettingsPanel() {
                 ))}
               </SelectPopup>
             </Select>
+          }
+        />
+
+        <SettingsRow
+          title="Terminal font"
+          description="Font family for the integrated terminal. Use a Nerd Font for Oh My Posh / Starship glyphs."
+          resetAction={
+            settings.terminalFontFamily !== DEFAULT_UNIFIED_SETTINGS.terminalFontFamily ? (
+              <SettingResetButton
+                label="terminal font"
+                onClick={() =>
+                  updateSettings({
+                    terminalFontFamily: DEFAULT_UNIFIED_SETTINGS.terminalFontFamily,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Input
+              className="w-full sm:w-64"
+              aria-label="Terminal font family"
+              value={settings.terminalFontFamily}
+              onChange={(event) => updateSettings({ terminalFontFamily: event.target.value })}
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Terminal font size"
+          description="Font size in pixels for the integrated terminal."
+          resetAction={
+            settings.terminalFontSize !== DEFAULT_UNIFIED_SETTINGS.terminalFontSize ? (
+              <SettingResetButton
+                label="terminal font size"
+                onClick={() =>
+                  updateSettings({
+                    terminalFontSize: DEFAULT_UNIFIED_SETTINGS.terminalFontSize,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Input
+              className="w-full sm:w-24"
+              aria-label="Terminal font size"
+              type="number"
+              min={8}
+              max={32}
+              value={settings.terminalFontSize}
+              onChange={(event) => {
+                const size = Number(event.target.value);
+                if (Number.isFinite(size) && size >= 8 && size <= 32) {
+                  updateSettings({ terminalFontSize: size });
+                }
+              }}
+            />
           }
         />
 
@@ -1149,6 +1234,27 @@ export function GeneralSettingsPanel() {
                 }
               />
               <TooltipPopup side="top">Refresh provider status</TooltipPopup>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    className="size-5 rounded-sm p-0 text-muted-foreground hover:text-foreground"
+                    disabled={isUpdatingHarnesses}
+                    onClick={() => void updateAllHarnesses()}
+                    aria-label="Update all harnesses"
+                  >
+                    {isUpdatingHarnesses ? (
+                      <LoaderIcon className="size-3 animate-spin" />
+                    ) : (
+                      <DownloadIcon className="size-3" />
+                    )}
+                  </Button>
+                }
+              />
+              <TooltipPopup side="top">Update all harnesses</TooltipPopup>
             </Tooltip>
           </div>
         }

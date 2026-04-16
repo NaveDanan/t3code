@@ -6,7 +6,7 @@ import { cn } from "~/lib/utils";
 import { DesktopTitleBar } from "./DesktopTitleBar";
 import { Skeleton } from "./ui/skeleton";
 
-export type DiffPanelMode = "inline" | "sheet" | "sidebar";
+export type DiffPanelMode = "inline" | "sheet" | "sidebar" | "embedded";
 
 function getDiffPanelHeaderRowClassName() {
   return cn("flex h-12 items-center justify-between gap-2 px-4");
@@ -17,7 +17,7 @@ export function DiffPanelShell(props: {
   header: ReactNode;
   children: ReactNode;
 }) {
-  const shouldUseCustomTitleBar = isElectron && props.mode !== "sheet";
+  const shouldUseCustomTitleBar = isElectron && props.mode !== "sheet" && props.mode !== "embedded";
 
   return (
     <div

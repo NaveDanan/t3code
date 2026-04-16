@@ -19,10 +19,22 @@ const TerminalEnvValueSchema = Schema.String.check(Schema.isMaxLength(8_192));
 const TerminalEnvSchema = Schema.Record(TerminalEnvKeySchema, TerminalEnvValueSchema).check(
   Schema.isMaxProperties(128),
 );
+const TerminalLaunchProfileIdSchema = TrimmedNonEmptyStringSchema.check(Schema.isMaxLength(256));
+const TerminalLaunchProfileArgsSchema = Schema.Array(TrimmedNonEmptyStringSchema).check(
+  Schema.isMaxLength(16),
+);
 
 const TerminalIdWithDefaultSchema = TerminalIdSchema.pipe(
   Schema.withDecodingDefault(Effect.succeed(DEFAULT_TERMINAL_ID)),
 );
+
+export const TerminalLaunchProfile = Schema.Struct({
+  id: TerminalLaunchProfileIdSchema,
+  label: TrimmedNonEmptyStringSchema.check(Schema.isMaxLength(128)),
+  shell: TrimmedNonEmptyStringSchema.check(Schema.isMaxLength(512)),
+  args: Schema.optional(TerminalLaunchProfileArgsSchema),
+});
+export type TerminalLaunchProfile = typeof TerminalLaunchProfile.Type;
 
 export const TerminalThreadInput = Schema.Struct({
   threadId: TrimmedNonEmptyStringSchema,
@@ -40,6 +52,7 @@ export const TerminalOpenInput = Schema.Struct({
   cwd: TrimmedNonEmptyStringSchema,
   worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyStringSchema)),
   executionBackend: Schema.optional(ForgeExecutionBackend),
+  launchProfile: Schema.optional(TerminalLaunchProfile),
   cols: Schema.optional(TerminalColsSchema),
   rows: Schema.optional(TerminalRowsSchema),
   env: Schema.optional(TerminalEnvSchema),
@@ -67,6 +80,7 @@ export const TerminalRestartInput = Schema.Struct({
   cwd: TrimmedNonEmptyStringSchema,
   worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyStringSchema)),
   executionBackend: Schema.optional(ForgeExecutionBackend),
+  launchProfile: Schema.optional(TerminalLaunchProfile),
   cols: TerminalColsSchema,
   rows: TerminalRowsSchema,
   env: Schema.optional(TerminalEnvSchema),
@@ -89,6 +103,7 @@ export const TerminalSessionSnapshot = Schema.Struct({
   cwd: Schema.String.check(Schema.isNonEmpty()),
   worktreePath: Schema.NullOr(TrimmedNonEmptyStringSchema),
   executionBackend: Schema.optional(ForgeExecutionBackend),
+  launchProfile: Schema.optional(TerminalLaunchProfile),
   status: TerminalSessionStatus,
   pid: Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0))),
   history: Schema.String,

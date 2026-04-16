@@ -1,0 +1,41 @@
+$ turbo run typecheck
+• turbo 2.8.17
+• Packages in scope: @t3tools/client-runtime, @t3tools/contracts, @t3tools/desktop, @t3tools/marketing, @t3tools/scripts, @t3tools/shared, @t3tools/web, t3
+• Running typecheck in 8 packages
+• Remote caching disabled
+@t3tools/marketing:typecheck: cache bypass, force executing 6403c3cd0594311a
+@t3tools/contracts:typecheck: cache bypass, force executing db9cd831e6437b6a
+@t3tools/marketing:typecheck: $ node ../../scripts/ensure-zod-locales-index.mjs && astro check
+@t3tools/contracts:typecheck: $ tsc --noEmit
+@t3tools/marketing:typecheck: [2m03:51:05[22m [34m[types][39m Generated [2m80ms[22m
+@t3tools/marketing:typecheck: [2m03:51:05[22m [34m[check][39m Getting diagnostics for Astro files in D:\Projects\t3code\apps\marketing...
+@t3tools/client-runtime:typecheck: cache bypass, force executing 6cbff0b8a70885a0
+@t3tools/shared:typecheck: cache bypass, force executing 631cb483a801ea33
+@t3tools/client-runtime:typecheck: $ tsc --noEmit
+@t3tools/shared:typecheck: $ tsc --noEmit
+@t3tools/marketing:typecheck: Result (6 files): 
+@t3tools/marketing:typecheck: - 0 errors
+@t3tools/marketing:typecheck: - 0 warnings
+@t3tools/marketing:typecheck: - 0 hints
+@t3tools/marketing:typecheck: 
+@t3tools/desktop:typecheck: cache bypass, force executing e2de20316f48971b
+@t3tools/scripts:typecheck: cache bypass, force executing 849fd397075e0fa8
+@t3tools/web:typecheck: cache bypass, force executing 7210b617e769f485
+@t3tools/desktop:typecheck: $ tsc --noEmit
+@t3tools/scripts:typecheck: $ tsc --noEmit
+@t3tools/web:typecheck: $ tsc --noEmit
+@t3tools/web:typecheck: src/terminalStateStore.ts(305,20): error TS2345: Argument of type 'readonly string[]' is not assignable to parameter of type 'string[]'.
+@t3tools/web:typecheck:   The type 'readonly string[]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+@t3tools/web:typecheck: src/terminalStateStore.ts(363,17): error TS2345: Argument of type 'readonly string[]' is not assignable to parameter of type 'string[]'.
+@t3tools/web:typecheck:   The type 'readonly string[]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+@t3tools/web:typecheck: error: script "typecheck" exited with code 1
+@t3tools/web:typecheck: ERROR: command finished with error: command (D:\Projects\t3code\apps\web) C:\Users\naved\.bun\bin\bun.exe run typecheck exited (1)
+@t3tools/web#typecheck: command (D:\Projects\t3code\apps\web) C:\Users\naved\.bun\bin\bun.exe run typecheck exited (1)
+
+ Tasks:    6 successful, 7 total
+Cached:    0 cached, 7 total
+  Time:    14.536s 
+Failed:    @t3tools/web#typecheck
+
+ ERROR  run failed: command  exited (1)
+error: script "typecheck" exited with code 1

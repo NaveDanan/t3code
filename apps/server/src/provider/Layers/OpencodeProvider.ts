@@ -1,10 +1,12 @@
 import type {
+  HarnessUpdateResult,
   ModelCapabilities,
   OpencodeSettings,
   ServerProviderModel,
   UpstreamProvider,
 } from "@t3tools/contracts";
 import { Effect, Equal, Layer, Result, Stream } from "effect";
+import { execFile } from "node:child_process";
 
 import {
   buildServerProvider,
@@ -84,11 +86,7 @@ function resolveOpencodeReasoningVariants(input: {
   if (configuredVariants.length > 0) {
     return configuredVariants;
   }
-  if (
-    input.supportsReasoning &&
-    input.providerId === "openai" &&
-    input.modelId.startsWith("gpt-5")
-  ) {
+  if (input.supportsReasoning) {
     return DEFAULT_OPENCODE_REASONING_VARIANTS;
   }
   return [];
@@ -134,6 +132,7 @@ function resolveOpencodeModels(input: {
         {
           readonly id: string;
           readonly name: string;
+          readonly reasoning?: boolean;
           readonly capabilities?: {
             readonly reasoning?: boolean;
           };
@@ -152,7 +151,7 @@ function resolveOpencodeModels(input: {
         capabilities: resolveOpencodeModelCapabilities({
           providerId: provider.id,
           modelId: model.id,
-          supportsReasoning: model.capabilities?.reasoning === true,
+          supportsReasoning: model.reasoning === true || model.capabilities?.reasoning === true,
           ...(model.variants ? { variants: model.variants } : {}),
         }),
       })),
@@ -253,7 +252,7 @@ export const checkOpencodeProviderStatus = Effect.gen(function* () {
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "OpenCode is disabled in T3 Code settings.",
+        message: "OpenCode is disabled in NJ Code settings.",
       },
     });
   }
@@ -335,6 +334,52 @@ export const OpencodeProviderLive = Layer.effect(
       Effect.provideService(OpencodeServerManager, opencodeServerManager),
     );
 
+    const updateProvider = Effect.gen(function* () {
+      const opencodeSettings = yield* serverSettings.getSettings.pipe(
+        Effect.map((settings) => settings.providers.opencode),
+      );
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          new Promise<{ stdout: string; stderr: string; code: number }>((resolve, reject) => {
+            execFile(
+              opencodeSettings.binaryPath,
+              ["upgrade"],
+              { timeout: 120_000, shell: process.platform === "win32" },
+              (error, stdout, stderr) => {
+                if (error && !("code" in error)) {
+                  reject(error);
+                  return;
+                }
+                resolve({
+                  stdout: String(stdout),
+                  stderr: String(stderr),
+                  code: (error as NodeJS.ErrnoException & { code?: number })?.code
+                    ? 1
+                    : ((error as { status?: number })?.status ?? 0),
+                });
+              },
+            );
+          }),
+        catch: (error) => error,
+      });
+      return {
+        provider: "opencode" as const,
+        success: result.code === 0,
+        message:
+          result.code === 0
+            ? result.stdout.trim() || "Update completed."
+            : result.stderr.trim() || result.stdout.trim() || `Exited with code ${result.code}.`,
+      } satisfies HarnessUpdateResult;
+    }).pipe(
+      Effect.catch(() =>
+        Effect.succeed({
+          provider: "opencode" as const,
+          success: false,
+          message: "Update command failed.",
+        }),
+      ),
+    );
+
     return yield* makeManagedServerProvider<OpencodeSettings>({
       getSettings: serverSettings.getSettings.pipe(
         Effect.map((settings) => settings.providers.opencode),
@@ -345,6 +390,7 @@ export const OpencodeProviderLive = Layer.effect(
       ),
       haveSettingsChanged: (previous, next) => !Equal.equals(previous, next),
       checkProvider,
+      updateProvider,
     });
   }),
 ).pipe(Layer.provideMerge(OpencodeServerManagerLive));

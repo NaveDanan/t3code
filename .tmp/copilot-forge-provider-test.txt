@@ -1,0 +1,113 @@
+$ vitest run src/provider/Layers/ProviderRegistry.test.ts
+
+[1m[46m RUN [49m[22m [36mv4.1.0 [39m[90mD:/Projects/t3code/apps/server[39m
+
+(node:32524) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[90mstdout[2m | src/provider/Layers/ProviderRegistry.test.ts[2m > [22m[2mProviderRegistry[2m > [22m[2mcheckForgeProviderStatus[2m > [22m[2mdoes not probe WSL when Git Bash is the selected Forge backend
+[22m[39m[03:21:06.400] ERROR (#354): Error [AssertionError]: expected 'error' to equal 'ready'
+    at Array.<anonymous> (D:/Projects/t3code/apps/server/src/provider/Layers/ProviderRegistry.test.ts:2000:20) {
+  actual: [32m'error'[39m,
+  expected: [32m'ready'[39m,
+  showDiff: [33mtrue[39m,
+  operator: [32m'strictEqual'[39m,
+  [cause]: [90mundefined[39m
+}
+
+ [31m❯[39m src/provider/Layers/ProviderRegistry.test.ts [2m([22m[2m62 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 26097[2mms[22m[39m
+       [32m✓[39m returns ready when codex is installed and authenticated[32m 12[2mms[22m[39m
+       [32m✓[39m returns the codex plan type in auth and keeps spark for supported plans[32m 4[2mms[22m[39m
+       [32m✓[39m hides spark from codex models for unsupported chatgpt plans[32m 4[2mms[22m[39m
+       [32m✓[39m hides spark from codex models for non-pro chatgpt subscriptions[32m 3[2mms[22m[39m
+       [32m✓[39m returns an api key label for codex api key auth[32m 3[2mms[22m[39m
+       [2m[90m↓[39m[22m inherits PATH when launching the codex probe with a CODEX_HOME override
+       [32m✓[39m returns unavailable when codex is missing[32m 4[2mms[22m[39m
+       [32m✓[39m returns unavailable when codex is below the minimum supported version[32m 3[2mms[22m[39m
+       [32m✓[39m returns unauthenticated when auth probe reports login required[32m 3[2mms[22m[39m
+       [32m✓[39m returns unauthenticated when login status output includes 'not logged in'[32m 3[2mms[22m[39m
+       [32m✓[39m returns warning when login status command is unsupported[32m 3[2mms[22m[39m
+       [32m✓[39m treats equal provider snapshots as unchanged[32m 1[2mms[22m[39m
+       [32m✓[39m reports OpenCode as disabled when the provider is disabled[32m 1[2mms[22m[39m
+       [32m✓[39m reports OpenCode bridge health as ready when a provider is connected[32m 2[2mms[22m[39m
+       [32m✓[39m derives OpenCode effort variants from provider-reported Anthropic variants[32m 1[2mms[22m[39m
+       [32m✓[39m assigns default reasoning variants to Anthropic models with reasoning capability but no explicit variants[32m 1[2mms[22m[39m
+       [32m✓[39m reports OpenCode as missing when the CLI is not installed[32m 1[2mms[22m[39m
+       [32m✓[39m reports OpenCode as error when the bridge fails with a non-ENOENT error[32m 1[2mms[22m[39m
+       [32m✓[39m reports OpenCode as unauthenticated when no upstream providers are connected[32m 0[2mms[22m[39m
+       [32m✓[39m reports OpenCode auth as unknown when no providers and no auth methods exist[32m 1[2mms[22m[39m
+       [32m✓[39m reports connected label for multiple connected OpenCode providers[32m 12[2mms[22m[39m
+       [33m[2m✓[22m[39m reruns codex health when codex provider settings change [33m 25690[2mms[22m[39m
+       [32m✓[39m skips codex probes entirely when the provider is disabled[32m 1[2mms[22m[39m
+       [32m✓[39m skips auth probe and returns ready when a custom model provider is configured[32m 7[2mms[22m[39m
+       [32m✓[39m still reports error when codex CLI is missing even with custom provider[32m 4[2mms[22m[39m
+       [32m✓[39m still runs auth probe when model_provider is openai[32m 7[2mms[22m[39m
+       [32m✓[39m exit code 0 with no auth markers is ready[32m 0[2mms[22m[39m
+       [32m✓[39m JSON with authenticated=false is unauthenticated[32m 0[2mms[22m[39m
+       [32m✓[39m JSON without auth marker is warning[32m 0[2mms[22m[39m
+       [32m✓[39m returns undefined when config file does not exist[32m 2[2mms[22m[39m
+       [32m✓[39m returns undefined when config has no model_provider key[32m 5[2mms[22m[39m
+       [32m✓[39m returns the provider when model_provider is set at top level[32m 4[2mms[22m[39m
+       [32m✓[39m returns openai when model_provider is openai[32m 4[2mms[22m[39m
+       [32m✓[39m ignores model_provider inside section headers[32m 4[2mms[22m[39m
+       [32m✓[39m handles comments and whitespace[32m 4[2mms[22m[39m
+       [32m✓[39m handles single-quoted values in TOML[32m 4[2mms[22m[39m
+       [32m✓[39m returns false when no config file exists[32m 2[2mms[22m[39m
+       [32m✓[39m returns false when model_provider is not set[32m 3[2mms[22m[39m
+       [32m✓[39m returns false when model_provider is openai[32m 3[2mms[22m[39m
+       [32m✓[39m returns true when model_provider is portkey[32m 3[2mms[22m[39m
+       [32m✓[39m returns true when model_provider is azure[32m 5[2mms[22m[39m
+       [32m✓[39m returns true when model_provider is ollama[32m 4[2mms[22m[39m
+       [32m✓[39m returns true when model_provider is a custom proxy[32m 4[2mms[22m[39m
+       [32m✓[39m returns ready when claude is installed and authenticated[32m 2[2mms[22m[39m
+       [32m✓[39m returns a display label for claude subscription types[32m 1[2mms[22m[39m
+       [32m✓[39m returns an api key label for claude api key auth[32m 1[2mms[22m[39m
+       [32m✓[39m returns unavailable when claude is missing[32m 1[2mms[22m[39m
+       [32m✓[39m returns error when version check fails with non-zero exit code[32m 1[2mms[22m[39m
+       [32m✓[39m returns unauthenticated when auth status reports not logged in[32m 1[2mms[22m[39m
+       [32m✓[39m returns unauthenticated when output includes 'not logged in'[32m 1[2mms[22m[39m
+       [32m✓[39m returns warning when auth status command is unsupported[32m 1[2mms[22m[39m
+       [32m✓[39m routes the bundled SDK CLI through node.exe in Windows Electron[32m 1[2mms[22m[39m
+       [32m✓[39m keeps the SDK default launch outside the Windows Electron runtime[32m 0[2mms[22m[39m
+       [32m✓[39m returns ready when the Copilot runtime reports an authenticated user[32m 1[2mms[22m[39m
+       [32m✓[39m treats environment-token auth as authenticated[32m 1[2mms[22m[39m
+       [32m✓[39m returns ready when forge is installed and an upstream provider is authenticated[32m 3[2mms[22m[39m
+       [32m✓[39m returns an error instead of hanging when forge version checks time out[32m 241[2mms[22m[39m
+[31m       [31m×[31m does not probe WSL when Git Bash is the selected Forge backend[39m[32m 12[2mms[22m[39m
+       [32m✓[39m exit code 0 with no auth markers is ready[32m 0[2mms[22m[39m
+       [32m✓[39m JSON with loggedIn=true is authenticated[32m 0[2mms[22m[39m
+       [32m✓[39m JSON with loggedIn=false is unauthenticated[32m 0[2mms[22m[39m
+       [32m✓[39m JSON without auth marker is warning[32m 0[2mms[22m[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/provider/Layers/ProviderRegistry.test.ts > ProviderRegistry > checkForgeProviderStatus > does not probe WSL when Git Bash is the selected Forge backend
+AssertionError: expected 'error' to equal 'ready'
+
+Expected: "ready"
+Received: "error"
+
+ ❯ Array.<anonymous> src/provider/Layers/ProviderRegistry.test.ts:2000:20
+    1998|             assert.strictEqual(sawWslProbe, false);
+    1999|             assert.strictEqual(status.provider, "forgecode");
+    2000|             assert.strictEqual(status.status, "ready");
+       |                    ^
+    2001|             assert.strictEqual(status.installed, true);
+    2002|             assert.strictEqual(status.auth.status, "authenticated");
+ ❯ next ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:1277:25
+ ❯ Object.~effect/Effect/evaluate ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/core.ts:531:30
+ ❯ FiberImpl.runLoop ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:634:39
+ ❯ runLoop ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:594:22
+ ❯ evaluate ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:1031:14
+ ❯ resume ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:1468:8
+ ❯ onExit ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:1484:10
+ ❯ exit ../../node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:609:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m60 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (62)[39m
+[2m   Start at [22m 03:20:39
+[2m   Duration [22m 27.43s[2m (transform 451ms, setup 0ms, import 1.03s, tests 26.10s, environment 0ms)[22m
+
+error: script "test" exited with code 1

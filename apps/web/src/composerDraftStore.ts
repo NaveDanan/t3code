@@ -2,6 +2,8 @@ import {
   CODEX_REASONING_EFFORT_OPTIONS,
   type ClaudeCodeEffort,
   type CodexReasoningEffort,
+  GITHUB_COPILOT_REASONING_EFFORT_OPTIONS,
+  type GitHubCopilotReasoningEffort,
   OPENCODE_EFFORT_OPTIONS,
   type OpencodeEffort,
   DEFAULT_MODEL_BY_PROVIDER,
@@ -530,7 +532,13 @@ function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
   );
 }
 
-const KNOWN_PROVIDER_KINDS = ["codex", "claudeAgent", "opencode", "forgecode"] as const;
+const KNOWN_PROVIDER_KINDS = [
+  "codex",
+  "claudeAgent",
+  "opencode",
+  "forgecode",
+  "githubCopilot",
+] as const;
 
 function normalizeProviderKind(value: unknown): ProviderKind | null {
   return KNOWN_PROVIDER_KINDS.includes(value as ProviderKind) ? (value as ProviderKind) : null;
@@ -634,13 +642,31 @@ function normalizeProviderModelOptions(
         }
       : undefined;
 
-  if (!codex && !claude && !opencode) {
+  const githubCopilotCandidate =
+    candidate?.githubCopilot && typeof candidate.githubCopilot === "object"
+      ? (candidate.githubCopilot as Record<string, unknown>)
+      : null;
+  const githubCopilotReasoningEffort: GitHubCopilotReasoningEffort | undefined =
+    GITHUB_COPILOT_REASONING_EFFORT_OPTIONS.includes(
+      githubCopilotCandidate?.reasoningEffort as GitHubCopilotReasoningEffort,
+    )
+      ? (githubCopilotCandidate?.reasoningEffort as GitHubCopilotReasoningEffort)
+      : undefined;
+  const githubCopilot =
+    githubCopilotReasoningEffort !== undefined
+      ? {
+          reasoningEffort: githubCopilotReasoningEffort,
+        }
+      : undefined;
+
+  if (!codex && !claude && !opencode && !githubCopilot) {
     return null;
   }
   return {
     ...(codex ? { codex } : {}),
     ...(claude ? { claudeAgent: claude } : {}),
     ...(opencode ? { opencode } : {}),
+    ...(githubCopilot ? { githubCopilot } : {}),
   };
 }
 

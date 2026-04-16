@@ -1,0 +1,182 @@
+
+[1m[44m DEV [49m[22m [34mv4.1.0 [39m[90mD:/Projects/t3code[39m
+
+
+[2m Test Files [22m [90m (1)[39m
+[2m      Tests [22m [1m[32m17 passed[39m[22m[90m (36)[39m
+[2m   Start at [22m 23:04:01
+[2m   Duration [22m 18.26s[2m (transform 474ms, setup 0ms, import 1.20s, tests 0ms, environment 0ms)[22m
+
+[1m[41m CANCELLED [49m[22m [31mTest run cancelled. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d a78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d ap78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d app78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/s78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/se78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/ser78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/serv78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/serve78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server t78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server te78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server tes78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test --78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- s78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- sr78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/t78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/te78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/ter78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/term78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/termi78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/termin78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/termina78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/L78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/La78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Lay78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Laye78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layer78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/M78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Ma78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Man78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Mana78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manag78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manage78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.t78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.te78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.tes78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.t78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *>78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> t78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> te78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> ter78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> term78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> termi78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> termin78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> termina78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-m78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-ma78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-man78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-mana78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manag78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manage78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-t78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-te78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-tes78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-o78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-ou78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-out78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-outp78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-outpu78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.t78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.tx78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt;78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; W78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Wr78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Wri78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Writ78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-O78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Ou78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Out78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Outp78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Outpu78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output 78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "E78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EX78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXI78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_C78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CO78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_COD78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$L78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LA78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LAS78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LAST78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTE78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEX78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXI78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXIT78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITC78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCO78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCOD78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE78[2K[1G[2K[1G[36m?[39m [1mInput a single project name[22m [90m»[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"78[2K[1G[2K[1G[32m√[39m [1mInput a single project name[22m [90m...[39m d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"78
+[?25h
+[1m[35m
+Restarting Vitest...[39m[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2mupdate snapshot [22m[39m
+       [2m Project name: [22m[34md apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"[39m
+       [2m Filename pattern: [22m[34mapps/server/src/terminal/Layers/Manager.test.ts[39m
+
+c[3J[1m[44m RERUN [49m[22m [34m[34mx1 [34m[39m
+       [2m Project name: [22m[34md apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"[39m
+       [2m Filename pattern: [22m[34mapps/server/src/terminal/Layers/Manager.test.ts[39m
+
+c[3J[1m[44m RERUN [49m[22m [34m[2mupdate snapshot [22m[39m
+       [2m Project name: [22m[34md apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"[39m
+       [2m Filename pattern: [22m[34mapps/server/src/terminal/Layers/Manager.test.ts[39m
+
+[31mNo test files found. You can change the file name pattern by pressing "p"
+[39m
+filter: apps/server/src/terminal/Layers/Manager.test.ts
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+[31mNo test files found. You can change the file name pattern by pressing "p"
+[39m
+filter: apps/server/src/terminal/Layers/Manager.test.ts
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+23:04:55 [vite] No projects matched the filter "d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"".
+23:04:55 [vite] server restart failed
+ [31m❯[39m apps/server/src/terminal/Layers/Manager.test.ts [2m([22m[2m0 test[22m[2m)[22m
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/server/src/terminal/Layers/Manager.test.ts [ apps/server/src/terminal/Layers/Manager.test.ts ]
+Error: Cannot read properties of undefined (reading 'tmps')
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [2mno tests[22m
+[2m   Start at [22m 23:04:55
+[2m   Duration [22m 0ms
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+[36m?[39m [1mInput test name pattern (RegExp)[22m › [1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38G[1G[J[36m?[39m [1mInput test name pattern (RegExp)[22m › 
+Please input filter pattern[1A[38Gc[3J[1m[44m RERUN [49m[22m 
+       [2m Project name: [22m[34md apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"[39m
+       [2m Filename pattern: [22m[34mapps/server/src/terminal/Layers/Manager.test.ts[39m
+       [2m Test name pattern: [22m[34m/em -Force typecheck-output.txt, terminal-manager-test-output.txt -ErrorAction SilentlyContinue/[39m
+
+ [31m❯[39m apps/server/src/terminal/Layers/Manager.test.ts [2m([22m[2m0 test[22m[2m)[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2mchange pattern [22m[39m
+       [2m Project name: [22m[34md apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"[39m
+       [2m Filename pattern: [22m[34mapps/server/src/terminal/Layers/Manager.test.ts[39m
+       [2m Test name pattern: [22m[34m/em -Force typecheck-output.txt, terminal-manager-test-output.txt -ErrorAction SilentlyContinue/[39m
+
+ [31m❯[39m apps/server/src/terminal/Layers/Manager.test.ts [2m([22m[2m0 test[22m[2m)[22m
+[31mNo test files found. You can change the file name pattern by pressing "p"
+[39m
+filter: apps/server/src/terminal/Layers/Manager.test.ts
+projects: d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+[31mNo test files found. You can change the file name pattern by pressing "p"
+[39m
+filter: apps/server/src/terminal/Layers/Manager.test.ts
+projects: d apps/server test -- src/terminal/Layers/Manager.test.ts *> terminal-manager-test-output.txt; Write-Output "EXIT_CODE=$LASTEXITCODE"
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m

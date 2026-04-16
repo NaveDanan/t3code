@@ -2,6 +2,7 @@ import * as OS from "node:os";
 import type {
   ModelCapabilities,
   CodexSettings,
+  HarnessUpdateResult,
   ServerProvider,
   ServerProviderModel,
   ServerProviderAuth,
@@ -365,7 +366,7 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Codex is disabled in T3 Code settings.",
+        message: "Codex is disabled in NJ Code settings.",
       },
     });
   }
@@ -560,6 +561,34 @@ export const CodexProviderLive = Layer.effect(
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
     );
 
+    const updateProvider = spawnAndCollect(
+      "npm",
+      ChildProcess.make("npm", ["install", "-g", "@openai/codex@latest"], {
+        shell: process.platform === "win32",
+        env: process.env,
+      }),
+    ).pipe(
+      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+      Effect.timeout("120 seconds"),
+      Effect.map(
+        (result): HarnessUpdateResult => ({
+          provider: "codex",
+          success: result.code === 0,
+          message:
+            result.code === 0
+              ? result.stdout.trim() || "Update completed."
+              : result.stderr.trim() || result.stdout.trim() || `Exited with code ${result.code}.`,
+        }),
+      ),
+      Effect.catch(() =>
+        Effect.succeed({
+          provider: "codex" as const,
+          success: false,
+          message: "Update command failed.",
+        }),
+      ),
+    );
+
     return yield* makeManagedServerProvider<CodexSettings>({
       getSettings: serverSettings.getSettings.pipe(
         Effect.map((settings) => settings.providers.codex),
@@ -570,6 +599,7 @@ export const CodexProviderLive = Layer.effect(
       ),
       haveSettingsChanged: (previous, next) => !Equal.equals(previous, next),
       checkProvider,
+      updateProvider,
     });
   }),
 );

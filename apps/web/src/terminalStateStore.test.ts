@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   migratePersistedTerminalStateStoreState,
   selectTerminalEventEntries,
+  selectThreadTerminalLaunchProfiles,
   selectThreadTerminalState,
   useTerminalStateStore,
 } from "./terminalStateStore";
@@ -62,6 +63,7 @@ describe("terminalStateStore actions", () => {
     useTerminalStateStore.setState({
       terminalStateByThreadKey: {},
       terminalLaunchContextByThreadKey: {},
+      terminalLaunchProfileByThreadKey: {},
       terminalEventEntriesByKey: {},
       nextTerminalEventId: 1,
     });
@@ -295,6 +297,11 @@ describe("terminalStateStore actions", () => {
           terminalId: "setup-bootstrap",
           cwd: "/tmp/worktree",
           worktreePath: "/tmp/worktree",
+          launchProfile: {
+            id: "pwsh",
+            label: "PowerShell",
+            shell: "pwsh.exe",
+          },
           status: "running",
           pid: 123,
           history: "",
@@ -325,9 +332,70 @@ describe("terminalStateStore actions", () => {
     ).toEqual({
       cwd: "/tmp/worktree",
       worktreePath: "/tmp/worktree",
+      launchProfile: {
+        id: "pwsh",
+        label: "PowerShell",
+        shell: "pwsh.exe",
+      },
+    });
+    expect(
+      selectThreadTerminalLaunchProfiles(
+        useTerminalStateStore.getState().terminalLaunchProfileByThreadKey,
+        THREAD_REF,
+      ),
+    ).toEqual({
+      "setup-bootstrap": {
+        id: "pwsh",
+        label: "PowerShell",
+        shell: "pwsh.exe",
+      },
     });
     expect(entries).toHaveLength(1);
     expect(entries[0]?.event.type).toBe("started");
+  });
+
+  it("drops terminal launch profiles when the terminal is removed", () => {
+    const store = useTerminalStateStore.getState();
+    store.setTerminalLaunchProfile(THREAD_REF, "terminal-2", {
+      id: "pwsh",
+      label: "PowerShell",
+      shell: "pwsh.exe",
+    });
+    store.newTerminal(THREAD_REF, "terminal-2");
+
+    expect(
+      selectThreadTerminalLaunchProfiles(
+        useTerminalStateStore.getState().terminalLaunchProfileByThreadKey,
+        THREAD_REF,
+      ),
+    ).toEqual({
+      "terminal-2": {
+        id: "pwsh",
+        label: "PowerShell",
+        shell: "pwsh.exe",
+      },
+    });
+
+    store.closeTerminal(THREAD_REF, "terminal-2");
+
+    expect(
+      selectThreadTerminalLaunchProfiles(
+        useTerminalStateStore.getState().terminalLaunchProfileByThreadKey,
+        THREAD_REF,
+      ),
+    ).toEqual({});
+  });
+
+  it("returns a stable empty launch-profile snapshot for missing threads", () => {
+    const state = useTerminalStateStore.getState().terminalLaunchProfileByThreadKey;
+
+    const first = selectThreadTerminalLaunchProfiles(state, THREAD_REF);
+    const second = selectThreadTerminalLaunchProfiles(state, THREAD_REF);
+    const missing = selectThreadTerminalLaunchProfiles(state, null);
+
+    expect(first).toBe(second);
+    expect(second).toBe(missing);
+    expect(first).toEqual({});
   });
 
   it("applies activity and exited terminal events to subprocess state while buffering events", () => {

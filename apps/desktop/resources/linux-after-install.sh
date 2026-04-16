@@ -3,7 +3,7 @@
 # This script runs as root after deb/rpm installation via the package manager.
 set +e
 
-APP_BIN="/opt/T3 Code (Alpha)/t3code"
+APP_BIN="/opt/NJ Code (Alpha)/t3code"
 APP_LINK="/usr/bin/t3code"
 ICON_THEME_DIR="/usr/share/icons/hicolor"
 PIXMAP_ICON="/usr/share/pixmaps/t3code.png"
@@ -14,7 +14,7 @@ if [ -x "$APP_BIN" ]; then
 #!/bin/bash
 set -e
 
-APP_BIN="/opt/T3 Code (Alpha)/t3code"
+APP_BIN="/opt/NJ Code (Alpha)/t3code"
 
 if [ "${T3CODE_ENABLE_WAYLAND:-}" = "1" ]; then
   exec "$APP_BIN" --no-sandbox "$@"

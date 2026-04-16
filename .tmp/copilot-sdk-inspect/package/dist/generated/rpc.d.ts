@@ -1,0 +1,1585 @@
+/**
+ * AUTO-GENERATED FILE - DO NOT EDIT
+ * Generated from: api.schema.json
+ */
+import type { MessageConnection } from "vscode-jsonrpc/node.js";
+export interface PingResult {
+    /**
+     * Echoed message (or default greeting)
+     */
+    message: string;
+    /**
+     * Server timestamp in milliseconds
+     */
+    timestamp: number;
+    /**
+     * Server protocol version number
+     */
+    protocolVersion: number;
+}
+export interface PingParams {
+    /**
+     * Optional message to echo back
+     */
+    message?: string;
+}
+export interface ModelsListResult {
+    /**
+     * List of available models with full metadata
+     */
+    models: {
+        /**
+         * Model identifier (e.g., "claude-sonnet-4.5")
+         */
+        id: string;
+        /**
+         * Display name
+         */
+        name: string;
+        capabilities: ModelCapabilities;
+        /**
+         * Policy state (if applicable)
+         */
+        policy?: {
+            /**
+             * Current policy state for this model
+             */
+            state: string;
+            /**
+             * Usage terms or conditions for this model
+             */
+            terms: string;
+        };
+        /**
+         * Billing information
+         */
+        billing?: {
+            /**
+             * Billing cost multiplier relative to the base rate
+             */
+            multiplier: number;
+        };
+        /**
+         * Supported reasoning effort levels (only present if model supports reasoning effort)
+         */
+        supportedReasoningEfforts?: string[];
+        /**
+         * Default reasoning effort level (only present if model supports reasoning effort)
+         */
+        defaultReasoningEffort?: string;
+    }[];
+}
+/**
+ * Model capabilities and limits
+ */
+export interface ModelCapabilities {
+    supports: ModelCapabilitiesSupports;
+    limits: ModelCapabilitiesLimits;
+}
+/**
+ * Feature flags indicating what the model supports
+ */
+export interface ModelCapabilitiesSupports {
+    /**
+     * Whether this model supports vision/image input
+     */
+    vision?: boolean;
+    /**
+     * Whether this model supports reasoning effort configuration
+     */
+    reasoningEffort?: boolean;
+}
+/**
+ * Token limits for prompts, outputs, and context window
+ */
+export interface ModelCapabilitiesLimits {
+    /**
+     * Maximum number of prompt/input tokens
+     */
+    max_prompt_tokens?: number;
+    /**
+     * Maximum number of output/completion tokens
+     */
+    max_output_tokens?: number;
+    /**
+     * Maximum total context window size in tokens
+     */
+    max_context_window_tokens: number;
+    vision?: ModelCapabilitiesLimitsVision;
+}
+/**
+ * Vision-specific limits
+ */
+export interface ModelCapabilitiesLimitsVision {
+    /**
+     * MIME types the model accepts
+     */
+    supported_media_types: string[];
+    /**
+     * Maximum number of images per prompt
+     */
+    max_prompt_images: number;
+    /**
+     * Maximum image size in bytes
+     */
+    max_prompt_image_size: number;
+}
+export interface ToolsListResult {
+    /**
+     * List of available built-in tools with metadata
+     */
+    tools: {
+        /**
+         * Tool identifier (e.g., "bash", "grep", "str_replace_editor")
+         */
+        name: string;
+        /**
+         * Optional namespaced name for declarative filtering (e.g., "playwright/navigate" for MCP tools)
+         */
+        namespacedName?: string;
+        /**
+         * Description of what the tool does
+         */
+        description: string;
+        /**
+         * JSON Schema for the tool's input parameters
+         */
+        parameters?: {
+            [k: string]: unknown;
+        };
+        /**
+         * Optional instructions for how to use this tool effectively
+         */
+        instructions?: string;
+    }[];
+}
+export interface ToolsListParams {
+    /**
+     * Optional model ID — when provided, the returned tool list reflects model-specific overrides
+     */
+    model?: string;
+}
+export interface AccountGetQuotaResult {
+    /**
+     * Quota snapshots keyed by type (e.g., chat, completions, premium_interactions)
+     */
+    quotaSnapshots: {
+        [k: string]: {
+            /**
+             * Number of requests included in the entitlement
+             */
+            entitlementRequests: number;
+            /**
+             * Number of requests used so far this period
+             */
+            usedRequests: number;
+            /**
+             * Percentage of entitlement remaining
+             */
+            remainingPercentage: number;
+            /**
+             * Number of overage requests made this period
+             */
+            overage: number;
+            /**
+             * Whether pay-per-request usage is allowed when quota is exhausted
+             */
+            overageAllowedWithExhaustedQuota: boolean;
+            /**
+             * Date when the quota resets (ISO 8601)
+             */
+            resetDate?: string;
+        };
+    };
+}
+export interface McpConfigListResult {
+    /**
+     * All MCP servers from user config, keyed by name
+     */
+    servers: {
+        /**
+         * MCP server configuration (local/stdio or remote/http)
+         */
+        [k: string]: {
+            /**
+             * Tools to include. Defaults to all tools if not specified.
+             */
+            tools?: string[];
+            type?: "local" | "stdio";
+            isDefaultServer?: boolean;
+            filterMapping?: {
+                [k: string]: "none" | "markdown" | "hidden_characters";
+            } | ("none" | "markdown" | "hidden_characters");
+            timeout?: number;
+            command: string;
+            args: string[];
+            cwd?: string;
+            env?: {
+                [k: string]: string;
+            };
+        } | {
+            /**
+             * Tools to include. Defaults to all tools if not specified.
+             */
+            tools?: string[];
+            type: "http" | "sse";
+            isDefaultServer?: boolean;
+            filterMapping?: {
+                [k: string]: "none" | "markdown" | "hidden_characters";
+            } | ("none" | "markdown" | "hidden_characters");
+            timeout?: number;
+            url: string;
+            headers?: {
+                [k: string]: string;
+            };
+            oauthClientId?: string;
+            oauthPublicClient?: boolean;
+        };
+    };
+}
+export interface McpConfigAddParams {
+    /**
+     * Unique name for the MCP server
+     */
+    name: string;
+    /**
+     * MCP server configuration (local/stdio or remote/http)
+     */
+    config: {
+        /**
+         * Tools to include. Defaults to all tools if not specified.
+         */
+        tools?: string[];
+        type?: "local" | "stdio";
+        isDefaultServer?: boolean;
+        filterMapping?: {
+            [k: string]: "none" | "markdown" | "hidden_characters";
+        } | ("none" | "markdown" | "hidden_characters");
+        timeout?: number;
+        command: string;
+        args: string[];
+        cwd?: string;
+        env?: {
+            [k: string]: string;
+        };
+    } | {
+        /**
+         * Tools to include. Defaults to all tools if not specified.
+         */
+        tools?: string[];
+        type: "http" | "sse";
+        isDefaultServer?: boolean;
+        filterMapping?: {
+            [k: string]: "none" | "markdown" | "hidden_characters";
+        } | ("none" | "markdown" | "hidden_characters");
+        timeout?: number;
+        url: string;
+        headers?: {
+            [k: string]: string;
+        };
+        oauthClientId?: string;
+        oauthPublicClient?: boolean;
+    };
+}
+export interface McpConfigUpdateParams {
+    /**
+     * Name of the MCP server to update
+     */
+    name: string;
+    /**
+     * MCP server configuration (local/stdio or remote/http)
+     */
+    config: {
+        /**
+         * Tools to include. Defaults to all tools if not specified.
+         */
+        tools?: string[];
+        type?: "local" | "stdio";
+        isDefaultServer?: boolean;
+        filterMapping?: {
+            [k: string]: "none" | "markdown" | "hidden_characters";
+        } | ("none" | "markdown" | "hidden_characters");
+        timeout?: number;
+        command: string;
+        args: string[];
+        cwd?: string;
+        env?: {
+            [k: string]: string;
+        };
+    } | {
+        /**
+         * Tools to include. Defaults to all tools if not specified.
+         */
+        tools?: string[];
+        type: "http" | "sse";
+        isDefaultServer?: boolean;
+        filterMapping?: {
+            [k: string]: "none" | "markdown" | "hidden_characters";
+        } | ("none" | "markdown" | "hidden_characters");
+        timeout?: number;
+        url: string;
+        headers?: {
+            [k: string]: string;
+        };
+        oauthClientId?: string;
+        oauthPublicClient?: boolean;
+    };
+}
+export interface McpConfigRemoveParams {
+    /**
+     * Name of the MCP server to remove
+     */
+    name: string;
+}
+export interface SessionFsSetProviderResult {
+    /**
+     * Whether the provider was set successfully
+     */
+    success: boolean;
+}
+export interface SessionFsSetProviderParams {
+    /**
+     * Initial working directory for sessions
+     */
+    initialCwd: string;
+    /**
+     * Path within each session's SessionFs where the runtime stores files for that session
+     */
+    sessionStatePath: string;
+    /**
+     * Path conventions used by this filesystem
+     */
+    conventions: "windows" | "posix";
+}
+/** @experimental */
+export interface SessionsForkResult {
+    /**
+     * The new forked session's ID
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionsForkParams {
+    /**
+     * Source session ID to fork from
+     */
+    sessionId: string;
+    /**
+     * Optional event ID boundary. When provided, the fork includes only events before this ID (exclusive). When omitted, all events are included.
+     */
+    toEventId?: string;
+}
+export interface SessionModelGetCurrentResult {
+    /**
+     * Currently active model identifier
+     */
+    modelId?: string;
+}
+export interface SessionModelGetCurrentParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+export interface SessionModelSwitchToResult {
+    /**
+     * Currently active model identifier after the switch
+     */
+    modelId?: string;
+}
+export interface SessionModelSwitchToParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Model identifier to switch to
+     */
+    modelId: string;
+    /**
+     * Reasoning effort level to use for the model
+     */
+    reasoningEffort?: string;
+    modelCapabilities?: ModelCapabilitiesOverride;
+}
+/**
+ * Override individual model capabilities resolved by the runtime
+ */
+export interface ModelCapabilitiesOverride {
+    supports?: ModelCapabilitiesOverrideSupports;
+    limits?: ModelCapabilitiesOverrideLimits;
+}
+/**
+ * Feature flags indicating what the model supports
+ */
+export interface ModelCapabilitiesOverrideSupports {
+    vision?: boolean;
+    reasoningEffort?: boolean;
+}
+/**
+ * Token limits for prompts, outputs, and context window
+ */
+export interface ModelCapabilitiesOverrideLimits {
+    max_prompt_tokens?: number;
+    max_output_tokens?: number;
+    /**
+     * Maximum total context window size in tokens
+     */
+    max_context_window_tokens?: number;
+    vision?: ModelCapabilitiesOverrideLimitsVision;
+}
+export interface ModelCapabilitiesOverrideLimitsVision {
+    /**
+     * MIME types the model accepts
+     */
+    supported_media_types?: string[];
+    /**
+     * Maximum number of images per prompt
+     */
+    max_prompt_images?: number;
+    /**
+     * Maximum image size in bytes
+     */
+    max_prompt_image_size?: number;
+}
+export interface SessionModeGetResult {
+    /**
+     * The current agent mode.
+     */
+    mode: "interactive" | "plan" | "autopilot";
+}
+export interface SessionModeGetParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+export interface SessionModeSetResult {
+    /**
+     * The agent mode after switching.
+     */
+    mode: "interactive" | "plan" | "autopilot";
+}
+export interface SessionModeSetParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * The mode to switch to. Valid values: "interactive", "plan", "autopilot".
+     */
+    mode: "interactive" | "plan" | "autopilot";
+}
+export interface SessionPlanReadResult {
+    /**
+     * Whether the plan file exists in the workspace
+     */
+    exists: boolean;
+    /**
+     * The content of the plan file, or null if it does not exist
+     */
+    content: string | null;
+    /**
+     * Absolute file path of the plan file, or null if workspace is not enabled
+     */
+    path: string | null;
+}
+export interface SessionPlanReadParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+export interface SessionPlanUpdateResult {
+}
+export interface SessionPlanUpdateParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * The new content for the plan file
+     */
+    content: string;
+}
+export interface SessionPlanDeleteResult {
+}
+export interface SessionPlanDeleteParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+export interface SessionWorkspaceListFilesResult {
+    /**
+     * Relative file paths in the workspace files directory
+     */
+    files: string[];
+}
+export interface SessionWorkspaceListFilesParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+export interface SessionWorkspaceReadFileResult {
+    /**
+     * File content as a UTF-8 string
+     */
+    content: string;
+}
+export interface SessionWorkspaceReadFileParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Relative path within the workspace files directory
+     */
+    path: string;
+}
+export interface SessionWorkspaceCreateFileResult {
+}
+export interface SessionWorkspaceCreateFileParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Relative path within the workspace files directory
+     */
+    path: string;
+    /**
+     * File content to write as a UTF-8 string
+     */
+    content: string;
+}
+/** @experimental */
+export interface SessionFleetStartResult {
+    /**
+     * Whether fleet mode was successfully activated
+     */
+    started: boolean;
+}
+/** @experimental */
+export interface SessionFleetStartParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Optional user prompt to combine with fleet instructions
+     */
+    prompt?: string;
+}
+/** @experimental */
+export interface SessionAgentListResult {
+    /**
+     * Available custom agents
+     */
+    agents: {
+        /**
+         * Unique identifier of the custom agent
+         */
+        name: string;
+        /**
+         * Human-readable display name
+         */
+        displayName: string;
+        /**
+         * Description of the agent's purpose
+         */
+        description: string;
+    }[];
+}
+/** @experimental */
+export interface SessionAgentListParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionAgentGetCurrentResult {
+    /**
+     * Currently selected custom agent, or null if using the default agent
+     */
+    agent: {
+        /**
+         * Unique identifier of the custom agent
+         */
+        name: string;
+        /**
+         * Human-readable display name
+         */
+        displayName: string;
+        /**
+         * Description of the agent's purpose
+         */
+        description: string;
+    } | null;
+}
+/** @experimental */
+export interface SessionAgentGetCurrentParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionAgentSelectResult {
+    /**
+     * The newly selected custom agent
+     */
+    agent: {
+        /**
+         * Unique identifier of the custom agent
+         */
+        name: string;
+        /**
+         * Human-readable display name
+         */
+        displayName: string;
+        /**
+         * Description of the agent's purpose
+         */
+        description: string;
+    };
+}
+/** @experimental */
+export interface SessionAgentSelectParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Name of the custom agent to select
+     */
+    name: string;
+}
+/** @experimental */
+export interface SessionAgentDeselectResult {
+}
+/** @experimental */
+export interface SessionAgentDeselectParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionAgentReloadResult {
+    /**
+     * Reloaded custom agents
+     */
+    agents: {
+        /**
+         * Unique identifier of the custom agent
+         */
+        name: string;
+        /**
+         * Human-readable display name
+         */
+        displayName: string;
+        /**
+         * Description of the agent's purpose
+         */
+        description: string;
+    }[];
+}
+/** @experimental */
+export interface SessionAgentReloadParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionSkillsListResult {
+    /**
+     * Available skills
+     */
+    skills: {
+        /**
+         * Unique identifier for the skill
+         */
+        name: string;
+        /**
+         * Description of what the skill does
+         */
+        description: string;
+        /**
+         * Source location type (e.g., project, personal, plugin)
+         */
+        source: string;
+        /**
+         * Whether the skill can be invoked by the user as a slash command
+         */
+        userInvocable: boolean;
+        /**
+         * Whether the skill is currently enabled
+         */
+        enabled: boolean;
+        /**
+         * Absolute path to the skill file
+         */
+        path?: string;
+    }[];
+}
+/** @experimental */
+export interface SessionSkillsListParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionSkillsEnableResult {
+}
+/** @experimental */
+export interface SessionSkillsEnableParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Name of the skill to enable
+     */
+    name: string;
+}
+/** @experimental */
+export interface SessionSkillsDisableResult {
+}
+/** @experimental */
+export interface SessionSkillsDisableParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Name of the skill to disable
+     */
+    name: string;
+}
+/** @experimental */
+export interface SessionSkillsReloadResult {
+}
+/** @experimental */
+export interface SessionSkillsReloadParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionMcpListResult {
+    /**
+     * Configured MCP servers
+     */
+    servers: {
+        /**
+         * Server name (config key)
+         */
+        name: string;
+        /**
+         * Connection status: connected, failed, needs-auth, pending, disabled, or not_configured
+         */
+        status: "connected" | "failed" | "needs-auth" | "pending" | "disabled" | "not_configured";
+        /**
+         * Configuration source: user, workspace, plugin, or builtin
+         */
+        source?: string;
+        /**
+         * Error message if the server failed to connect
+         */
+        error?: string;
+    }[];
+}
+/** @experimental */
+export interface SessionMcpListParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionMcpEnableResult {
+}
+/** @experimental */
+export interface SessionMcpEnableParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Name of the MCP server to enable
+     */
+    serverName: string;
+}
+/** @experimental */
+export interface SessionMcpDisableResult {
+}
+/** @experimental */
+export interface SessionMcpDisableParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Name of the MCP server to disable
+     */
+    serverName: string;
+}
+/** @experimental */
+export interface SessionMcpReloadResult {
+}
+/** @experimental */
+export interface SessionMcpReloadParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionPluginsListResult {
+    /**
+     * Installed plugins
+     */
+    plugins: {
+        /**
+         * Plugin name
+         */
+        name: string;
+        /**
+         * Marketplace the plugin came from
+         */
+        marketplace: string;
+        /**
+         * Installed version
+         */
+        version?: string;
+        /**
+         * Whether the plugin is currently enabled
+         */
+        enabled: boolean;
+    }[];
+}
+/** @experimental */
+export interface SessionPluginsListParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionExtensionsListResult {
+    /**
+     * Discovered extensions and their current status
+     */
+    extensions: {
+        /**
+         * Source-qualified ID (e.g., 'project:my-ext', 'user:auth-helper')
+         */
+        id: string;
+        /**
+         * Extension name (directory name)
+         */
+        name: string;
+        /**
+         * Discovery source: project (.github/extensions/) or user (~/.copilot/extensions/)
+         */
+        source: "project" | "user";
+        /**
+         * Current status: running, disabled, failed, or starting
+         */
+        status: "running" | "disabled" | "failed" | "starting";
+        /**
+         * Process ID if the extension is running
+         */
+        pid?: number;
+    }[];
+}
+/** @experimental */
+export interface SessionExtensionsListParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionExtensionsEnableResult {
+}
+/** @experimental */
+export interface SessionExtensionsEnableParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Source-qualified extension ID to enable
+     */
+    id: string;
+}
+/** @experimental */
+export interface SessionExtensionsDisableResult {
+}
+/** @experimental */
+export interface SessionExtensionsDisableParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Source-qualified extension ID to disable
+     */
+    id: string;
+}
+/** @experimental */
+export interface SessionExtensionsReloadResult {
+}
+/** @experimental */
+export interface SessionExtensionsReloadParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+export interface SessionToolsHandlePendingToolCallResult {
+    /**
+     * Whether the tool call result was handled successfully
+     */
+    success: boolean;
+}
+export interface SessionToolsHandlePendingToolCallParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    requestId: string;
+    result?: string | {
+        textResultForLlm: string;
+        resultType?: string;
+        error?: string;
+        toolTelemetry?: {
+            [k: string]: unknown;
+        };
+    };
+    error?: string;
+}
+export interface SessionCommandsHandlePendingCommandResult {
+    success: boolean;
+}
+export interface SessionCommandsHandlePendingCommandParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Request ID from the command invocation event
+     */
+    requestId: string;
+    /**
+     * Error message if the command handler failed
+     */
+    error?: string;
+}
+export interface SessionUiElicitationResult {
+    /**
+     * The user's response: accept (submitted), decline (rejected), or cancel (dismissed)
+     */
+    action: "accept" | "decline" | "cancel";
+    /**
+     * The form values submitted by the user (present when action is 'accept')
+     */
+    content?: {
+        [k: string]: string | number | boolean | string[];
+    };
+}
+export interface SessionUiElicitationParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Message describing what information is needed from the user
+     */
+    message: string;
+    /**
+     * JSON Schema describing the form fields to present to the user
+     */
+    requestedSchema: {
+        /**
+         * Schema type indicator (always 'object')
+         */
+        type: "object";
+        /**
+         * Form field definitions, keyed by field name
+         */
+        properties: {
+            [k: string]: {
+                type: "string";
+                title?: string;
+                description?: string;
+                enum: string[];
+                enumNames?: string[];
+                default?: string;
+            } | {
+                type: "string";
+                title?: string;
+                description?: string;
+                oneOf: {
+                    const: string;
+                    title: string;
+                }[];
+                default?: string;
+            } | {
+                type: "array";
+                title?: string;
+                description?: string;
+                minItems?: number;
+                maxItems?: number;
+                items: {
+                    type: "string";
+                    enum: string[];
+                };
+                default?: string[];
+            } | {
+                type: "array";
+                title?: string;
+                description?: string;
+                minItems?: number;
+                maxItems?: number;
+                items: {
+                    anyOf: {
+                        const: string;
+                        title: string;
+                    }[];
+                };
+                default?: string[];
+            } | {
+                type: "boolean";
+                title?: string;
+                description?: string;
+                default?: boolean;
+            } | {
+                type: "string";
+                title?: string;
+                description?: string;
+                minLength?: number;
+                maxLength?: number;
+                format?: "email" | "uri" | "date" | "date-time";
+                default?: string;
+            } | {
+                type: "number" | "integer";
+                title?: string;
+                description?: string;
+                minimum?: number;
+                maximum?: number;
+                default?: number;
+            };
+        };
+        /**
+         * List of required field names
+         */
+        required?: string[];
+    };
+}
+export interface SessionUiHandlePendingElicitationResult {
+    /**
+     * Whether the response was accepted. False if the request was already resolved by another client.
+     */
+    success: boolean;
+}
+export interface SessionUiHandlePendingElicitationParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * The unique request ID from the elicitation.requested event
+     */
+    requestId: string;
+    /**
+     * The elicitation response (accept with form values, decline, or cancel)
+     */
+    result: {
+        /**
+         * The user's response: accept (submitted), decline (rejected), or cancel (dismissed)
+         */
+        action: "accept" | "decline" | "cancel";
+        /**
+         * The form values submitted by the user (present when action is 'accept')
+         */
+        content?: {
+            [k: string]: string | number | boolean | string[];
+        };
+    };
+}
+export interface SessionPermissionsHandlePendingPermissionRequestResult {
+    /**
+     * Whether the permission request was handled successfully
+     */
+    success: boolean;
+}
+export interface SessionPermissionsHandlePendingPermissionRequestParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    requestId: string;
+    result: {
+        kind: "approved";
+    } | {
+        kind: "denied-by-rules";
+        rules: unknown[];
+    } | {
+        kind: "denied-no-approval-rule-and-could-not-request-from-user";
+    } | {
+        kind: "denied-interactively-by-user";
+        feedback?: string;
+    } | {
+        kind: "denied-by-content-exclusion-policy";
+        path: string;
+        message: string;
+    } | {
+        kind: "denied-by-permission-request-hook";
+        message?: string;
+        interrupt?: boolean;
+    };
+}
+export interface SessionLogResult {
+    /**
+     * The unique identifier of the emitted session event
+     */
+    eventId: string;
+}
+export interface SessionLogParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Human-readable message
+     */
+    message: string;
+    /**
+     * Log severity level. Determines how the message is displayed in the timeline. Defaults to "info".
+     */
+    level?: "info" | "warning" | "error";
+    /**
+     * When true, the message is transient and not persisted to the session event log on disk
+     */
+    ephemeral?: boolean;
+    /**
+     * Optional URL the user can open in their browser for more details
+     */
+    url?: string;
+}
+export interface SessionShellExecResult {
+    /**
+     * Unique identifier for tracking streamed output
+     */
+    processId: string;
+}
+export interface SessionShellExecParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Shell command to execute
+     */
+    command: string;
+    /**
+     * Working directory (defaults to session working directory)
+     */
+    cwd?: string;
+    /**
+     * Timeout in milliseconds (default: 30000)
+     */
+    timeout?: number;
+}
+export interface SessionShellKillResult {
+    /**
+     * Whether the signal was sent successfully
+     */
+    killed: boolean;
+}
+export interface SessionShellKillParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Process identifier returned by shell.exec
+     */
+    processId: string;
+    /**
+     * Signal to send (default: SIGTERM)
+     */
+    signal?: "SIGTERM" | "SIGKILL" | "SIGINT";
+}
+/** @experimental */
+export interface SessionHistoryCompactResult {
+    /**
+     * Whether compaction completed successfully
+     */
+    success: boolean;
+    /**
+     * Number of tokens freed by compaction
+     */
+    tokensRemoved: number;
+    /**
+     * Number of messages removed during compaction
+     */
+    messagesRemoved: number;
+}
+/** @experimental */
+export interface SessionHistoryCompactParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+}
+/** @experimental */
+export interface SessionHistoryTruncateResult {
+    /**
+     * Number of events that were removed
+     */
+    eventsRemoved: number;
+}
+/** @experimental */
+export interface SessionHistoryTruncateParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Event ID to truncate to. This event and all events after it are removed from the session.
+     */
+    eventId: string;
+}
+export interface SessionFsReadFileResult {
+    /**
+     * File content as UTF-8 string
+     */
+    content: string;
+}
+export interface SessionFsReadFileParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+}
+export interface SessionFsWriteFileParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+    /**
+     * Content to write
+     */
+    content: string;
+    /**
+     * Optional POSIX-style mode for newly created files
+     */
+    mode?: number;
+}
+export interface SessionFsAppendFileParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+    /**
+     * Content to append
+     */
+    content: string;
+    /**
+     * Optional POSIX-style mode for newly created files
+     */
+    mode?: number;
+}
+export interface SessionFsExistsResult {
+    /**
+     * Whether the path exists
+     */
+    exists: boolean;
+}
+export interface SessionFsExistsParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+}
+export interface SessionFsStatResult {
+    /**
+     * Whether the path is a file
+     */
+    isFile: boolean;
+    /**
+     * Whether the path is a directory
+     */
+    isDirectory: boolean;
+    /**
+     * File size in bytes
+     */
+    size: number;
+    /**
+     * ISO 8601 timestamp of last modification
+     */
+    mtime: string;
+    /**
+     * ISO 8601 timestamp of creation
+     */
+    birthtime: string;
+}
+export interface SessionFsStatParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+}
+export interface SessionFsMkdirParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+    /**
+     * Create parent directories as needed
+     */
+    recursive?: boolean;
+    /**
+     * Optional POSIX-style mode for newly created directories
+     */
+    mode?: number;
+}
+export interface SessionFsReaddirResult {
+    /**
+     * Entry names in the directory
+     */
+    entries: string[];
+}
+export interface SessionFsReaddirParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+}
+export interface SessionFsReaddirWithTypesResult {
+    /**
+     * Directory entries with type information
+     */
+    entries: {
+        /**
+         * Entry name
+         */
+        name: string;
+        /**
+         * Entry type
+         */
+        type: "file" | "directory";
+    }[];
+}
+export interface SessionFsReaddirWithTypesParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+}
+export interface SessionFsRmParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Path using SessionFs conventions
+     */
+    path: string;
+    /**
+     * Remove directories and their contents recursively
+     */
+    recursive?: boolean;
+    /**
+     * Ignore errors if the path does not exist
+     */
+    force?: boolean;
+}
+export interface SessionFsRenameParams {
+    /**
+     * Target session identifier
+     */
+    sessionId: string;
+    /**
+     * Source path using SessionFs conventions
+     */
+    src: string;
+    /**
+     * Destination path using SessionFs conventions
+     */
+    dest: string;
+}
+/** Create typed server-scoped RPC methods (no session required). */
+export declare function createServerRpc(connection: MessageConnection): {
+    ping: (params: PingParams) => Promise<PingResult>;
+    models: {
+        list: () => Promise<ModelsListResult>;
+    };
+    tools: {
+        list: (params: ToolsListParams) => Promise<ToolsListResult>;
+    };
+    account: {
+        getQuota: () => Promise<AccountGetQuotaResult>;
+    };
+    mcp: {
+        config: {
+            list: () => Promise<McpConfigListResult>;
+            add: (params: McpConfigAddParams) => Promise<void>;
+            update: (params: McpConfigUpdateParams) => Promise<void>;
+            remove: (params: McpConfigRemoveParams) => Promise<void>;
+        };
+    };
+    sessionFs: {
+        setProvider: (params: SessionFsSetProviderParams) => Promise<SessionFsSetProviderResult>;
+    };
+    /** @experimental */
+    sessions: {
+        fork: (params: SessionsForkParams) => Promise<SessionsForkResult>;
+    };
+};
+/** Create typed session-scoped RPC methods. */
+export declare function createSessionRpc(connection: MessageConnection, sessionId: string): {
+    model: {
+        getCurrent: () => Promise<SessionModelGetCurrentResult>;
+        switchTo: (params: Omit<SessionModelSwitchToParams, "sessionId">) => Promise<SessionModelSwitchToResult>;
+    };
+    mode: {
+        get: () => Promise<SessionModeGetResult>;
+        set: (params: Omit<SessionModeSetParams, "sessionId">) => Promise<SessionModeSetResult>;
+    };
+    plan: {
+        read: () => Promise<SessionPlanReadResult>;
+        update: (params: Omit<SessionPlanUpdateParams, "sessionId">) => Promise<SessionPlanUpdateResult>;
+        delete: () => Promise<SessionPlanDeleteResult>;
+    };
+    workspace: {
+        listFiles: () => Promise<SessionWorkspaceListFilesResult>;
+        readFile: (params: Omit<SessionWorkspaceReadFileParams, "sessionId">) => Promise<SessionWorkspaceReadFileResult>;
+        createFile: (params: Omit<SessionWorkspaceCreateFileParams, "sessionId">) => Promise<SessionWorkspaceCreateFileResult>;
+    };
+    /** @experimental */
+    fleet: {
+        start: (params: Omit<SessionFleetStartParams, "sessionId">) => Promise<SessionFleetStartResult>;
+    };
+    /** @experimental */
+    agent: {
+        list: () => Promise<SessionAgentListResult>;
+        getCurrent: () => Promise<SessionAgentGetCurrentResult>;
+        select: (params: Omit<SessionAgentSelectParams, "sessionId">) => Promise<SessionAgentSelectResult>;
+        deselect: () => Promise<SessionAgentDeselectResult>;
+        reload: () => Promise<SessionAgentReloadResult>;
+    };
+    /** @experimental */
+    skills: {
+        list: () => Promise<SessionSkillsListResult>;
+        enable: (params: Omit<SessionSkillsEnableParams, "sessionId">) => Promise<SessionSkillsEnableResult>;
+        disable: (params: Omit<SessionSkillsDisableParams, "sessionId">) => Promise<SessionSkillsDisableResult>;
+        reload: () => Promise<SessionSkillsReloadResult>;
+    };
+    /** @experimental */
+    mcp: {
+        list: () => Promise<SessionMcpListResult>;
+        enable: (params: Omit<SessionMcpEnableParams, "sessionId">) => Promise<SessionMcpEnableResult>;
+        disable: (params: Omit<SessionMcpDisableParams, "sessionId">) => Promise<SessionMcpDisableResult>;
+        reload: () => Promise<SessionMcpReloadResult>;
+    };
+    /** @experimental */
+    plugins: {
+        list: () => Promise<SessionPluginsListResult>;
+    };
+    /** @experimental */
+    extensions: {
+        list: () => Promise<SessionExtensionsListResult>;
+        enable: (params: Omit<SessionExtensionsEnableParams, "sessionId">) => Promise<SessionExtensionsEnableResult>;
+        disable: (params: Omit<SessionExtensionsDisableParams, "sessionId">) => Promise<SessionExtensionsDisableResult>;
+        reload: () => Promise<SessionExtensionsReloadResult>;
+    };
+    tools: {
+        handlePendingToolCall: (params: Omit<SessionToolsHandlePendingToolCallParams, "sessionId">) => Promise<SessionToolsHandlePendingToolCallResult>;
+    };
+    commands: {
+        handlePendingCommand: (params: Omit<SessionCommandsHandlePendingCommandParams, "sessionId">) => Promise<SessionCommandsHandlePendingCommandResult>;
+    };
+    ui: {
+        elicitation: (params: Omit<SessionUiElicitationParams, "sessionId">) => Promise<SessionUiElicitationResult>;
+        handlePendingElicitation: (params: Omit<SessionUiHandlePendingElicitationParams, "sessionId">) => Promise<SessionUiHandlePendingElicitationResult>;
+    };
+    permissions: {
+        handlePendingPermissionRequest: (params: Omit<SessionPermissionsHandlePendingPermissionRequestParams, "sessionId">) => Promise<SessionPermissionsHandlePendingPermissionRequestResult>;
+    };
+    log: (params: Omit<SessionLogParams, "sessionId">) => Promise<SessionLogResult>;
+    shell: {
+        exec: (params: Omit<SessionShellExecParams, "sessionId">) => Promise<SessionShellExecResult>;
+        kill: (params: Omit<SessionShellKillParams, "sessionId">) => Promise<SessionShellKillResult>;
+    };
+    /** @experimental */
+    history: {
+        compact: () => Promise<SessionHistoryCompactResult>;
+        truncate: (params: Omit<SessionHistoryTruncateParams, "sessionId">) => Promise<SessionHistoryTruncateResult>;
+    };
+};
+/** Handler for `sessionFs` client session API methods. */
+export interface SessionFsHandler {
+    readFile(params: SessionFsReadFileParams): Promise<SessionFsReadFileResult>;
+    writeFile(params: SessionFsWriteFileParams): Promise<void>;
+    appendFile(params: SessionFsAppendFileParams): Promise<void>;
+    exists(params: SessionFsExistsParams): Promise<SessionFsExistsResult>;
+    stat(params: SessionFsStatParams): Promise<SessionFsStatResult>;
+    mkdir(params: SessionFsMkdirParams): Promise<void>;
+    readdir(params: SessionFsReaddirParams): Promise<SessionFsReaddirResult>;
+    readdirWithTypes(params: SessionFsReaddirWithTypesParams): Promise<SessionFsReaddirWithTypesResult>;
+    rm(params: SessionFsRmParams): Promise<void>;
+    rename(params: SessionFsRenameParams): Promise<void>;
+}
+/** All client session API handler groups. */
+export interface ClientSessionApiHandlers {
+    sessionFs?: SessionFsHandler;
+}
+/**
+ * Register client session API handlers on a JSON-RPC connection.
+ * The server calls these methods to delegate work to the client.
+ * Each incoming call includes a `sessionId` in the params; the registration
+ * function uses `getHandlers` to resolve the session's handlers.
+ */
+export declare function registerClientSessionApiHandlers(connection: MessageConnection, getHandlers: (sessionId: string) => ClientSessionApiHandlers): void;

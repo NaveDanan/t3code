@@ -106,6 +106,7 @@ function createBaseServerConfig(): ServerConfig {
           customModels: [],
           hiddenModels: [],
         },
+        githubCopilot: { enabled: true, binaryPath: "", customModels: [], hiddenModels: [] },
       },
     },
   };

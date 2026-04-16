@@ -6,6 +6,7 @@ import { readEnvironmentConnection } from "./environments/runtime";
 export function createEnvironmentApi(rpcClient: WsRpcClient): EnvironmentApi {
   return {
     terminal: {
+      listProfiles: () => rpcClient.terminal.listProfiles(),
       open: (input) => rpcClient.terminal.open(input as never),
       write: (input) => rpcClient.terminal.write(input as never),
       resize: (input) => rpcClient.terminal.resize(input as never),
@@ -15,7 +16,9 @@ export function createEnvironmentApi(rpcClient: WsRpcClient): EnvironmentApi {
       onEvent: (callback) => rpcClient.terminal.onEvent(callback),
     },
     projects: {
+      readFile: rpcClient.projects.readFile,
       searchEntries: rpcClient.projects.searchEntries,
+      searchText: rpcClient.projects.searchText,
       writeFile: rpcClient.projects.writeFile,
     },
     git: {

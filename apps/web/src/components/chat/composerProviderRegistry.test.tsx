@@ -132,6 +132,22 @@ const OPENCODE_MODELS: ReadonlyArray<ServerProviderModel> = [
     name: "Anthropic Claude Sonnet 4.5",
     isCustom: false,
     capabilities: {
+      reasoningEffortLevels: [
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium", isDefault: true },
+        { value: "high", label: "High" },
+      ],
+      supportsFastMode: false,
+      supportsThinkingToggle: false,
+      contextWindowOptions: [],
+      promptInjectedEffortLevels: [],
+    },
+  },
+  {
+    slug: "google/gemini-2.5-flash",
+    name: "Google Gemini 2.5 Flash",
+    isCustom: false,
+    capabilities: {
       reasoningEffortLevels: [],
       supportsFastMode: false,
       supportsThinkingToggle: false,
@@ -492,10 +508,28 @@ describe("getComposerProviderState", () => {
     });
   });
 
-  it("drops OpenCode effort options for models without effort controls", () => {
+  it("returns OpenCode defaults for Anthropic-backed effort-capable models", () => {
     const state = getComposerProviderState({
       provider: "opencode",
       model: "anthropic/claude-sonnet-4-5",
+      models: OPENCODE_MODELS,
+      prompt: "",
+      modelOptions: undefined,
+    });
+
+    expect(state).toEqual({
+      provider: "opencode",
+      promptEffort: "medium",
+      modelOptionsForDispatch: {
+        effort: "medium",
+      },
+    });
+  });
+
+  it("drops OpenCode effort options for models without effort controls", () => {
+    const state = getComposerProviderState({
+      provider: "opencode",
+      model: "google/gemini-2.5-flash",
       models: OPENCODE_MODELS,
       prompt: "",
       modelOptions: {

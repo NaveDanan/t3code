@@ -67,7 +67,8 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
     select: (params) => resolveThreadRouteRef(params),
   });
   const diffSearch = useSearch({ strict: false, select: (search) => parseDiffRouteSearch(search) });
-  const diffOpen = diffSearch.diff === "1";
+  const diffVisible =
+    diffSearch.rightPanel === "1" && (diffSearch.rightPanelTab ?? "diff") === "diff";
   const activeThreadId = routeThreadRef?.threadId ?? null;
   const activeThread = useStore(
     useMemo(() => createThreadSelectorByRef(routeThreadRef), [routeThreadRef]),
@@ -200,11 +201,11 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
   }, [renderablePatch]);
 
   useEffect(() => {
-    if (diffOpen && !previousDiffOpenRef.current) {
+    if (diffVisible && !previousDiffOpenRef.current) {
       setDiffWordWrap(settings.diffWordWrap);
     }
-    previousDiffOpenRef.current = diffOpen;
-  }, [diffOpen, settings.diffWordWrap]);
+    previousDiffOpenRef.current = diffVisible;
+  }, [diffVisible, settings.diffWordWrap]);
 
   useEffect(() => {
     if (!selectedFilePath || !patchViewportRef.current) {
@@ -235,7 +236,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
       params: buildThreadRouteParams(scopeThreadRef(activeThread.environmentId, activeThread.id)),
       search: (previous) => {
         const rest = stripDiffSearchParams(previous);
-        return { ...rest, diff: "1", diffTurnId: turnId };
+        return { ...rest, rightPanel: "1", rightPanelTab: "diff", diffTurnId: turnId };
       },
     });
   };
@@ -246,7 +247,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
       params: buildThreadRouteParams(scopeThreadRef(activeThread.environmentId, activeThread.id)),
       search: (previous) => {
         const rest = stripDiffSearchParams(previous);
-        return { ...rest, diff: "1" };
+        return { ...rest, rightPanel: "1", rightPanelTab: "diff" };
       },
     });
   };

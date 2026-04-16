@@ -1,15 +1,20 @@
 /**
- * WorkspaceFileSystem - Effect service contract for workspace file mutations.
+ * WorkspaceFileSystem - Effect service contract for workspace file access.
  *
- * Owns workspace-root-relative file write operations and their associated
- * safety checks and cache invalidation hooks.
+ * Owns workspace-root-relative file read and write operations and their
+ * associated safety checks and cache invalidation hooks.
  *
  * @module WorkspaceFileSystem
  */
 import { Schema, Context } from "effect";
 import type { Effect } from "effect";
 
-import type { ProjectWriteFileInput, ProjectWriteFileResult } from "@t3tools/contracts";
+import type {
+  ProjectReadFileInput,
+  ProjectReadFileResult,
+  ProjectWriteFileInput,
+  ProjectWriteFileResult,
+} from "@t3tools/contracts";
 import { WorkspacePathOutsideRootError } from "./WorkspacePaths.ts";
 
 export class WorkspaceFileSystemError extends Schema.TaggedErrorClass<WorkspaceFileSystemError>()(
@@ -27,6 +32,19 @@ export class WorkspaceFileSystemError extends Schema.TaggedErrorClass<WorkspaceF
  * WorkspaceFileSystemShape - Service API for workspace-relative file operations.
  */
 export interface WorkspaceFileSystemShape {
+  /**
+   * Read a text file relative to the workspace root.
+   *
+   * Rejects paths that escape the workspace root and non-text files that
+   * are too large for the inline editor.
+   */
+  readonly readFile: (
+    input: ProjectReadFileInput,
+  ) => Effect.Effect<
+    ProjectReadFileResult,
+    WorkspaceFileSystemError | WorkspacePathOutsideRootError
+  >;
+
   /**
    * Write a file relative to the workspace root.
    *

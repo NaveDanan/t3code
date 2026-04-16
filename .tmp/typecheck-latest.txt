@@ -1,0 +1,42 @@
+$ turbo run typecheck
+• turbo 2.8.17
+• Packages in scope: @t3tools/client-runtime, @t3tools/contracts, @t3tools/desktop, @t3tools/marketing, @t3tools/scripts, @t3tools/shared, @t3tools/web, t3
+• Running typecheck in 8 packages
+• Remote caching disabled
+@t3tools/marketing:typecheck: cache bypass, force executing 6403c3cd0594311a
+@t3tools/contracts:typecheck: cache bypass, force executing df2a9479c523110d
+@t3tools/marketing:typecheck: $ node ../../scripts/ensure-zod-locales-index.mjs && astro check
+@t3tools/contracts:typecheck: $ tsc --noEmit
+@t3tools/client-runtime:typecheck: cache bypass, force executing befff79941ee36f4
+@t3tools/shared:typecheck: cache bypass, force executing 13544843c3f100fe
+@t3tools/client-runtime:typecheck: $ tsc --noEmit
+@t3tools/shared:typecheck: $ tsc --noEmit
+@t3tools/marketing:typecheck: [2m02:17:03[22m [34m[types][39m Generated [2m86ms[22m
+@t3tools/marketing:typecheck: [2m02:17:03[22m [34m[check][39m Getting diagnostics for Astro files in D:\Projects\t3code\apps\marketing...
+@t3tools/web:typecheck: cache bypass, force executing 200ad7ff77cb8d9d
+@t3tools/scripts:typecheck: cache bypass, force executing 68c206100ac0e35f
+@t3tools/desktop:typecheck: cache bypass, force executing dec88f0c1e9b3507
+@t3tools/web:typecheck: $ tsc --noEmit
+@t3tools/scripts:typecheck: $ tsc --noEmit
+@t3tools/desktop:typecheck: $ tsc --noEmit
+@t3tools/marketing:typecheck: Result (6 files): 
+@t3tools/marketing:typecheck: - 0 errors
+@t3tools/marketing:typecheck: - 0 warnings
+@t3tools/marketing:typecheck: - 0 hints
+@t3tools/marketing:typecheck: 
+@t3tools/desktop:typecheck: src/clientPersistence.test.ts(51,7): error TS2739: Type '{ appFontSize: "normal"; busyThreadFollowupMode: "queue"; confirmThreadArchive: true; confirmThreadDelete: false; diffWordWrap: true; sidebarProjectSortOrder: "manual"; sidebarThreadSortOrder: "created_at"; timestampFormat: "24-hour"; }' is missing the following properties from type '{ readonly appFontSize: "big" | "normal" | "large" | "xlarge"; readonly busyThreadFollowupMode: "steer" | "queue"; readonly confirmThreadArchive: boolean; readonly confirmThreadDelete: boolean; ... 5 more ...; readonly timestampFormat: "locale" | ... 1 more ... | "24-hour"; }': terminalFontFamily, terminalFontSize
+@t3tools/desktop:typecheck: src/syncShellEnvironment.test.ts(111,9): error TS2353: Object literal may only specify known properties, and 'readRegistryPath' does not exist in type '{ platform?: Platform; readEnvironment?: ShellEnvironmentReader; }'.
+@t3tools/desktop:typecheck: src/syncShellEnvironment.test.ts(136,7): error TS2353: Object literal may only specify known properties, and 'readRegistryPath' does not exist in type '{ platform?: Platform; readEnvironment?: ShellEnvironmentReader; }'.
+@t3tools/desktop:typecheck: src/syncShellEnvironment.test.ts(159,52): error TS2353: Object literal may only specify known properties, and 'readRegistryPath' does not exist in type '{ platform?: Platform; readEnvironment?: ShellEnvironmentReader; }'.
+@t3tools/desktop:typecheck: src/syncShellEnvironment.test.ts(179,52): error TS2353: Object literal may only specify known properties, and 'readRegistryPath' does not exist in type '{ platform?: Platform; readEnvironment?: ShellEnvironmentReader; }'.
+@t3tools/desktop:typecheck: error: script "typecheck" exited with code 1
+@t3tools/desktop:typecheck: ERROR: command finished with error: command (D:\Projects\t3code\apps\desktop) C:\Users\naved\.bun\bin\bun.exe run typecheck exited (1)
+@t3tools/desktop#typecheck: command (D:\Projects\t3code\apps\desktop) C:\Users\naved\.bun\bin\bun.exe run typecheck exited (1)
+
+ Tasks:    5 successful, 7 total
+Cached:    0 cached, 7 total
+  Time:    11.574s 
+Failed:    @t3tools/desktop#typecheck
+
+ ERROR  run failed: command  exited (1)
+error: script "typecheck" exited with code 1

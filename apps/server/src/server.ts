@@ -22,6 +22,7 @@ import { ProviderSessionRuntimeRepositoryLive } from "./persistence/Layers/Provi
 import { makeCodexAdapterLive } from "./provider/Layers/CodexAdapter";
 import { makeClaudeAdapterLive } from "./provider/Layers/ClaudeAdapter";
 import { makeForgeAdapterLive } from "./provider/Layers/ForgeAdapter";
+import { makeGitHubCopilotAdapterLive } from "./provider/Layers/GitHubCopilotAdapter";
 import { makeOpencodeAdapterLive } from "./provider/Layers/OpencodeAdapter";
 import { ProviderAdapterRegistryLive } from "./provider/Layers/ProviderAdapterRegistry";
 import { makeProviderServiceLive } from "./provider/Layers/ProviderService";
@@ -157,11 +158,13 @@ const ProviderLayerLive = Layer.unwrap(
     );
     const forgeAdapterLayer = makeForgeAdapterLive();
     const opencodeAdapterLayer = makeOpencodeAdapterLive();
+    const githubCopilotAdapterLayer = makeGitHubCopilotAdapterLive();
     const adapterRegistryLayer = ProviderAdapterRegistryLive.pipe(
       Layer.provide(codexAdapterLayer),
       Layer.provide(claudeAdapterLayer),
       Layer.provide(forgeAdapterLayer),
       Layer.provide(opencodeAdapterLayer),
+      Layer.provide(githubCopilotAdapterLayer),
       Layer.provideMerge(ProviderSessionDirectoryLayerLive),
     );
     return makeProviderServiceLive(

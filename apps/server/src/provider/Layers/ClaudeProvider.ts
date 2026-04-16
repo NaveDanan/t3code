@@ -1,5 +1,6 @@
 import type {
   ClaudeSettings,
+  HarnessUpdateResult,
   ModelCapabilities,
   ServerProvider,
   ServerProviderModel,
@@ -471,7 +472,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Claude is disabled in T3 Code settings.",
+        message: "Claude is disabled in NJ Code settings.",
       },
     });
   }
@@ -643,6 +644,29 @@ export const ClaudeProviderLive = Layer.effect(
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
     );
 
+    const updateProvider = runClaudeCommand(["update"]).pipe(
+      Effect.provideService(ServerSettingsService, serverSettings),
+      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+      Effect.timeout("120 seconds"),
+      Effect.map(
+        (result): HarnessUpdateResult => ({
+          provider: "claudeAgent",
+          success: result.code === 0,
+          message:
+            result.code === 0
+              ? result.stdout.trim() || "Update completed."
+              : result.stderr.trim() || result.stdout.trim() || `Exited with code ${result.code}.`,
+        }),
+      ),
+      Effect.catch(() =>
+        Effect.succeed({
+          provider: "claudeAgent" as const,
+          success: false,
+          message: "Update command failed.",
+        }),
+      ),
+    );
+
     return yield* makeManagedServerProvider<ClaudeSettings>({
       getSettings: serverSettings.getSettings.pipe(
         Effect.map((settings) => settings.providers.claudeAgent),
@@ -653,6 +677,7 @@ export const ClaudeProviderLive = Layer.effect(
       ),
       haveSettingsChanged: (previous, next) => !Equal.equals(previous, next),
       checkProvider,
+      updateProvider,
     });
   }),
 );

@@ -1,5 +1,6 @@
 import {
   CommandId,
+  DEFAULT_CLIENT_SETTINGS,
   DEFAULT_SERVER_SETTINGS,
   type DesktopBridge,
   EnvironmentId,
@@ -24,6 +25,18 @@ const showContextMenuFallbackMock =
     ) => Promise<T | null>
   >();
 
+const testClientSettings = {
+  ...DEFAULT_CLIENT_SETTINGS,
+  appFontSize: "normal" as const,
+  busyThreadFollowupMode: "queue" as const,
+  confirmThreadArchive: true,
+  confirmThreadDelete: false,
+  diffWordWrap: true,
+  sidebarProjectSortOrder: "manual" as const,
+  sidebarThreadSortOrder: "created_at" as const,
+  timestampFormat: "24-hour" as const,
+};
+
 function registerListener<T>(listeners: Set<(event: T) => void>, listener: (event: T) => void) {
   listeners.add(listener);
   return () => {
@@ -38,6 +51,7 @@ const gitStatusListeners = new Set<(event: GitStatusResult) => void>();
 const rpcClientMock = {
   dispose: vi.fn(),
   terminal: {
+    listProfiles: vi.fn(),
     open: vi.fn(),
     write: vi.fn(),
     resize: vi.fn(),
@@ -49,7 +63,9 @@ const rpcClientMock = {
     ),
   },
   projects: {
+    readFile: vi.fn(),
     searchEntries: vi.fn(),
+    searchText: vi.fn(),
     writeFile: vi.fn(),
   },
   shell: {
@@ -429,6 +445,25 @@ describe("wsApi", () => {
     });
   });
 
+  it("forwards workspace file reads to the project RPC", async () => {
+    rpcClientMock.projects.readFile.mockResolvedValue({
+      relativePath: "plan.md",
+      contents: "# Plan\n",
+    });
+    const { createEnvironmentApi } = await import("./environmentApi");
+
+    const api = createEnvironmentApi(rpcClientMock as never);
+    await api.projects.readFile({
+      cwd: "/tmp/project",
+      relativePath: "plan.md",
+    });
+
+    expect(rpcClientMock.projects.readFile).toHaveBeenCalledWith({
+      cwd: "/tmp/project",
+      relativePath: "plan.md",
+    });
+  });
+
   it("forwards full-thread diff requests to the orchestration RPC", async () => {
     rpcClientMock.orchestration.getFullThreadDiff.mockResolvedValue({ diff: "patch" });
     const { createEnvironmentApi } = await import("./environmentApi");
@@ -531,16 +566,7 @@ describe("wsApi", () => {
     const api = createLocalApi(rpcClientMock as never);
 
     await api.persistence.getClientSettings();
-    await api.persistence.setClientSettings({
-      appFontSize: "normal",
-      busyThreadFollowupMode: "queue",
-      confirmThreadArchive: true,
-      confirmThreadDelete: false,
-      diffWordWrap: true,
-      sidebarProjectSortOrder: "manual",
-      sidebarThreadSortOrder: "created_at",
-      timestampFormat: "24-hour",
-    });
+    await api.persistence.setClientSettings(testClientSettings);
     await api.persistence.getSavedEnvironmentRegistry();
     await api.persistence.setSavedEnvironmentRegistry([]);
     await api.persistence.getSavedEnvironmentSecret(EnvironmentId.make("environment-local"));
@@ -551,16 +577,7 @@ describe("wsApi", () => {
     await api.persistence.removeSavedEnvironmentSecret(EnvironmentId.make("environment-local"));
 
     expect(getClientSettings).toHaveBeenCalledWith();
-    expect(setClientSettings).toHaveBeenCalledWith({
-      appFontSize: "normal",
-      busyThreadFollowupMode: "queue",
-      confirmThreadArchive: true,
-      confirmThreadDelete: false,
-      diffWordWrap: true,
-      sidebarProjectSortOrder: "manual",
-      sidebarThreadSortOrder: "created_at",
-      timestampFormat: "24-hour",
-    });
+    expect(setClientSettings).toHaveBeenCalledWith(testClientSettings);
     expect(getSavedEnvironmentRegistry).toHaveBeenCalledWith();
     expect(setSavedEnvironmentRegistry).toHaveBeenCalledWith([]);
     expect(getSavedEnvironmentSecret).toHaveBeenCalledWith("environment-local");
@@ -572,16 +589,7 @@ describe("wsApi", () => {
     const { createLocalApi } = await import("./localApi");
     const api = createLocalApi(rpcClientMock as never);
 
-    await api.persistence.setClientSettings({
-      appFontSize: "normal",
-      busyThreadFollowupMode: "queue",
-      confirmThreadArchive: true,
-      confirmThreadDelete: false,
-      diffWordWrap: true,
-      sidebarProjectSortOrder: "manual",
-      sidebarThreadSortOrder: "created_at",
-      timestampFormat: "24-hour",
-    });
+    await api.persistence.setClientSettings(testClientSettings);
     await api.persistence.setSavedEnvironmentRegistry([
       {
         environmentId: EnvironmentId.make("environment-local"),
@@ -597,16 +605,7 @@ describe("wsApi", () => {
       "bearer-token",
     );
 
-    await expect(api.persistence.getClientSettings()).resolves.toEqual({
-      appFontSize: "normal",
-      busyThreadFollowupMode: "queue",
-      confirmThreadArchive: true,
-      confirmThreadDelete: false,
-      diffWordWrap: true,
-      sidebarProjectSortOrder: "manual",
-      sidebarThreadSortOrder: "created_at",
-      timestampFormat: "24-hour",
-    });
+    await expect(api.persistence.getClientSettings()).resolves.toEqual(testClientSettings);
     await expect(api.persistence.getSavedEnvironmentRegistry()).resolves.toEqual([
       {
         environmentId: EnvironmentId.make("environment-local"),

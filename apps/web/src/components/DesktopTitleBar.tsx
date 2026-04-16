@@ -37,7 +37,7 @@ export function DesktopTitleBar(props: DesktopTitleBarProps) {
               className="inline-flex size-4 items-center justify-center rounded-sm bg-foreground font-semibold text-background"
               style={{ fontSize: 9 }}
             >
-              T3
+              NJ
             </span>
             <span className="truncate font-medium tracking-tight text-foreground/85">
               {contextLabel}

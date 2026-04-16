@@ -1221,7 +1221,7 @@ const makeForgeAdapter = Effect.fn("makeForgeAdapter")(function* (
     if ((input.attachments ?? []).length > 0) {
       return yield* toValidationError(
         "sendTurn",
-        "ForgeCode attachments are not supported in T3 Code v1.",
+        "ForgeCode attachments are not supported in NJ Code v1.",
       );
     }
 

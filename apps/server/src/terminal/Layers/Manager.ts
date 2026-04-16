@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -5,6 +6,7 @@ import {
   ThreadId,
   type ForgeExecutionBackend,
   type TerminalEvent,
+  type TerminalLaunchProfile,
   type TerminalSessionSnapshot,
   type TerminalSessionStatus,
 } from "@t3tools/contracts";
@@ -99,6 +101,7 @@ interface TerminalStartInput {
   cwd: string;
   worktreePath?: string | null;
   executionBackend?: ForgeExecutionBackend;
+  launchProfile?: TerminalLaunchProfile;
   cols: number;
   rows: number;
   env?: Record<string, string>;
@@ -110,6 +113,7 @@ interface TerminalSessionState {
   cwd: string;
   worktreePath: string | null;
   executionBackend: ForgeExecutionBackend | undefined;
+  launchProfile: TerminalLaunchProfile | undefined;
   status: TerminalSessionStatus;
   pid: number | null;
   history: string;
@@ -166,6 +170,7 @@ function snapshot(session: TerminalSessionState): TerminalSessionSnapshot {
     cwd: session.cwd,
     worktreePath: session.worktreePath,
     ...(session.executionBackend ? { executionBackend: session.executionBackend } : {}),
+    ...(session.launchProfile ? { launchProfile: session.launchProfile } : {}),
     status: session.status,
     pid: session.pid,
     history: session.history,
@@ -202,7 +207,7 @@ function enqueueProcessEvent(
 
 function defaultShellResolver(): string {
   if (process.platform === "win32") {
-    return process.env.ComSpec ?? "cmd.exe";
+    return "pwsh.exe";
   }
   return process.env.SHELL ?? "bash";
 }
@@ -223,11 +228,36 @@ function normalizeShellCommand(value: string | undefined): string | null {
 
 function shellCandidateFromCommand(command: string | null): ShellCandidate | null {
   if (!command || command.length === 0) return null;
-  const shellName = path.basename(command).toLowerCase();
-  if (process.platform !== "win32" && shellName === "zsh") {
-    return { shell: command, args: ["-o", "nopromptsp"] };
+  const shellName = path
+    .basename(command)
+    .replace(/\.exe$/i, "")
+    .toLowerCase();
+
+  if (process.platform === "win32") {
+    // Git Bash on Windows should be spawned as a login shell so user
+    // profiles (e.g. .bash_profile / .profile) are loaded.
+    if (shellName === "bash") {
+      return { shell: command, args: ["--login"] };
+    }
+    // PowerShell and cmd load profiles automatically when interactive
+    // via ConPTY – no extra flags needed.
+    return { shell: command };
   }
-  return { shell: command };
+
+  // On macOS / Linux, spawn as login shells so that user profile files
+  // (.bash_profile, .zprofile, .zshrc, config.fish, …) are sourced.
+  // This matches standard terminal-emulator behaviour and ensures tools
+  // configured in profile scripts (Oh My Posh, Starship, nvm, etc.) work.
+  switch (shellName) {
+    case "zsh":
+      return { shell: command, args: ["-l", "-o", "nopromptsp"] };
+    case "bash":
+      return { shell: command, args: ["--login"] };
+    case "fish":
+      return { shell: command, args: ["-l"] };
+    default:
+      return { shell: command };
+  }
 }
 
 function formatShellCandidate(candidate: ShellCandidate): string {
@@ -248,14 +278,88 @@ function uniqueShellCandidates(candidates: Array<ShellCandidate | null>): ShellC
   return ordered;
 }
 
+function gitInstallRootFromGitExePath(gitExePath: string): string | null {
+  const normalized = path.normalize(gitExePath);
+  const parentDir = path.dirname(normalized);
+  const parentName = path.basename(parentDir).toLowerCase();
+  if (parentName !== "cmd" && parentName !== "bin" && parentName !== "mingw64") {
+    return null;
+  }
+  return path.dirname(parentDir);
+}
+
+function pathEntriesFromEnv(): ReadonlyArray<string> {
+  const raw = process.env.Path ?? process.env.PATH ?? "";
+  return raw
+    .split(path.delimiter)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function discoverGitInstallRoots(): ReadonlyArray<string> {
+  const candidates = new Set<string>();
+
+  for (const entry of pathEntriesFromEnv()) {
+    const gitExePath = path.join(entry, "git.exe");
+    if (!existsSync(gitExePath)) {
+      continue;
+    }
+    const root = gitInstallRootFromGitExePath(gitExePath);
+    if (root) {
+      candidates.add(root);
+    }
+  }
+
+  const knownRoots = [
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Programs", "Git") : null,
+    process.env.ProgramFiles ? path.join(process.env.ProgramFiles, "Git") : null,
+    process.env["ProgramFiles(x86)"] ? path.join(process.env["ProgramFiles(x86)"], "Git") : null,
+  ];
+  for (const root of knownRoots) {
+    if (root && existsSync(root)) {
+      candidates.add(root);
+    }
+  }
+
+  return [...candidates];
+}
+
+function discoverGitBashCandidate(): ShellCandidate | null {
+  if (process.platform !== "win32") {
+    return null;
+  }
+
+  for (const root of discoverGitInstallRoots()) {
+    const bashPath = path.join(root, "bin", "bash.exe");
+    if (existsSync(bashPath)) {
+      return { shell: bashPath, args: ["--login"] };
+    }
+  }
+
+  return null;
+}
+
+function isGitBashCandidate(candidate: ShellCandidate): boolean {
+  if (process.platform !== "win32") {
+    return false;
+  }
+
+  return path
+    .normalize(candidate.shell)
+    .toLowerCase()
+    .endsWith(`${path.sep}git${path.sep}bin${path.sep}bash.exe`);
+}
+
 function resolveShellCandidates(shellResolver: () => string): ShellCandidate[] {
   const requested = shellCandidateFromCommand(normalizeShellCommand(shellResolver()));
 
   if (process.platform === "win32") {
     return uniqueShellCandidates([
       requested,
-      shellCandidateFromCommand(process.env.ComSpec ?? null),
+      shellCandidateFromCommand("pwsh.exe"),
       shellCandidateFromCommand("powershell.exe"),
+      discoverGitBashCandidate(),
+      shellCandidateFromCommand(process.env.ComSpec ?? null),
       shellCandidateFromCommand("cmd.exe"),
     ]);
   }
@@ -316,6 +420,52 @@ function isRetryableShellSpawnError(error: PtySpawnError): boolean {
     message.includes("file not found") ||
     message.includes("no such file")
   );
+}
+
+function shellLabelFromCandidate(candidate: ShellCandidate): string {
+  if (isGitBashCandidate(candidate)) {
+    return "Git Bash";
+  }
+
+  const shellName = path
+    .basename(candidate.shell)
+    .replace(/\.exe$/i, "")
+    .toLowerCase();
+  switch (shellName) {
+    case "pwsh":
+      return "PowerShell";
+    case "powershell":
+      return "Windows PowerShell";
+    case "cmd":
+      return "Command Prompt";
+    case "bash":
+      return "Bash";
+    case "zsh":
+      return "Zsh";
+    case "sh":
+      return "Sh";
+    default: {
+      const fallback = path.basename(candidate.shell).trim() || candidate.shell.trim();
+      return fallback.length > 0 ? fallback : formatShellCandidate(candidate);
+    }
+  }
+}
+
+function launchProfilesFromShellCandidates(
+  shellCandidates: ReadonlyArray<ShellCandidate>,
+): ReadonlyArray<TerminalLaunchProfile> {
+  const seenLabels = new Map<string, number>();
+  return shellCandidates.map((candidate) => {
+    const baseLabel = shellLabelFromCandidate(candidate);
+    const count = (seenLabels.get(baseLabel) ?? 0) + 1;
+    seenLabels.set(baseLabel, count);
+    return {
+      id: formatShellCandidate(candidate),
+      label: count === 1 ? baseLabel : `${baseLabel} ${count}`,
+      shell: candidate.shell,
+      ...(candidate.args ? { args: [...candidate.args] } : {}),
+    };
+  });
 }
 
 function checkWindowsSubprocessActivity(
@@ -1439,6 +1589,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
         session.cwd = input.cwd;
         session.worktreePath = input.worktreePath ?? null;
         session.executionBackend = input.executionBackend;
+        session.launchProfile = input.launchProfile;
         session.cols = input.cols;
         session.rows = input.rows;
         session.exitCode = null;
@@ -1474,7 +1625,20 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
                     terminalEnv,
                     session,
                   )
-                : yield* trySpawn(resolveShellCandidates(shellResolver), terminalEnv, session);
+                : yield* trySpawn(
+                    input.launchProfile
+                      ? [
+                          {
+                            shell: input.launchProfile.shell,
+                            ...(input.launchProfile.args
+                              ? { args: [...input.launchProfile.args] }
+                              : {}),
+                          },
+                        ]
+                      : resolveShellCandidates(shellResolver),
+                    terminalEnv,
+                    session,
+                  );
               ptyProcess = spawnResult.process;
               startedShell = spawnResult.shellLabel;
 
@@ -1724,6 +1888,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               cwd: input.cwd,
               worktreePath: input.worktreePath ?? null,
               executionBackend: input.executionBackend,
+              launchProfile: input.launchProfile,
               status: "starting",
               pid: null,
               history,
@@ -1758,6 +1923,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
                 terminalId,
                 cwd: input.cwd,
                 ...(input.worktreePath !== undefined ? { worktreePath: input.worktreePath } : {}),
+                ...(input.launchProfile ? { launchProfile: input.launchProfile } : {}),
                 cols,
                 rows,
                 ...(input.env ? { env: input.env } : {}),
@@ -1812,6 +1978,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
                 terminalId,
                 cwd: input.cwd,
                 worktreePath: liveSession.worktreePath,
+                ...(input.launchProfile ? { launchProfile: input.launchProfile } : {}),
                 cols: targetCols,
                 rows: targetRows,
                 ...(input.env ? { env: input.env } : {}),
@@ -1831,6 +1998,9 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           return snapshot(liveSession);
         }),
       );
+
+    const listProfiles: TerminalManagerShape["listProfiles"] = () =>
+      Effect.succeed(launchProfilesFromShellCandidates(resolveShellCandidates(shellResolver)));
 
     const write: TerminalManagerShape["write"] = Effect.fn("terminal.write")(function* (input) {
       const terminalId = input.terminalId ?? DEFAULT_TERMINAL_ID;
@@ -1953,6 +2123,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               terminalId,
               cwd: input.cwd,
               ...(input.worktreePath !== undefined ? { worktreePath: input.worktreePath } : {}),
+              ...(input.launchProfile ? { launchProfile: input.launchProfile } : {}),
               cols,
               rows,
               ...(input.env ? { env: input.env } : {}),
@@ -1986,6 +2157,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
       );
 
     return {
+      listProfiles,
       open,
       write,
       resize,

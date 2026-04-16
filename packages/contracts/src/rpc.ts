@@ -46,9 +46,15 @@ import {
   OrchestrationRpcSchemas,
 } from "./orchestration";
 import {
+  ProjectReadFileError,
+  ProjectReadFileInput,
+  ProjectReadFileResult,
   ProjectSearchEntriesError,
   ProjectSearchEntriesInput,
   ProjectSearchEntriesResult,
+  ProjectSearchTextError,
+  ProjectSearchTextInput,
+  ProjectSearchTextResult,
   ProjectWriteFileError,
   ProjectWriteFileInput,
   ProjectWriteFileResult,
@@ -58,6 +64,7 @@ import {
   TerminalCloseInput,
   TerminalError,
   TerminalEvent,
+  TerminalLaunchProfile,
   TerminalOpenInput,
   TerminalResizeInput,
   TerminalRestartInput,
@@ -68,6 +75,7 @@ import {
   ServerConfigStreamEvent,
   ServerConfig,
   ServerLifecycleStreamEvent,
+  ServerHarnessUpdatePayload,
   ServerProviderUpdatedPayload,
   ServerUpsertKeybindingInput,
   ServerUpsertKeybindingResult,
@@ -79,7 +87,9 @@ export const WS_METHODS = {
   projectsList: "projects.list",
   projectsAdd: "projects.add",
   projectsRemove: "projects.remove",
+  projectsReadFile: "projects.readFile",
   projectsSearchEntries: "projects.searchEntries",
+  projectsSearchText: "projects.searchText",
   projectsWriteFile: "projects.writeFile",
 
   // Shell methods
@@ -100,6 +110,7 @@ export const WS_METHODS = {
 
   // Terminal methods
   terminalOpen: "terminal.open",
+  terminalListProfiles: "terminal.listProfiles",
   terminalWrite: "terminal.write",
   terminalResize: "terminal.resize",
   terminalClear: "terminal.clear",
@@ -109,6 +120,7 @@ export const WS_METHODS = {
   // Server meta
   serverGetConfig: "server.getConfig",
   serverRefreshProviders: "server.refreshProviders",
+  serverUpdateHarnesses: "server.updateHarnesses",
   serverUpsertKeybinding: "server.upsertKeybinding",
   serverGetSettings: "server.getSettings",
   serverUpdateSettings: "server.updateSettings",
@@ -139,6 +151,11 @@ export const WsServerRefreshProvidersRpc = Rpc.make(WS_METHODS.serverRefreshProv
   success: ServerProviderUpdatedPayload,
 });
 
+export const WsServerUpdateHarnessesRpc = Rpc.make(WS_METHODS.serverUpdateHarnesses, {
+  payload: Schema.Struct({}),
+  success: ServerHarnessUpdatePayload,
+});
+
 export const WsServerGetSettingsRpc = Rpc.make(WS_METHODS.serverGetSettings, {
   payload: Schema.Struct({}),
   success: ServerSettings,
@@ -155,6 +172,18 @@ export const WsProjectsSearchEntriesRpc = Rpc.make(WS_METHODS.projectsSearchEntr
   payload: ProjectSearchEntriesInput,
   success: ProjectSearchEntriesResult,
   error: ProjectSearchEntriesError,
+});
+
+export const WsProjectsSearchTextRpc = Rpc.make(WS_METHODS.projectsSearchText, {
+  payload: ProjectSearchTextInput,
+  success: ProjectSearchTextResult,
+  error: ProjectSearchTextError,
+});
+
+export const WsProjectsReadFileRpc = Rpc.make(WS_METHODS.projectsReadFile, {
+  payload: ProjectReadFileInput,
+  success: ProjectReadFileResult,
+  error: ProjectReadFileError,
 });
 
 export const WsProjectsWriteFileRpc = Rpc.make(WS_METHODS.projectsWriteFile, {
@@ -243,6 +272,12 @@ export const WsGitInitRpc = Rpc.make(WS_METHODS.gitInit, {
 export const WsTerminalOpenRpc = Rpc.make(WS_METHODS.terminalOpen, {
   payload: TerminalOpenInput,
   success: TerminalSessionSnapshot,
+  error: TerminalError,
+});
+
+export const WsTerminalListProfilesRpc = Rpc.make(WS_METHODS.terminalListProfiles, {
+  payload: Schema.Struct({}),
+  success: Schema.Array(TerminalLaunchProfile),
   error: TerminalError,
 });
 
@@ -345,10 +380,13 @@ export const WsSubscribeAuthAccessRpc = Rpc.make(WS_METHODS.subscribeAuthAccess,
 export const WsRpcGroup = RpcGroup.make(
   WsServerGetConfigRpc,
   WsServerRefreshProvidersRpc,
+  WsServerUpdateHarnessesRpc,
   WsServerUpsertKeybindingRpc,
   WsServerGetSettingsRpc,
   WsServerUpdateSettingsRpc,
+  WsProjectsReadFileRpc,
   WsProjectsSearchEntriesRpc,
+  WsProjectsSearchTextRpc,
   WsProjectsWriteFileRpc,
   WsShellOpenInEditorRpc,
   WsSubscribeGitStatusRpc,
@@ -364,6 +402,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsGitCheckoutRpc,
   WsGitInitRpc,
   WsTerminalOpenRpc,
+  WsTerminalListProfilesRpc,
   WsTerminalWriteRpc,
   WsTerminalResizeRpc,
   WsTerminalClearRpc,

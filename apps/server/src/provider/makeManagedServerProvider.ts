@@ -1,4 +1,4 @@
-import type { ServerProvider } from "@t3tools/contracts";
+import type { HarnessUpdateResult, ServerProvider } from "@t3tools/contracts";
 import { Duration, Effect, PubSub, Ref, Scope, Stream } from "effect";
 import * as Semaphore from "effect/Semaphore";
 
@@ -12,6 +12,7 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
   readonly streamSettings: Stream.Stream<Settings>;
   readonly haveSettingsChanged: (previous: Settings, next: Settings) => boolean;
   readonly checkProvider: Effect.Effect<ServerProvider, ServerSettingsError>;
+  readonly updateProvider?: Effect.Effect<HarnessUpdateResult>;
   readonly refreshInterval?: Duration.Input;
 }): Effect.fn.Return<ServerProviderShape, ServerSettingsError, Scope.Scope> {
   const refreshSemaphore = yield* Semaphore.make(1);
@@ -67,6 +68,13 @@ export const makeManagedServerProvider = Effect.fn("makeManagedServerProvider")(
       Effect.orDie,
     ),
     refresh: refreshSnapshot().pipe(Effect.tapError(Effect.logError), Effect.orDie),
+    update:
+      input.updateProvider ??
+      Effect.succeed({
+        provider: "codex",
+        success: false,
+        message: "Update not supported for this provider.",
+      } as HarnessUpdateResult),
     get streamChanges() {
       return Stream.fromPubSub(changesPubSub);
     },

@@ -13,6 +13,7 @@ import {
   normalizeClaudeModelOptionsWithCapabilities,
   normalizeCodexModelOptionsWithCapabilities,
   normalizeForgeCodeModelOptionsWithCapabilities,
+  normalizeGitHubCopilotModelOptionsWithCapabilities,
   normalizeOpencodeModelOptionsWithCapabilities,
 } from "@t3tools/shared/model";
 
@@ -124,6 +125,23 @@ function getProviderStateFromCapabilities(
         modelOptionsForDispatch: normalizeForgeCodeModelOptionsWithCapabilities(
           caps,
           modelOptions?.forgecode,
+        ),
+        ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
+        ...(ultrathinkActive
+          ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
+          : {}),
+        ...(ultrathinkActive ? { modelPickerIconClassName: "ultrathink-chroma" } : {}),
+      };
+    }
+    case "githubCopilot": {
+      const providerOptions = modelOptions?.githubCopilot;
+      const promptEffort = resolveEffort(caps, providerOptions?.reasoningEffort ?? null) ?? null;
+      return {
+        provider,
+        promptEffort,
+        modelOptionsForDispatch: normalizeGitHubCopilotModelOptionsWithCapabilities(
+          caps,
+          providerOptions,
         ),
         ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
         ...(ultrathinkActive
@@ -306,6 +324,51 @@ const composerProviderRegistry: Record<ProviderKind, ProviderRegistryEntry> = {
       !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
         <TraitsPicker
           provider="forgecode"
+          models={models}
+          {...(threadRef ? { threadRef } : {})}
+          {...(draftId ? { draftId } : {})}
+          model={model}
+          modelOptions={modelOptions}
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+        />
+      ),
+  },
+  githubCopilot: {
+    getState: (input) => getProviderStateFromCapabilities(input),
+    renderTraitsMenuContent: ({
+      threadRef,
+      draftId,
+      model,
+      models,
+      modelOptions,
+      prompt,
+      onPromptChange,
+    }) =>
+      !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
+        <TraitsMenuContent
+          provider="githubCopilot"
+          models={models}
+          {...(threadRef ? { threadRef } : {})}
+          {...(draftId ? { draftId } : {})}
+          model={model}
+          modelOptions={modelOptions}
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+        />
+      ),
+    renderTraitsPicker: ({
+      threadRef,
+      draftId,
+      model,
+      models,
+      modelOptions,
+      prompt,
+      onPromptChange,
+    }) =>
+      !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
+        <TraitsPicker
+          provider="githubCopilot"
           models={models}
           {...(threadRef ? { threadRef } : {})}
           {...(draftId ? { draftId } : {})}

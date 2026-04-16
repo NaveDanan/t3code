@@ -1,0 +1,41 @@
+$ turbo run typecheck
+• turbo 2.8.17
+• Packages in scope: @t3tools/client-runtime, @t3tools/contracts, @t3tools/desktop, @t3tools/marketing, @t3tools/scripts, @t3tools/shared, @t3tools/web, t3
+• Running typecheck in 8 packages
+• Remote caching disabled
+@t3tools/contracts:typecheck: cache bypass, force executing 5aa2b2cd34db412b
+@t3tools/marketing:typecheck: cache bypass, force executing 6403c3cd0594311a
+@t3tools/contracts:typecheck: $ tsc --noEmit
+@t3tools/marketing:typecheck: $ node ../../scripts/ensure-zod-locales-index.mjs && astro check
+@t3tools/marketing:typecheck: [2m03:18:32[22m [34m[types][39m Generated [2m80ms[22m
+@t3tools/marketing:typecheck: [2m03:18:32[22m [34m[check][39m Getting diagnostics for Astro files in D:\Projects\t3code\apps\marketing...
+@t3tools/client-runtime:typecheck: cache bypass, force executing 3971f9fa971d0f01
+@t3tools/shared:typecheck: cache bypass, force executing f3ad9183fa6f0c11
+@t3tools/client-runtime:typecheck: $ tsc --noEmit
+@t3tools/shared:typecheck: $ tsc --noEmit
+@t3tools/marketing:typecheck: Result (6 files): 
+@t3tools/marketing:typecheck: - 0 errors
+@t3tools/marketing:typecheck: - 0 warnings
+@t3tools/marketing:typecheck: - 0 hints
+@t3tools/marketing:typecheck: 
+@t3tools/web:typecheck: cache bypass, force executing 372a48a020e1257b
+@t3tools/desktop:typecheck: cache bypass, force executing 8f3beb5924d79691
+@t3tools/scripts:typecheck: cache bypass, force executing 281ceb4c0c9a362b
+@t3tools/web:typecheck: $ tsc --noEmit
+@t3tools/desktop:typecheck: $ tsc --noEmit
+@t3tools/scripts:typecheck: $ tsc --noEmit
+@t3tools/web:typecheck: src/localApi.test.ts(556,45): error TS2345: Argument of type '{ appFontSize: "normal"; busyThreadFollowupMode: "queue"; confirmThreadArchive: true; confirmThreadDelete: false; diffWordWrap: true; sidebarProjectSortOrder: "manual"; sidebarThreadSortOrder: "created_at"; timestampFormat: "24-hour"; }' is not assignable to parameter of type '{ readonly appFontSize: "big" | "normal" | "large" | "xlarge"; readonly busyThreadFollowupMode: "steer" | "queue"; readonly confirmThreadArchive: boolean; readonly confirmThreadDelete: boolean; ... 5 more ...; readonly timestampFormat: "locale" | ... 1 more ... | "24-hour"; }'.
+@t3tools/web:typecheck:   Type '{ appFontSize: "normal"; busyThreadFollowupMode: "queue"; confirmThreadArchive: true; confirmThreadDelete: false; diffWordWrap: true; sidebarProjectSortOrder: "manual"; sidebarThreadSortOrder: "created_at"; timestampFormat: "24-hour"; }' is missing the following properties from type '{ readonly appFontSize: "big" | "normal" | "large" | "xlarge"; readonly busyThreadFollowupMode: "steer" | "queue"; readonly confirmThreadArchive: boolean; readonly confirmThreadDelete: boolean; ... 5 more ...; readonly timestampFormat: "locale" | ... 1 more ... | "24-hour"; }': terminalFontFamily, terminalFontSize
+@t3tools/web:typecheck: src/localApi.test.ts(597,45): error TS2345: Argument of type '{ appFontSize: "normal"; busyThreadFollowupMode: "queue"; confirmThreadArchive: true; confirmThreadDelete: false; diffWordWrap: true; sidebarProjectSortOrder: "manual"; sidebarThreadSortOrder: "created_at"; timestampFormat: "24-hour"; }' is not assignable to parameter of type '{ readonly appFontSize: "big" | "normal" | "large" | "xlarge"; readonly busyThreadFollowupMode: "steer" | "queue"; readonly confirmThreadArchive: boolean; readonly confirmThreadDelete: boolean; ... 5 more ...; readonly timestampFormat: "locale" | ... 1 more ... | "24-hour"; }'.
+@t3tools/web:typecheck:   Type '{ appFontSize: "normal"; busyThreadFollowupMode: "queue"; confirmThreadArchive: true; confirmThreadDelete: false; diffWordWrap: true; sidebarProjectSortOrder: "manual"; sidebarThreadSortOrder: "created_at"; timestampFormat: "24-hour"; }' is missing the following properties from type '{ readonly appFontSize: "big" | "normal" | "large" | "xlarge"; readonly busyThreadFollowupMode: "steer" | "queue"; readonly confirmThreadArchive: boolean; readonly confirmThreadDelete: boolean; ... 5 more ...; readonly timestampFormat: "locale" | ... 1 more ... | "24-hour"; }': terminalFontFamily, terminalFontSize
+@t3tools/web:typecheck: error: script "typecheck" exited with code 1
+@t3tools/web:typecheck: ERROR: command finished with error: command (D:\Projects\t3code\apps\web) C:\Users\naved\.bun\bin\bun.exe run typecheck exited (1)
+@t3tools/web#typecheck: command (D:\Projects\t3code\apps\web) C:\Users\naved\.bun\bin\bun.exe run typecheck exited (1)
+
+ Tasks:    6 successful, 7 total
+Cached:    0 cached, 7 total
+  Time:    15.307s 
+Failed:    @t3tools/web#typecheck
+
+ ERROR  run failed: command  exited (1)
+error: script "typecheck" exited with code 1

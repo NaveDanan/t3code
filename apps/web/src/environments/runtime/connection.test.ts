@@ -63,6 +63,7 @@ function createTestClient(options?: {
       }),
     },
     terminal: {
+      listProfiles: vi.fn(async () => []),
       open: vi.fn(async () => undefined),
       write: vi.fn(async () => undefined),
       resize: vi.fn(async () => undefined),

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -71,15 +72,88 @@ function ensureWindowsGitOnPath(env: NodeJS.ProcessEnv): void {
   env[pathKey] = nextEntries.join(";");
 }
 
+function expandWindowsEnvVars(value: string, env: NodeJS.ProcessEnv): string {
+  return value.replace(/%([^%]+)%/g, (original, varName: string) => {
+    return env[varName] ?? original;
+  });
+}
+
+function readWindowsRegistryPath(registryKey: string): string | undefined {
+  try {
+    const result = spawnSync("reg.exe", ["query", registryKey, "/v", "Path"], {
+      encoding: "utf8",
+      timeout: 5_000,
+      windowsHide: true,
+    });
+    if (result.status !== 0 || !result.stdout) return undefined;
+    const match = result.stdout.match(/^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.+)$/im);
+    return match?.[1]?.trim();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Read the current User + Machine PATH from the Windows registry and merge
+ * any new entries into `env`. This handles the common case where a tool was
+ * installed (adding its directory to PATH) after the Electron app was
+ * launched, so the inherited `process.env.PATH` is stale.
+ */
+function refreshWindowsPathFromRegistry(
+  env: NodeJS.ProcessEnv,
+  readRegistryPath: RegistryPathReader,
+): void {
+  const machinePath = readRegistryPath(
+    "HKLM\\System\\CurrentControlSet\\Control\\Session Manager\\Environment",
+  );
+  const userPath = readRegistryPath("HKCU\\Environment");
+
+  if (!machinePath && !userPath) return;
+
+  const pathKey = resolvePathKey(env);
+  const inheritedEntries = splitPathEntries(env[pathKey], "win32");
+
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  for (const entry of inheritedEntries) {
+    const key = normalizePathEntry(entry, "win32");
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(entry);
+    }
+  }
+
+  for (const source of [userPath, machinePath]) {
+    if (!source) continue;
+    const expanded = expandWindowsEnvVars(source, env);
+    for (const entry of splitPathEntries(expanded, "win32")) {
+      const key = normalizePathEntry(entry, "win32");
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(entry);
+      }
+    }
+  }
+
+  if (merged.length > inheritedEntries.length) {
+    env[pathKey] = merged.join(";");
+  }
+}
+
+export type RegistryPathReader = (registryKey: string) => string | undefined;
+
 export function syncShellEnvironment(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     platform?: NodeJS.Platform;
     readEnvironment?: ShellEnvironmentReader;
+    readRegistryPath?: RegistryPathReader;
   } = {},
 ): void {
   const platform = options.platform ?? process.platform;
   if (platform === "win32") {
+    refreshWindowsPathFromRegistry(env, options.readRegistryPath ?? readWindowsRegistryPath);
     ensureWindowsGitOnPath(env);
     return;
   }

@@ -6,7 +6,7 @@
  *
  * @module ProviderRegistry
  */
-import type { ProviderKind, ServerProvider } from "@t3tools/contracts";
+import type { HarnessUpdateResult, ProviderKind, ServerProvider } from "@t3tools/contracts";
 import { Context } from "effect";
 import type { Effect, Stream } from "effect";
 
@@ -20,6 +20,11 @@ export interface ProviderRegistryShape {
    * Refresh all providers, or a single provider when specified.
    */
   readonly refresh: (provider?: ProviderKind) => Effect.Effect<ReadonlyArray<ServerProvider>>;
+
+  /**
+   * Run the self-update command for each enabled provider harness.
+   */
+  readonly updateAll: Effect.Effect<ReadonlyArray<HarnessUpdateResult>>;
 
   /**
    * Stream of provider snapshot updates.

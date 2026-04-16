@@ -163,6 +163,11 @@ describe("TerminalSessionSnapshot", () => {
         cwd: "/tmp/project",
         worktreePath: null,
         executionBackend: "gitbash",
+        launchProfile: {
+          id: "pwsh",
+          label: "PowerShell",
+          shell: "pwsh.exe",
+        },
         status: "running",
         pid: 1234,
         history: "hello\n",
@@ -225,6 +230,11 @@ describe("TerminalEvent", () => {
           cwd: "/tmp/project/.t3/worktrees/feature-a",
           worktreePath: "/tmp/project/.t3/worktrees/feature-a",
           executionBackend: "wsl",
+          launchProfile: {
+            id: "pwsh",
+            label: "PowerShell",
+            shell: "pwsh.exe",
+          },
           status: "running",
           pid: 1234,
           history: "",

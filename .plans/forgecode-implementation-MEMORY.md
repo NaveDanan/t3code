@@ -1,6 +1,6 @@
 # ForgeCode Harness Implementation Memory
 
-This document records the implementation facts for the ForgeCode harness in T3 Code.
+This document records the implementation facts for the ForgeCode harness in NJ Code.
 
 It is not a speculative plan. It is the current reference for how the integration is supposed to work, which upstream constraints matter, and which shortcuts are intentionally rejected.
 

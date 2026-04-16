@@ -50,6 +50,63 @@ const writeTextFile = Effect.fn("writeTextFile")(function* (
 });
 
 it.layer(TestLayer)("WorkspaceFileSystemLive", (it) => {
+  describe("readFile", () => {
+    it.effect("reads text files relative to the workspace root", () =>
+      Effect.gen(function* () {
+        const workspaceFileSystem = yield* WorkspaceFileSystem;
+        const cwd = yield* makeTempDir;
+        yield* writeTextFile(cwd, "notes/todo.md", "- ship dialog\n");
+
+        const result = yield* workspaceFileSystem.readFile({
+          cwd,
+          relativePath: "notes/todo.md",
+        });
+
+        expect(result).toEqual({
+          relativePath: "notes/todo.md",
+          contents: "- ship dialog\n",
+        });
+      }),
+    );
+
+    it.effect("rejects files outside the workspace root", () =>
+      Effect.gen(function* () {
+        const workspaceFileSystem = yield* WorkspaceFileSystem;
+        const cwd = yield* makeTempDir;
+
+        const error = yield* workspaceFileSystem
+          .readFile({
+            cwd,
+            relativePath: "../escape.md",
+          })
+          .pipe(Effect.flip);
+
+        expect(error.message).toContain(
+          "Workspace file path must be relative to the project root: ../escape.md",
+        );
+      }),
+    );
+
+    it.effect("rejects files that are too large for the inline editor", () =>
+      Effect.gen(function* () {
+        const workspaceFileSystem = yield* WorkspaceFileSystem;
+        const cwd = yield* makeTempDir;
+        yield* writeTextFile(cwd, "notes/huge.txt", "x".repeat(1024 * 1024 + 1));
+
+        const error = yield* workspaceFileSystem
+          .readFile({
+            cwd,
+            relativePath: "notes/huge.txt",
+          })
+          .pipe(Effect.flip);
+
+        expect(error).toMatchObject({
+          detail: "File is larger than 1 MB and cannot be edited in the dialog.",
+        });
+      }),
+    );
+  });
+
   describe("writeFile", () => {
     it.effect("writes files relative to the workspace root", () =>
       Effect.gen(function* () {

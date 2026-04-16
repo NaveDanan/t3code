@@ -7,10 +7,10 @@
 
 import { parseScopedThreadKey, scopedThreadKey } from "@t3tools/client-runtime";
 import {
-  ThreadId,
   type ForgeExecutionBackend,
   type ScopedThreadRef,
   type TerminalEvent,
+  type TerminalLaunchProfile,
 } from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -37,7 +37,10 @@ export interface ThreadTerminalLaunchContext {
   cwd: string;
   worktreePath: string | null;
   executionBackend?: ForgeExecutionBackend;
+  launchProfile?: TerminalLaunchProfile;
 }
+
+type ThreadTerminalLaunchProfiles = Record<string, TerminalLaunchProfile>;
 
 export interface TerminalEventEntry {
   id: number;
@@ -46,6 +49,9 @@ export interface TerminalEventEntry {
 
 const TERMINAL_STATE_STORAGE_KEY = "t3code:terminal-state:v1";
 const EMPTY_TERMINAL_EVENT_ENTRIES: ReadonlyArray<TerminalEventEntry> = [];
+const EMPTY_THREAD_TERMINAL_LAUNCH_PROFILES: Readonly<ThreadTerminalLaunchProfiles> = Object.freeze(
+  {},
+);
 const MAX_TERMINAL_EVENT_BUFFER = 200;
 
 interface PersistedTerminalStateStoreState {
@@ -163,7 +169,7 @@ function normalizeTerminalGroups(
   return nextGroups;
 }
 
-function arraysEqual(a: string[], b: string[]): boolean {
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) return false;
   for (let index = 0; index < a.length; index += 1) {
     if (a[index] !== b[index]) return false;
@@ -282,6 +288,94 @@ function copyTerminalGroups(groups: ThreadTerminalGroup[]): ThreadTerminalGroup[
   }));
 }
 
+function terminalLaunchProfilesEqual(
+  left: ThreadTerminalLaunchProfiles | undefined,
+  right: ThreadTerminalLaunchProfiles | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  const leftEntries = Object.entries(left);
+  const rightEntries = Object.entries(right);
+  if (leftEntries.length !== rightEntries.length) return false;
+  for (const [terminalId, launchProfile] of leftEntries) {
+    const other = right[terminalId];
+    if (!other) return false;
+    if (
+      other.id !== launchProfile.id ||
+      other.label !== launchProfile.label ||
+      other.shell !== launchProfile.shell ||
+      !arraysEqual(other.args ?? [], launchProfile.args ?? [])
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function pruneThreadTerminalLaunchProfiles(
+  launchProfilesByThreadKey: Record<string, ThreadTerminalLaunchProfiles>,
+  threadKey: string,
+  nextState: ThreadTerminalState | undefined,
+): Record<string, ThreadTerminalLaunchProfiles> {
+  const current = launchProfilesByThreadKey[threadKey];
+  if (!current) {
+    return launchProfilesByThreadKey;
+  }
+  if (!nextState) {
+    const { [threadKey]: _removed, ...rest } = launchProfilesByThreadKey;
+    return rest;
+  }
+
+  const validTerminalIds = new Set(nextState.terminalIds);
+  const nextEntries = Object.entries(current).filter(([terminalId]) =>
+    validTerminalIds.has(terminalId),
+  );
+  if (nextEntries.length === Object.keys(current).length) {
+    return launchProfilesByThreadKey;
+  }
+  if (nextEntries.length === 0) {
+    const { [threadKey]: _removed, ...rest } = launchProfilesByThreadKey;
+    return rest;
+  }
+
+  const nextProfiles = Object.fromEntries(nextEntries);
+  if (terminalLaunchProfilesEqual(current, nextProfiles)) {
+    return launchProfilesByThreadKey;
+  }
+
+  return {
+    ...launchProfilesByThreadKey,
+    [threadKey]: nextProfiles,
+  };
+}
+
+function upsertThreadTerminalLaunchProfile(
+  launchProfilesByThreadKey: Record<string, ThreadTerminalLaunchProfiles>,
+  threadKey: string,
+  terminalId: string,
+  launchProfile: TerminalLaunchProfile,
+): Record<string, ThreadTerminalLaunchProfiles> {
+  const current = launchProfilesByThreadKey[threadKey] ?? {};
+  const existing = current[terminalId];
+  if (
+    existing &&
+    existing.id === launchProfile.id &&
+    existing.label === launchProfile.label &&
+    existing.shell === launchProfile.shell &&
+    arraysEqual(existing.args ?? [], launchProfile.args ?? [])
+  ) {
+    return launchProfilesByThreadKey;
+  }
+
+  return {
+    ...launchProfilesByThreadKey,
+    [threadKey]: {
+      ...current,
+      [terminalId]: launchProfile,
+    },
+  };
+}
+
 function appendTerminalEventEntry(
   terminalEventEntriesByKey: Record<string, ReadonlyArray<TerminalEventEntry>>,
   nextTerminalEventId: number,
@@ -317,6 +411,7 @@ function launchContextFromStartEvent(
     ...(event.snapshot.executionBackend
       ? { executionBackend: event.snapshot.executionBackend }
       : {}),
+    ...(event.snapshot.launchProfile ? { launchProfile: event.snapshot.launchProfile } : {}),
   };
 }
 
@@ -528,6 +623,19 @@ export function selectThreadTerminalState(
   return terminalStateByThreadKey[terminalThreadKey(threadRef)] ?? getDefaultThreadTerminalState();
 }
 
+export function selectThreadTerminalLaunchProfiles(
+  terminalLaunchProfileByThreadKey: Record<string, ThreadTerminalLaunchProfiles>,
+  threadRef: ScopedThreadRef | null | undefined,
+): Readonly<ThreadTerminalLaunchProfiles> {
+  if (!threadRef || threadRef.threadId.length === 0) {
+    return EMPTY_THREAD_TERMINAL_LAUNCH_PROFILES;
+  }
+  return (
+    terminalLaunchProfileByThreadKey[terminalThreadKey(threadRef)] ??
+    EMPTY_THREAD_TERMINAL_LAUNCH_PROFILES
+  );
+}
+
 function updateTerminalStateByThreadKey(
   terminalStateByThreadKey: Record<string, ThreadTerminalState>,
   threadRef: ScopedThreadRef,
@@ -575,6 +683,7 @@ export function selectTerminalEventEntries(
 interface TerminalStateStoreState {
   terminalStateByThreadKey: Record<string, ThreadTerminalState>;
   terminalLaunchContextByThreadKey: Record<string, ThreadTerminalLaunchContext>;
+  terminalLaunchProfileByThreadKey: Record<string, ThreadTerminalLaunchProfiles>;
   terminalEventEntriesByKey: Record<string, ReadonlyArray<TerminalEventEntry>>;
   nextTerminalEventId: number;
   setTerminalOpen: (threadRef: ScopedThreadRef, open: boolean) => void;
@@ -591,6 +700,11 @@ interface TerminalStateStoreState {
   setTerminalLaunchContext: (
     threadRef: ScopedThreadRef,
     context: ThreadTerminalLaunchContext,
+  ) => void;
+  setTerminalLaunchProfile: (
+    threadRef: ScopedThreadRef,
+    terminalId: string,
+    launchProfile: TerminalLaunchProfile,
   ) => void;
   clearTerminalLaunchContext: (threadRef: ScopedThreadRef) => void;
   setTerminalActivity: (
@@ -613,6 +727,7 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
         updater: (state: ThreadTerminalState) => ThreadTerminalState,
       ) => {
         set((state) => {
+          const threadKey = terminalThreadKey(threadRef);
           const nextTerminalStateByThreadKey = updateTerminalStateByThreadKey(
             state.terminalStateByThreadKey,
             threadRef,
@@ -621,8 +736,15 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
           if (nextTerminalStateByThreadKey === state.terminalStateByThreadKey) {
             return state;
           }
+          const nextThreadState = nextTerminalStateByThreadKey[threadKey];
+          const nextTerminalLaunchProfileByThreadKey = pruneThreadTerminalLaunchProfiles(
+            state.terminalLaunchProfileByThreadKey,
+            threadKey,
+            nextThreadState,
+          );
           return {
             terminalStateByThreadKey: nextTerminalStateByThreadKey,
+            terminalLaunchProfileByThreadKey: nextTerminalLaunchProfileByThreadKey,
           };
         });
       };
@@ -630,6 +752,7 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
       return {
         terminalStateByThreadKey: {},
         terminalLaunchContextByThreadKey: {},
+        terminalLaunchProfileByThreadKey: {},
         terminalEventEntriesByKey: {},
         nextTerminalEventId: 1,
         setTerminalOpen: (threadRef, open) =>
@@ -672,6 +795,22 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
               [terminalThreadKey(threadRef)]: context,
             },
           })),
+        setTerminalLaunchProfile: (threadRef, terminalId, launchProfile) =>
+          set((state) => {
+            const threadKey = terminalThreadKey(threadRef);
+            const nextTerminalLaunchProfileByThreadKey = upsertThreadTerminalLaunchProfile(
+              state.terminalLaunchProfileByThreadKey,
+              threadKey,
+              terminalId,
+              launchProfile,
+            );
+            if (nextTerminalLaunchProfileByThreadKey === state.terminalLaunchProfileByThreadKey) {
+              return state;
+            }
+            return {
+              terminalLaunchProfileByThreadKey: nextTerminalLaunchProfileByThreadKey,
+            };
+          }),
         clearTerminalLaunchContext: (threadRef) =>
           set((state) => {
             const threadKey = terminalThreadKey(threadRef);
@@ -699,6 +838,7 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
             const threadKey = terminalThreadKey(threadRef);
             let nextTerminalStateByThreadKey = state.terminalStateByThreadKey;
             let nextTerminalLaunchContextByThreadKey = state.terminalLaunchContextByThreadKey;
+            let nextTerminalLaunchProfileByThreadKey = state.terminalLaunchProfileByThreadKey;
 
             if (event.type === "started" || event.type === "restarted") {
               nextTerminalStateByThreadKey = updateTerminalStateByThreadKey(
@@ -718,6 +858,14 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
                 ...nextTerminalLaunchContextByThreadKey,
                 [threadKey]: launchContextFromStartEvent(event),
               };
+              if (event.snapshot.launchProfile) {
+                nextTerminalLaunchProfileByThreadKey = upsertThreadTerminalLaunchProfile(
+                  nextTerminalLaunchProfileByThreadKey,
+                  threadKey,
+                  event.terminalId,
+                  event.snapshot.launchProfile,
+                );
+              }
             }
 
             const hasRunningSubprocess = terminalRunningSubprocessFromEvent(event);
@@ -740,6 +888,11 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
             return {
               terminalStateByThreadKey: nextTerminalStateByThreadKey,
               terminalLaunchContextByThreadKey: nextTerminalLaunchContextByThreadKey,
+              terminalLaunchProfileByThreadKey: pruneThreadTerminalLaunchProfiles(
+                nextTerminalLaunchProfileByThreadKey,
+                threadKey,
+                nextTerminalStateByThreadKey[threadKey],
+              ),
               ...nextEventState,
             };
           }),
@@ -755,6 +908,10 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
               state.terminalLaunchContextByThreadKey[threadKey] !== undefined;
             const { [threadKey]: _removed, ...remainingLaunchContexts } =
               state.terminalLaunchContextByThreadKey;
+            const hadLaunchProfiles =
+              state.terminalLaunchProfileByThreadKey[threadKey] !== undefined;
+            const { [threadKey]: _removedLaunchProfiles, ...remainingLaunchProfiles } =
+              state.terminalLaunchProfileByThreadKey;
             const nextTerminalEventEntriesByKey = { ...state.terminalEventEntriesByKey };
             let removedEventEntries = false;
             for (const key of Object.keys(nextTerminalEventEntriesByKey)) {
@@ -766,6 +923,7 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
             if (
               nextTerminalStateByThreadKey === state.terminalStateByThreadKey &&
               !hadLaunchContext &&
+              !hadLaunchProfiles &&
               !removedEventEntries
             ) {
               return state;
@@ -773,6 +931,7 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
             return {
               terminalStateByThreadKey: nextTerminalStateByThreadKey,
               terminalLaunchContextByThreadKey: remainingLaunchContexts,
+              terminalLaunchProfileByThreadKey: remainingLaunchProfiles,
               terminalEventEntriesByKey: nextTerminalEventEntriesByKey,
             };
           }),
@@ -782,6 +941,8 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
             const hadTerminalState = state.terminalStateByThreadKey[threadKey] !== undefined;
             const hadLaunchContext =
               state.terminalLaunchContextByThreadKey[threadKey] !== undefined;
+            const hadLaunchProfiles =
+              state.terminalLaunchProfileByThreadKey[threadKey] !== undefined;
             const nextTerminalEventEntriesByKey = { ...state.terminalEventEntriesByKey };
             let removedEventEntries = false;
             for (const key of Object.keys(nextTerminalEventEntriesByKey)) {
@@ -790,16 +951,24 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
                 removedEventEntries = true;
               }
             }
-            if (!hadTerminalState && !hadLaunchContext && !removedEventEntries) {
+            if (
+              !hadTerminalState &&
+              !hadLaunchContext &&
+              !hadLaunchProfiles &&
+              !removedEventEntries
+            ) {
               return state;
             }
             const nextTerminalStateByThreadKey = { ...state.terminalStateByThreadKey };
             delete nextTerminalStateByThreadKey[threadKey];
             const nextLaunchContexts = { ...state.terminalLaunchContextByThreadKey };
             delete nextLaunchContexts[threadKey];
+            const nextLaunchProfiles = { ...state.terminalLaunchProfileByThreadKey };
+            delete nextLaunchProfiles[threadKey];
             return {
               terminalStateByThreadKey: nextTerminalStateByThreadKey,
               terminalLaunchContextByThreadKey: nextLaunchContexts,
+              terminalLaunchProfileByThreadKey: nextLaunchProfiles,
               terminalEventEntriesByKey: nextTerminalEventEntriesByKey,
             };
           }),
@@ -810,6 +979,9 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
             );
             const orphanedLaunchContextIds = Object.keys(
               state.terminalLaunchContextByThreadKey,
+            ).filter((key) => !activeThreadKeys.has(key));
+            const orphanedLaunchProfileIds = Object.keys(
+              state.terminalLaunchProfileByThreadKey,
             ).filter((key) => !activeThreadKeys.has(key));
             const nextTerminalEventEntriesByKey = { ...state.terminalEventEntriesByKey };
             let removedEventEntries = false;
@@ -823,6 +995,7 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
             if (
               orphanedIds.length === 0 &&
               orphanedLaunchContextIds.length === 0 &&
+              orphanedLaunchProfileIds.length === 0 &&
               !removedEventEntries
             ) {
               return state;
@@ -835,9 +1008,14 @@ export const useTerminalStateStore = create<TerminalStateStoreState>()(
             for (const id of orphanedLaunchContextIds) {
               delete nextLaunchContexts[id];
             }
+            const nextLaunchProfiles = { ...state.terminalLaunchProfileByThreadKey };
+            for (const id of orphanedLaunchProfileIds) {
+              delete nextLaunchProfiles[id];
+            }
             return {
               terminalStateByThreadKey: next,
               terminalLaunchContextByThreadKey: nextLaunchContexts,
+              terminalLaunchProfileByThreadKey: nextLaunchProfiles,
               terminalEventEntriesByKey: nextTerminalEventEntriesByKey,
             };
           }),

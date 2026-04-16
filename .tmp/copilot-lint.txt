@@ -1,0 +1,401 @@
+$ oxlint --report-unused-disable-directives
+
+  ! eslint(no-unused-vars): Identifier 'AppFontSize' is imported but never used.
+    ,-[apps/web/src/hooks/useSettings.ts:15:3]
+ 14 | import {
+ 15 |   AppFontSize,
+    :   ^^^^^|^^^^^
+    :        `-- 'AppFontSize' is imported here
+ 16 |   type ClientSettings,
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'Undo2Icon' is imported but never used.
+   ,-[apps/web/src/components/settings/SettingsPanels.tsx:8:3]
+ 7 |   RefreshCwIcon,
+ 8 |   Undo2Icon,
+   :   ^^^^|^^^^
+   :       `-- 'Undo2Icon' is imported here
+ 9 |   XIcon,
+   `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'XIcon' is imported but never used.
+    ,-[apps/web/src/components/settings/SettingsPanels.tsx:9:3]
+  8 |   Undo2Icon,
+  9 |   XIcon,
+    :   ^^|^^
+    :     `-- 'XIcon' is imported here
+ 10 | } from "lucide-react";
+    `----
+  help: Consider removing this import.
+
+  ! eslint-plugin-react-hooks(exhaustive-deps): React Hook useCallback has a missing dependency: 'props'
+     ,-[apps/web/src/components/ProjectFilesPanel.tsx:297:5]
+ 240 |                 onDoubleClick={() => {
+ 241 |                   props.onOpenFile(node.path);
+     :                   ^^|^^
+     :                     `-- useCallback uses `props` here
+ 242 |                 }}
+ 243 |                 onKeyDown={(event) => {
+ 244 |                   if (event.key === "Enter" || event.key === " ") {
+ 245 |                     event.preventDefault();
+ 246 |                     props.onOpenFile(node.path);
+ 247 |                   }
+ 248 |                 }}
+ 249 |               >
+ 250 |                 <span aria-hidden="true" className="size-3.5 shrink-0" />
+ 251 |                 <VscodeEntryIcon
+ 252 |                   pathValue={node.path}
+ 253 |                   kind="file"
+ 254 |                   theme={props.resolvedTheme}
+ 255 |                   className="size-3.5"
+ 256 |                 />
+ 257 |                 <span className="truncate font-mono text-[11px] text-foreground/85">
+ 258 |                   {highlightName(node.name, props.searchQuery)}
+ 259 |                 </span>
+ 260 |                 {fileTextMatches && fileTextMatches.matches.length > 0 ? (
+ 261 |                   <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 py-px font-mono text-[10px] text-muted-foreground">
+ 262 |                     {fileTextMatches.matches.length}
+ 263 |                   </span>
+ 264 |                 ) : null}
+ 265 |               </button>
+ 266 |               {fileTextMatches && fileTextMatches.matches.length > 0 ? (
+ 267 |                 <div className="space-y-px" style={{ paddingLeft: `${leftPadding + 18}px` }}>
+ 268 |                   {fileTextMatches.matches.map((match) => (
+ 269 |                     <button
+ 270 |                       key={`${node.path}:${match.lineNumber}`}
+ 271 |                       type="button"
+ 272 |                       className="flex w-full items-start gap-2 rounded-md py-0.5 pr-2 text-left hover:bg-accent/40"
+ 273 |                       title="Double-click to open and edit"
+ 274 |                       onDoubleClick={() => {
+ 275 |                         props.onOpenFile(node.path);
+ 276 |                       }}
+ 277 |                       onKeyDown={(event) => {
+ 278 |                         if (event.key === "Enter" || event.key === " ") {
+ 279 |                           event.preventDefault();
+ 280 |                           props.onOpenFile(node.path);
+ 281 |                         }
+ 282 |                       }}
+ 283 |                     >
+ 284 |                       <span className="w-8 shrink-0 text-right font-mono text-[10px] text-muted-foreground/70">
+ 285 |                         {match.lineNumber}
+ 286 |                       </span>
+ 287 |                       <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/70">
+ 288 |                         {highlightLineText(match.lineText, props.searchQuery ?? "", match.submatches)}
+ 289 |                       </span>
+ 290 |                     </button>
+ 291 |                   ))}
+ 292 |                 </div>
+ 293 |               ) : null}
+ 294 |             </div>
+ 295 |           );
+ 296 |         },
+ 297 | ,->     [
+ 298 | |         expandedDirectories,
+ 299 | |         props.allDirectoriesExpanded,
+ 300 | |         props.onOpenFile,
+ 301 | |         props.resolvedTheme,
+ 302 | |         props.searchQuery,
+ 303 | |         textMatchesByPath,
+ 304 | |         toggleDirectory,
+ 305 | `->     ],
+ 306 |       );
+     `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint-plugin-react-hooks(exhaustive-deps): React Hook useCallback has unnecessary dependency: props.onOpenFile
+     ,-[apps/web/src/components/ProjectFilesPanel.tsx:297:5]
+ 296 |         },
+ 297 | ,->     [
+ 298 | |         expandedDirectories,
+ 299 | |         props.allDirectoriesExpanded,
+ 300 | |         props.onOpenFile,
+ 301 | |         props.resolvedTheme,
+ 302 | |         props.searchQuery,
+ 303 | |         textMatchesByPath,
+ 304 | |         toggleDirectory,
+ 305 | `->     ],
+ 306 |       );
+     `----
+  help: Either include it or remove the dependency array.
+
+  ! eslint-plugin-react-hooks(exhaustive-deps): React hook useMemo depends on `textSearchFiles`, which changes every render
+     ,-[apps/web/src/components/ProjectFilesPanel.tsx:349:16]
+ 340 |   const entries = projectEntriesQuery.data?.entries ?? EMPTY_PROJECT_ENTRIES;
+ 341 |   const textSearchFiles = projectTextSearchQuery.data?.files ?? [];
+     :         ^^^^^^^|^^^^^^^
+     :                `-- `textSearchFiles` is declared here
+ 342 |   const mergedEntries = useMemo(() => {
+ 343 |     if (!showSearchResults || textSearchFiles.length === 0) return entries;
+ 344 |     const existingPaths = new Set(entries.map((e) => e.path));
+ 345 |     const extraEntries = textSearchFiles
+ 346 |       .filter((f) => !existingPaths.has(f.path))
+ 347 |       .map((f) => ({ path: f.path, kind: "file" as const }));
+ 348 |     return extraEntries.length > 0 ? [...entries, ...extraEntries] : entries;
+ 349 |   }, [entries, textSearchFiles, showSearchResults]);
+     :                ^^^^^^^|^^^^^^^
+     :                       `-- it will always cause this hook to re-evaluate
+ 350 |   const allDirectoriesExpanded = false;
+     `----
+  help: Try memoizing this variable with `useRef` or `useCallback`.
+
+  ! eslint(no-unused-vars): Identifier 'isGitRepository' is imported but never used.
+    ,-[apps/server/src/orchestration/Layers/CheckpointReactor.ts:26:10]
+ 25 | import { OrchestrationDispatchError } from "../Errors.ts";
+ 26 | import { isGitRepository } from "../../git/Utils.ts";
+    :          ^^^^^^^|^^^^^^^
+    :                 `-- 'isGitRepository' is imported here
+ 27 | import { GitStatusBroadcaster } from "../../git/Services/GitStatusBroadcaster.ts";
+    `----
+  help: Consider removing this import.
+
+  ! eslint-plugin-unicorn(consistent-function-scoping): Function `resolveRegistryRead` does not capture any variables from its parent scope
+    ,-[apps/web/src/environments/runtime/catalog.test.ts:98:9]
+ 97 |   it("does not let stale hydration overwrite records added while hydration is in flight", async () => {
+ 98 |     let resolveRegistryRead: () => void = () => {
+    :         ^^^^^^^^^^^^^^^^^^^
+ 99 |       throw new Error("Registry read resolver was not initialized.");
+    `----
+  help: Move `resolveRegistryRead` to the outer scope to avoid recreating it on every call.
+
+  ! eslint(no-unused-vars): Identifier 'ThreadId' is imported but never used.
+    ,-[apps/web/src/terminalStateStore.ts:10:3]
+  9 | import {
+ 10 |   ThreadId,
+    :   ^^^^|^^^
+    :       `-- 'ThreadId' is imported here
+ 11 |   type ForgeExecutionBackend,
+    `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'buildModelSelection' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:123:10]
+ 122 | import { resolveAppModelSelection } from "../modelSelection";
+ 123 | import { buildModelSelection } from "../modelSelectionUtils";
+     :          ^^^^^^^^^|^^^^^^^^^
+     :                   `-- 'buildModelSelection' is imported here
+ 124 | import { isTerminalFocused } from "../lib/terminalFocus";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ContextWindowMeter' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:150:10]
+ 149 | import { DesktopTitleBar } from "./DesktopTitleBar";
+ 150 | import { ContextWindowMeter } from "./chat/ContextWindowMeter";
+     :          ^^^^^^^^^|^^^^^^^^
+     :                   `-- 'ContextWindowMeter' is imported here
+ 151 | import { buildExpandedImagePreview, ExpandedImagePreview } from "./chat/ExpandedImagePreview";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'buildExpandedImagePreview' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:151:10]
+ 150 | import { ContextWindowMeter } from "./chat/ContextWindowMeter";
+ 151 | import { buildExpandedImagePreview, ExpandedImagePreview } from "./chat/ExpandedImagePreview";
+     :          ^^^^^^^^^^^^|^^^^^^^^^^^^
+     :                      `-- 'buildExpandedImagePreview' is imported here
+ 152 | import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'AVAILABLE_PROVIDER_OPTIONS' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:152:10]
+ 151 | import { buildExpandedImagePreview, ExpandedImagePreview } from "./chat/ExpandedImagePreview";
+ 152 | import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
+     :          ^^^^^^^^^^^^^|^^^^^^^^^^^^
+     :                       `-- 'AVAILABLE_PROVIDER_OPTIONS' is imported here
+ 153 | import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ProviderModelPicker' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:152:38]
+ 151 | import { buildExpandedImagePreview, ExpandedImagePreview } from "./chat/ExpandedImagePreview";
+ 152 | import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
+     :                                      ^^^^^^^^^|^^^^^^^^^
+     :                                               `-- 'ProviderModelPicker' is imported here
+ 153 | import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ComposerCommandItem' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:153:10]
+ 152 | import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
+ 153 | import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
+     :          ^^^^^^^^^|^^^^^^^^^
+     :                   `-- 'ComposerCommandItem' is imported here
+ 154 | import { ComposerPendingApprovalActions } from "./chat/ComposerPendingApprovalActions";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ComposerCommandMenu' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:153:31]
+ 152 | import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
+ 153 | import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
+     :                               ^^^^^^^^^|^^^^^^^^^
+     :                                        `-- 'ComposerCommandMenu' is imported here
+ 154 | import { ComposerPendingApprovalActions } from "./chat/ComposerPendingApprovalActions";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ComposerPendingApprovalActions' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:154:10]
+ 153 | import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
+ 154 | import { ComposerPendingApprovalActions } from "./chat/ComposerPendingApprovalActions";
+     :          ^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^
+     :                         `-- 'ComposerPendingApprovalActions' is imported here
+ 155 | import { CompactComposerControlsMenu } from "./chat/CompactComposerControlsMenu";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'CompactComposerControlsMenu' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:155:10]
+ 154 | import { ComposerPendingApprovalActions } from "./chat/ComposerPendingApprovalActions";
+ 155 | import { CompactComposerControlsMenu } from "./chat/CompactComposerControlsMenu";
+     :          ^^^^^^^^^^^^^|^^^^^^^^^^^^^
+     :                       `-- 'CompactComposerControlsMenu' is imported here
+ 156 | import { ComposerPrimaryActions } from "./chat/ComposerPrimaryActions";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ComposerPrimaryActions' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:156:10]
+ 155 | import { CompactComposerControlsMenu } from "./chat/CompactComposerControlsMenu";
+ 156 | import { ComposerPrimaryActions } from "./chat/ComposerPrimaryActions";
+     :          ^^^^^^^^^^^|^^^^^^^^^^
+     :                     `-- 'ComposerPrimaryActions' is imported here
+ 157 | import { ComposerPendingApprovalPanel } from "./chat/ComposerPendingApprovalPanel";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ComposerPendingApprovalPanel' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:157:10]
+ 156 | import { ComposerPrimaryActions } from "./chat/ComposerPrimaryActions";
+ 157 | import { ComposerPendingApprovalPanel } from "./chat/ComposerPendingApprovalPanel";
+     :          ^^^^^^^^^^^^^^|^^^^^^^^^^^^^
+     :                        `-- 'ComposerPendingApprovalPanel' is imported here
+ 158 | import { ComposerPendingUserInputPanel } from "./chat/ComposerPendingUserInputPanel";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ComposerPendingUserInputPanel' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:158:10]
+ 157 | import { ComposerPendingApprovalPanel } from "./chat/ComposerPendingApprovalPanel";
+ 158 | import { ComposerPendingUserInputPanel } from "./chat/ComposerPendingUserInputPanel";
+     :          ^^^^^^^^^^^^^^|^^^^^^^^^^^^^^
+     :                        `-- 'ComposerPendingUserInputPanel' is imported here
+ 159 | import { ComposerPlanFollowUpBanner } from "./chat/ComposerPlanFollowUpBanner";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'ComposerPlanFollowUpBanner' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:159:10]
+ 158 | import { ComposerPendingUserInputPanel } from "./chat/ComposerPendingUserInputPanel";
+ 159 | import { ComposerPlanFollowUpBanner } from "./chat/ComposerPlanFollowUpBanner";
+     :          ^^^^^^^^^^^^^|^^^^^^^^^^^^
+     :                       `-- 'ComposerPlanFollowUpBanner' is imported here
+ 160 | import {
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'getComposerProviderState' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:161:3]
+ 160 | import {
+ 161 |   getComposerProviderState,
+     :   ^^^^^^^^^^^^|^^^^^^^^^^^
+     :               `-- 'getComposerProviderState' is imported here
+ 162 |   renderProviderTraitsMenuContent,
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'renderProviderTraitsMenuContent' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:162:3]
+ 161 |   getComposerProviderState,
+ 162 |   renderProviderTraitsMenuContent,
+     :   ^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^
+     :                  `-- 'renderProviderTraitsMenuContent' is imported here
+ 163 |   renderProviderTraitsPicker,
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Identifier 'renderProviderTraitsPicker' is imported but never used.
+     ,-[apps/web/src/components/ChatView.tsx:163:3]
+ 162 |   renderProviderTraitsMenuContent,
+ 163 |   renderProviderTraitsPicker,
+     :   ^^^^^^^^^^^^^|^^^^^^^^^^^^
+     :                `-- 'renderProviderTraitsPicker' is imported here
+ 164 | } from "./chat/composerProviderRegistry";
+     `----
+  help: Consider removing this import.
+
+  ! eslint(no-unused-vars): Variable 'COMPOSER_PATH_QUERY_DEBOUNCE_MS' is declared but never used. Unused variables should start with a '_'.
+     ,-[apps/web/src/components/ChatView.tsx:351:7]
+ 350 | 
+ 351 | const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
+     :       ^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^
+     :                      `-- 'COMPOSER_PATH_QUERY_DEBOUNCE_MS' is declared here
+ 352 | const SCRIPT_TERMINAL_COLS = 120;
+     `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'modelOptionsByProvider' is declared but never used. Unused variables should start with a '_'.
+      ,-[apps/web/src/components/ChatView.tsx:1516:9]
+ 1515 |   const availableEditors = useServerAvailableEditors();
+ 1516 |   const modelOptionsByProvider = useMemo(
+      :         ^^^^^^^^^^^|^^^^^^^^^^
+      :                    `-- 'modelOptionsByProvider' is declared here
+ 1517 |     () => ({
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'queuedFollowupPreview' is declared but never used. Unused variables should start with a '_'.
+      ,-[apps/web/src/components/ChatView.tsx:1542:9]
+ 1541 |     queuedFollowupCount > 0 ? (activeThread?.queuedFollowups[0] ?? null) : null;
+ 1542 |   const queuedFollowupPreview = firstQueuedFollowup
+      :         ^^^^^^^^^^|^^^^^^^^^^
+      :                   `-- 'queuedFollowupPreview' is declared here
+ 1543 |     ? getQueuedFollowupPreview(firstQueuedFollowup)
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'onRemoveQueuedFollowup' is declared but never used. Unused variables should start with a '_'.
+      ,-[apps/web/src/components/ChatView.tsx:2934:9]
+ 2933 | 
+ 2934 |   const onRemoveQueuedFollowup = useCallback(
+      :         ^^^^^^^^^^^|^^^^^^^^^^
+      :                    `-- 'onRemoveQueuedFollowup' is declared here
+ 2935 |     async (queuedFollowupId: string) => {
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint(no-unused-vars): Variable 'onSteerQueuedFollowup' is declared but never used. Unused variables should start with a '_'.
+      ,-[apps/web/src/components/ChatView.tsx:2959:9]
+ 2958 | 
+ 2959 |   const onSteerQueuedFollowup = useCallback(
+      :         ^^^^^^^^^^|^^^^^^^^^^
+      :                   `-- 'onSteerQueuedFollowup' is declared here
+ 2960 |     async (queuedFollowupId: string) => {
+      `----
+  help: Consider removing this declaration.
+
+  ! eslint-plugin-unicorn(consistent-function-scoping): Function `readRegistryPath` does not capture any variables from its parent scope
+     ,-[apps/desktop/src/syncShellEnvironment.test.ts:145:11]
+ 144 |   it("merges new PATH entries from the Windows registry", () => {
+ 145 |     const readRegistryPath = (key: string) => {
+     :           ^^^^^^^^^^^^^^^^
+ 146 |       if (key.includes("HKCU")) {
+     `----
+  help: Move `readRegistryPath` to the outer scope to avoid recreating it on every call.
+
+  ! eslint-plugin-unicorn(consistent-function-scoping): Function `readRegistryPath` does not capture any variables from its parent scope
+     ,-[apps/desktop/src/syncShellEnvironment.test.ts:167:11]
+ 166 |   it("expands %VAR% references in Windows registry PATH values", () => {
+ 167 |     const readRegistryPath = (key: string) => {
+     :           ^^^^^^^^^^^^^^^^
+ 168 |       if (key.includes("HKCU")) {
+     `----
+  help: Move `readRegistryPath` to the outer scope to avoid recreating it on every call.
+
+Found 32 warnings and 0 errors.
+Finished in 64ms on 707 files with 149 rules using 20 threads.

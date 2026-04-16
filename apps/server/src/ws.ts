@@ -13,7 +13,9 @@ import {
   OrchestrationGetSnapshotError,
   OrchestrationGetTurnDiffError,
   ORCHESTRATION_WS_METHODS,
+  ProjectReadFileError,
   ProjectSearchEntriesError,
+  ProjectSearchTextError,
   ProjectWriteFileError,
   OrchestrationReplayEventsError,
   ThreadId,
@@ -634,6 +636,17 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
             providerRegistry.refresh().pipe(Effect.map((providers) => ({ providers }))),
             { "rpc.aggregate": "server" },
           ),
+        [WS_METHODS.serverUpdateHarnesses]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.serverUpdateHarnesses,
+            Effect.gen(function* () {
+              const results = yield* providerRegistry.updateAll;
+              yield* Effect.sleep("3 seconds");
+              const providers = yield* providerRegistry.refresh();
+              return { results, providers };
+            }),
+            { "rpc.aggregate": "server" },
+          ),
         [WS_METHODS.serverUpsertKeybinding]: (rule) =>
           observeRpcEffect(
             WS_METHODS.serverUpsertKeybinding,
@@ -662,6 +675,36 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
                     cause,
                   }),
               ),
+            ),
+            { "rpc.aggregate": "workspace" },
+          ),
+        [WS_METHODS.projectsSearchText]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.projectsSearchText,
+            workspaceEntries.searchText(input).pipe(
+              Effect.mapError(
+                (cause) =>
+                  new ProjectSearchTextError({
+                    message: `Failed to search workspace file contents: ${cause.detail}`,
+                    cause,
+                  }),
+              ),
+            ),
+            { "rpc.aggregate": "workspace" },
+          ),
+        [WS_METHODS.projectsReadFile]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.projectsReadFile,
+            workspaceFileSystem.readFile(input).pipe(
+              Effect.mapError((cause) => {
+                const message = Schema.is(WorkspacePathOutsideRootError)(cause)
+                  ? "Workspace file path must stay within the project root."
+                  : cause.detail;
+                return new ProjectReadFileError({
+                  message,
+                  cause,
+                });
+              }),
             ),
             { "rpc.aggregate": "workspace" },
           ),
@@ -786,6 +829,10 @@ const makeWsRpcLayer = (currentSessionId: AuthSessionId) =>
           ),
         [WS_METHODS.terminalOpen]: (input) =>
           observeRpcEffect(WS_METHODS.terminalOpen, terminalManager.open(input), {
+            "rpc.aggregate": "terminal",
+          }),
+        [WS_METHODS.terminalListProfiles]: () =>
+          observeRpcEffect(WS_METHODS.terminalListProfiles, terminalManager.listProfiles(), {
             "rpc.aggregate": "terminal",
           }),
         [WS_METHODS.terminalWrite]: (input) =>

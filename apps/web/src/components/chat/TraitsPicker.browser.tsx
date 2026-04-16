@@ -8,7 +8,6 @@ import {
   DEFAULT_SERVER_SETTINGS,
   type OpencodeModelOptions,
   EnvironmentId,
-  ProjectId,
   type ServerProvider,
   ThreadId,
 } from "@t3tools/contracts";
@@ -155,6 +154,22 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
       {
         slug: "anthropic/claude-sonnet-4-5",
         name: "Anthropic Claude Sonnet 4.5",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium", isDefault: true },
+            { value: "high", label: "High" },
+          ],
+          supportsFastMode: false,
+          supportsThinkingToggle: false,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+      {
+        slug: "google/gemini-2.5-flash",
+        name: "Google Gemini 2.5 Flash",
         isCustom: false,
         capabilities: {
           reasoningEffortLevels: [],
@@ -642,9 +657,30 @@ describe("TraitsPicker (OpenCode)", () => {
     });
   });
 
-  it("hides OpenCode traits when the selected model has no effort controls", async () => {
+  it("shows OpenCode effort controls for Anthropic-backed models", async () => {
     await using _ = await mountOpencodePicker({
       model: "anthropic/claude-sonnet-4-5",
+    });
+
+    await vi.waitFor(() => {
+      expect(document.body.textContent ?? "").toContain("Medium");
+    });
+    await page.getByRole("button").click();
+
+    await vi.waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("Effort");
+      expect(text).toContain("Low");
+      expect(text).toContain("Medium");
+      expect(text).toContain("High");
+      expect(text).not.toContain("Minimal");
+      expect(text).not.toContain("Extra High");
+    });
+  });
+
+  it("hides OpenCode traits when the selected model has no effort controls", async () => {
+    await using _ = await mountOpencodePicker({
+      model: "google/gemini-2.5-flash",
     });
 
     expect(document.querySelector("button")).toBeNull();

@@ -62,6 +62,13 @@ const PROVIDER_CUSTOM_MODEL_CONFIG: Record<ProviderKind, ProviderCustomModelConf
     placeholder: "provider-id/model-id",
     example: "github_copilot/gpt-5.4",
   },
+  githubCopilot: {
+    provider: "githubCopilot",
+    title: "GitHub Copilot",
+    description: "Save additional GitHub Copilot model slugs for the picker and `/model` command.",
+    placeholder: "your-copilot-model-slug",
+    example: "gpt-5.4",
+  },
 };
 
 export const MODEL_PROVIDER_SETTINGS = Object.values(PROVIDER_CUSTOM_MODEL_CONFIG);
@@ -194,6 +201,12 @@ export function getCustomModelOptionsByProvider(
       providers,
       "forgecode",
       selectedProvider === "forgecode" ? selectedModel : undefined,
+    ),
+    githubCopilot: getAppModelOptions(
+      settings,
+      providers,
+      "githubCopilot",
+      selectedProvider === "githubCopilot" ? selectedModel : undefined,
     ),
   };
 }

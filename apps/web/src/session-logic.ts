@@ -32,6 +32,7 @@ export const PROVIDER_OPTIONS: Array<{
   { value: "claudeAgent", label: "Claude", available: true },
   { value: "opencode", label: "OpenCode", available: true },
   { value: "forgecode", label: "ForgeCode", available: true },
+  { value: "githubCopilot", label: "GitHub Copilot", available: true },
   { value: "cursor", label: "Cursor", available: false },
 ];
 
