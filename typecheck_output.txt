@@ -5,12 +5,12 @@ $ turbo run typecheck
    • Running typecheck in 8 packages
    • Remote caching disabled
 
-@t3tools/marketing:typecheck: cache bypass, force executing aa76afa3635eb97a
 @t3tools/contracts:typecheck: cache bypass, force executing d24d0e335329b47f
-@t3tools/marketing:typecheck: $ node ../../scripts/ensure-zod-locales-index.mjs && astro check
+@t3tools/marketing:typecheck: cache bypass, force executing aa76afa3635eb97a
 @t3tools/contracts:typecheck: $ tsc --noEmit
-@t3tools/marketing:typecheck: [2m06:01:11[22m [34m[types][39m Generated [2m73ms[22m
-@t3tools/marketing:typecheck: [2m06:01:11[22m [34m[check][39m Getting diagnostics for Astro files in D:\Projects\t3code\apps\marketing...
+@t3tools/marketing:typecheck: $ node ../../scripts/ensure-zod-locales-index.mjs && astro check
+@t3tools/marketing:typecheck: [2m05:55:41[22m [34m[types][39m Generated [2m52ms[22m
+@t3tools/marketing:typecheck: [2m05:55:41[22m [34m[check][39m Getting diagnostics for Astro files in D:\Projects\t3code\apps\marketing...
 @t3tools/client-runtime:typecheck: cache bypass, force executing 2528cdf0c9f189e4
 @t3tools/shared:typecheck: cache bypass, force executing 2db4fe4091add2fa
 @t3tools/client-runtime:typecheck: $ tsc --noEmit
@@ -20,11 +20,11 @@ $ turbo run typecheck
 @t3tools/marketing:typecheck: - 0 warnings
 @t3tools/marketing:typecheck: - 0 hints
 @t3tools/marketing:typecheck: 
-@t3tools/web:typecheck: cache bypass, force executing 48a08c25511f62b7
 @t3tools/scripts:typecheck: cache bypass, force executing 585cd5bbbd0f3cca
+@t3tools/web:typecheck: cache bypass, force executing 48a08c25511f62b7
 @t3tools/desktop:typecheck: cache bypass, force executing 207255eb2a3713e5
-@t3tools/web:typecheck: $ tsc --noEmit
 @t3tools/scripts:typecheck: $ tsc --noEmit
+@t3tools/web:typecheck: $ tsc --noEmit
 @t3tools/desktop:typecheck: $ tsc --noEmit
 @t3tools/web:typecheck: src/components/ui/input.tsx(44,10): error TS2322: Type '{ required?: boolean | undefined; type?: HTMLInputTypeAttribute | undefined; id?: string | undefined; role?: AriaRole | undefined; key?: Key | null | undefined; ... 305 more ...; size: number | undefined; }' is not assignable to type 'DetailedHTMLProps<InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>'.
 @t3tools/web:typecheck:   Types of property 'style' are incompatible.
@@ -35,7 +35,7 @@ $ turbo run typecheck
 
  Tasks:    6 successful, 7 total
 Cached:    0 cached, 7 total
-  Time:    12.354s 
+  Time:    13.352s 
 Failed:    @t3tools/web#typecheck
 
  ERROR  run failed: command  exited (1)

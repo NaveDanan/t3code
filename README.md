@@ -30,7 +30,7 @@ winget install T3Tools.T3Code
 #### macOS (Homebrew)
 
 ```bash
-brew install --cask t3-code
+brew install --cask NJ-Code
 ```
 
 #### Arch Linux (AUR)

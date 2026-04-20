@@ -1,6 +1,6 @@
 import { scopeProjectRef } from "@t3tools/client-runtime";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import ChatView from "../components/ChatView";
 import { threadHasStarted } from "../components/ChatView.logic";
@@ -14,6 +14,7 @@ import {
   updateRightPanelSearch,
 } from "../diffRouteSearch";
 
+import { Spinner } from "../components/ui/spinner";
 import { useTheme } from "../hooks/useTheme";
 import { SidebarInset } from "../components/ui/sidebar";
 import {
@@ -44,6 +45,7 @@ function DraftChatThreadRouteView() {
   const serverThreadStarted = threadHasStarted(serverThread);
   const rightPanelOpen = search.rightPanel === "1";
   const rightPanelTab = search.rightPanelTab ?? getStoredRightPanelTab();
+  const redirectedCanonicalThreadKeyRef = useRef<string | null>(null);
 
   const { resolvedTheme } = useTheme();
   const canonicalThreadRef = useMemo(
@@ -96,8 +98,16 @@ function DraftChatThreadRouteView() {
 
   useEffect(() => {
     if (!canonicalThreadRef) {
+      redirectedCanonicalThreadKeyRef.current = null;
       return;
     }
+
+    const redirectKey = `${canonicalThreadRef.environmentId}:${canonicalThreadRef.threadId}:${rightPanelOpen ? rightPanelTab : "closed"}`;
+    if (redirectedCanonicalThreadKeyRef.current === redirectKey) {
+      return;
+    }
+    redirectedCanonicalThreadKeyRef.current = redirectKey;
+
     void navigate({
       to: "/$environmentId/$threadId",
       params: buildThreadRouteParams(canonicalThreadRef),
@@ -121,11 +131,12 @@ function DraftChatThreadRouteView() {
   if (canonicalThreadRef) {
     return (
       <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground">
-        <ChatView
-          environmentId={canonicalThreadRef.environmentId}
-          threadId={canonicalThreadRef.threadId}
-          routeKind="server"
-        />
+        <div className="flex min-h-0 flex-1 items-center justify-center bg-background px-4 py-10 text-foreground sm:px-6">
+          <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/90 px-4 py-3 shadow-sm">
+            <Spinner className="size-4 text-foreground/70" />
+            <span className="text-sm text-muted-foreground">Opening promoted thread...</span>
+          </div>
+        </div>
       </SidebarInset>
     );
   }

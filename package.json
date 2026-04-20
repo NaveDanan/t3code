@@ -60,6 +60,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "electron-builder": "26.8.1",
     "oxfmt": "^0.40.0",
     "oxlint": "^1.55.0",
     "turbo": "^2.3.3",

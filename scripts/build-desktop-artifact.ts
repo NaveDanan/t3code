@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { delimiter as PATH_DELIMITER, join } from "node:path";
 
 import rootPackageJson from "../package.json" with { type: "json" };
 import desktopPackageJson from "../apps/desktop/package.json" with { type: "json" };
@@ -233,6 +233,7 @@ interface StagePackageJson {
   readonly version: string;
   readonly buildVersion: string;
   readonly t3codeCommitHash: string;
+  readonly packageManager: string;
   readonly private: true;
   readonly description: string;
   readonly homepage: string;
@@ -544,7 +545,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   const buildConfig: Record<string, unknown> = {
     appId: "com.t3tools.t3code",
     productName,
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    artifactName: "NJ-Code-${version}-${arch}.${ext}",
     npmRebuild: false,
     nodeGypRebuild: false,
     directories: {
@@ -736,6 +737,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
+    packageManager: rootPackageJson.packageManager,
     private: true,
     description: "NJ Code desktop build",
     homepage: "https://github.com/pingdotgg/t3code",
@@ -814,6 +816,12 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     buildEnv.GYP_MSVS_VERSION = buildEnv.GYP_MSVS_VERSION ?? "2022";
   }
 
+  const workspaceBinDir = join(repoRoot, "node_modules", ".bin");
+  buildEnv.PATH = buildEnv.PATH
+    ? `${workspaceBinDir}${PATH_DELIMITER}${buildEnv.PATH}`
+    : workspaceBinDir;
+  const electronBuilderCli = join(repoRoot, "node_modules", "electron-builder", "cli.js");
+
   yield* Effect.log(
     `[desktop-artifact] Building ${options.platform}/${options.target} (arch=${options.arch}, version=${appVersion})...`,
   );
@@ -822,9 +830,9 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       cwd: stageAppDir,
       env: buildEnv,
       ...commandOutputOptions(options.verbose),
-      // Windows needs shell mode to resolve .cmd shims.
-      shell: process.platform === "win32",
-    })`bunx electron-builder ${platformConfig.cliFlag} --${options.arch} --publish never`,
+      // Invoke the local electron-builder CLI with Node directly, so a shell is unnecessary.
+      shell: false,
+    })`${process.execPath} ${electronBuilderCli} ${platformConfig.cliFlag} --${options.arch} --publish never`,
   );
 
   const stageDistDir = path.join(stageAppDir, "dist");

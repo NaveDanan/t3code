@@ -16,7 +16,7 @@ import type {
 } from "@t3tools/contracts";
 import { Effect, Equal, Layer, Result, Stream } from "effect";
 import { existsSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, delimiter, extname, isAbsolute, join } from "node:path";
 import { isWindowsCommandNotFound, runProcess } from "../../processRunner";
 
 import {
@@ -102,7 +102,7 @@ function findExecutableOnPath(
   }
 
   const seen = new Set<string>();
-  for (const rawEntry of pathValue.split(";")) {
+  for (const rawEntry of pathValue.split(delimiter)) {
     const entry = rawEntry.trim();
     if (entry.length === 0) {
       continue;
@@ -124,6 +124,63 @@ function findExecutableOnPath(
   return undefined;
 }
 
+function resolveExecutableNamesForPlatform(
+  binaryPath: string,
+  options?: {
+    readonly platform?: NodeJS.Platform;
+    readonly pathExt?: string | undefined;
+  },
+): ReadonlyArray<string> {
+  const trimmedBinaryPath = binaryPath.trim();
+  if (trimmedBinaryPath.length === 0) {
+    return [];
+  }
+
+  const platform = options?.platform ?? process.platform;
+  if (platform !== "win32") {
+    return [trimmedBinaryPath];
+  }
+
+  if (extname(trimmedBinaryPath).length > 0) {
+    return [trimmedBinaryPath];
+  }
+
+  const pathExtValue = options?.pathExt ?? process.env.PATHEXT;
+  const extensions = (pathExtValue || ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .map((value) => value.trim())
+    .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
+
+  return [trimmedBinaryPath, ...extensions.map((extension) => `${trimmedBinaryPath}${extension}`)];
+}
+
+function resolveCliPathForSdk(
+  binaryPath: string,
+  options?: {
+    readonly pathValue?: string;
+    readonly platform?: NodeJS.Platform;
+    readonly pathExt?: string | undefined;
+  },
+): string | undefined {
+  const trimmedBinaryPath = binaryPath.trim();
+  if (trimmedBinaryPath.length === 0) {
+    return undefined;
+  }
+
+  if (
+    isAbsolute(trimmedBinaryPath) ||
+    trimmedBinaryPath.includes("/") ||
+    trimmedBinaryPath.includes("\\")
+  ) {
+    return existsSync(trimmedBinaryPath) ? trimmedBinaryPath : undefined;
+  }
+
+  return findExecutableOnPath(
+    resolveExecutableNamesForPlatform(trimmedBinaryPath, options),
+    options?.pathValue ?? process.env.PATH,
+  );
+}
+
 export function resolveGitHubCopilotSdkLaunchConfig(
   binaryPath: string,
   options?: {
@@ -135,6 +192,14 @@ export function resolveGitHubCopilotSdkLaunchConfig(
 ): GitHubCopilotSdkLaunchConfig {
   const platform = options?.platform ?? process.platform;
   const runningInElectron = options?.runningInElectron ?? isElectronNodeRuntime();
+  const resolvedCliPath = resolveCliPathForSdk(binaryPath, {
+    pathValue: options?.pathValue,
+    platform,
+  });
+
+  if (resolvedCliPath) {
+    return { cliPath: resolvedCliPath };
+  }
 
   if (!shouldUseBundledSdkCli(binaryPath)) {
     return { cliPath: binaryPath };

@@ -1,3 +1,7 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, it, assert } from "@effect/vitest";
 import {
@@ -1761,6 +1765,25 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         });
 
         assert.deepStrictEqual(launchConfig, {});
+      });
+
+      it("prefers a Copilot executable resolved from PATH before the bundled SDK CLI", () => {
+        const tempRoot = mkdtempSync(join(tmpdir(), "t3code-copilot-sdk-"));
+        const copilotCmdPath = join(tempRoot, "copilot.cmd");
+        writeFileSync(copilotCmdPath, "@echo off\r\n", "utf8");
+
+        const launchConfig = resolveGitHubCopilotSdkLaunchConfig("copilot", {
+          bundledCliPath: "C:\\sdk\\copilot\\index.js",
+          pathValue: tempRoot,
+          platform: "win32",
+          runningInElectron: true,
+        });
+
+        assert.deepStrictEqual(launchConfig, {
+          cliPath: copilotCmdPath.toUpperCase().endsWith(".CMD")
+            ? copilotCmdPath.slice(0, -4) + ".CMD"
+            : copilotCmdPath,
+        });
       });
 
       it.effect("returns ready when the Copilot runtime reports an authenticated user", () =>
