@@ -113,14 +113,9 @@ import {
   projectScriptIdFromCommand,
 } from "~/projectScripts";
 import { newCommandId, newDraftId, newMessageId, newThreadId } from "~/lib/utils";
-import {
-  getProviderModelCapabilities,
-  getProviderModels,
-  resolveSelectableProvider,
-} from "../providerModels";
+import { getProviderModelCapabilities, resolveSelectableProvider } from "../providerModels";
 import { useSettings } from "../hooks/useSettings";
 import { resolveAppModelSelection } from "../modelSelection";
-import { buildModelSelection } from "../modelSelectionUtils";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { deriveLogicalProjectKey } from "../logicalProject";
 import {
@@ -151,31 +146,19 @@ import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import { ChatHeader } from "./chat/ChatHeader";
 import { DesktopTitleBar } from "./DesktopTitleBar";
-import { ContextWindowMeter } from "./chat/ContextWindowMeter";
-import { buildExpandedImagePreview, ExpandedImagePreview } from "./chat/ExpandedImagePreview";
-import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
-import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
-import { ComposerPendingApprovalActions } from "./chat/ComposerPendingApprovalActions";
-import { CompactComposerControlsMenu } from "./chat/CompactComposerControlsMenu";
-import { ComposerPrimaryActions } from "./chat/ComposerPrimaryActions";
-import { ComposerPendingApprovalPanel } from "./chat/ComposerPendingApprovalPanel";
-import { ComposerPendingUserInputPanel } from "./chat/ComposerPendingUserInputPanel";
-import { ComposerPlanFollowUpBanner } from "./chat/ComposerPlanFollowUpBanner";
-import {
-  getComposerProviderState,
-  renderProviderTraitsMenuContent,
-  renderProviderTraitsPicker,
-} from "./chat/composerProviderRegistry";
+import { ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { NoActiveThreadState } from "./NoActiveThreadState";
 import { resolveEffectiveEnvMode, resolveEnvironmentOptionLabel } from "./BranchToolbar.logic";
 import { ProviderStatusBanner } from "./chat/ProviderStatusBanner";
 import { ThreadErrorBanner } from "./chat/ThreadErrorBanner";
 import {
+  applyAttachmentPreviewHandoffs,
+  type AttachmentPreviewHandoff,
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   buildExpiredTerminalContextToastCopy,
   buildLocalDraftThread,
   buildTemporaryWorktreeBranchName,
-  collectUserMessageBlobPreviewUrls,
+  collectUserMessageAttachmentPreviewHandoff,
   createLocalDispatchSnapshot,
   deriveComposerSendState,
   hasServerAcknowledgedLocalDispatch,
@@ -352,7 +335,6 @@ function formatOutgoingPrompt(params: {
   return params.text;
 }
 
-const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
 const SCRIPT_TERMINAL_COLS = 120;
 const SCRIPT_TERMINAL_ROWS = 30;
 
@@ -791,7 +773,7 @@ export default function ChatView(props: ChatViewProps) {
     null,
   );
   const [attachmentPreviewHandoffByMessageId, setAttachmentPreviewHandoffByMessageId] = useState<
-    Record<string, string[]>
+    Record<string, AttachmentPreviewHandoff>
   >({});
   const [lastInvokedScriptByProjectId, setLastInvokedScriptByProjectId] = useLocalStorage(
     LAST_INVOKED_SCRIPT_BY_PROJECT_KEY,
@@ -811,7 +793,9 @@ export default function ChatView(props: ChatViewProps) {
     top: number;
   } | null>(null);
   const pendingInteractionAnchorFrameRef = useRef<number | null>(null);
-  const attachmentPreviewHandoffByMessageIdRef = useRef<Record<string, string[]>>({});
+  const attachmentPreviewHandoffByMessageIdRef = useRef<Record<string, AttachmentPreviewHandoff>>(
+    {},
+  );
   const attachmentPreviewPromotionInFlightByMessageIdRef = useRef<Record<string, true>>({});
   const sendInFlightRef = useRef(false);
   const terminalOpenByThreadRef = useRef<Record<string, boolean>>({});
@@ -1260,10 +1244,10 @@ export default function ChatView(props: ChatViewProps) {
     attachmentPreviewHandoffByMessageIdRef.current = attachmentPreviewHandoffByMessageId;
   }, [attachmentPreviewHandoffByMessageId]);
   const clearAttachmentPreviewHandoff = useCallback(
-    (messageId: MessageId, previewUrls?: ReadonlyArray<string>) => {
+    (messageId: MessageId, handoffAttachments?: AttachmentPreviewHandoff) => {
       delete attachmentPreviewPromotionInFlightByMessageIdRef.current[messageId];
-      const currentPreviewUrls =
-        previewUrls ?? attachmentPreviewHandoffByMessageIdRef.current[messageId] ?? [];
+      const currentHandoffAttachments =
+        handoffAttachments ?? attachmentPreviewHandoffByMessageIdRef.current[messageId] ?? [];
       setAttachmentPreviewHandoffByMessageId((existing) => {
         if (!(messageId in existing)) {
           return existing;
@@ -1273,17 +1257,19 @@ export default function ChatView(props: ChatViewProps) {
         attachmentPreviewHandoffByMessageIdRef.current = next;
         return next;
       });
-      for (const previewUrl of currentPreviewUrls) {
-        revokeBlobPreviewUrl(previewUrl);
+      for (const attachment of currentHandoffAttachments) {
+        revokeBlobPreviewUrl(attachment.previewUrl);
       }
     },
     [],
   );
   const clearAttachmentPreviewHandoffs = useCallback(() => {
     attachmentPreviewPromotionInFlightByMessageIdRef.current = {};
-    for (const previewUrls of Object.values(attachmentPreviewHandoffByMessageIdRef.current)) {
-      for (const previewUrl of previewUrls) {
-        revokeBlobPreviewUrl(previewUrl);
+    for (const handoffAttachments of Object.values(
+      attachmentPreviewHandoffByMessageIdRef.current,
+    )) {
+      for (const attachment of handoffAttachments) {
+        revokeBlobPreviewUrl(attachment.previewUrl);
       }
     }
     attachmentPreviewHandoffByMessageIdRef.current = {};
@@ -1297,24 +1283,31 @@ export default function ChatView(props: ChatViewProps) {
       }
     };
   }, [clearAttachmentPreviewHandoffs]);
-  const handoffAttachmentPreviews = useCallback((messageId: MessageId, previewUrls: string[]) => {
-    if (previewUrls.length === 0) return;
+  const handoffAttachmentPreviews = useCallback(
+    (messageId: MessageId, handoffAttachments: AttachmentPreviewHandoff) => {
+      if (handoffAttachments.length === 0) return;
 
-    const previousPreviewUrls = attachmentPreviewHandoffByMessageIdRef.current[messageId] ?? [];
-    for (const previewUrl of previousPreviewUrls) {
-      if (!previewUrls.includes(previewUrl)) {
-        revokeBlobPreviewUrl(previewUrl);
+      const previousHandoffAttachments =
+        attachmentPreviewHandoffByMessageIdRef.current[messageId] ?? [];
+      const nextPreviewUrlSet = new Set(
+        handoffAttachments.map((attachment) => attachment.previewUrl),
+      );
+      for (const previousAttachment of previousHandoffAttachments) {
+        if (!nextPreviewUrlSet.has(previousAttachment.previewUrl)) {
+          revokeBlobPreviewUrl(previousAttachment.previewUrl);
+        }
       }
-    }
-    setAttachmentPreviewHandoffByMessageId((existing) => {
-      const next = {
-        ...existing,
-        [messageId]: previewUrls,
-      };
-      attachmentPreviewHandoffByMessageIdRef.current = next;
-      return next;
-    });
-  }, []);
+      setAttachmentPreviewHandoffByMessageId((existing) => {
+        const next = {
+          ...existing,
+          [messageId]: handoffAttachments,
+        };
+        attachmentPreviewHandoffByMessageIdRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
   const serverMessages = activeThread?.messages;
   useEffect(() => {
     if (typeof Image === "undefined" || !serverMessages || serverMessages.length === 0) {
@@ -1323,7 +1316,7 @@ export default function ChatView(props: ChatViewProps) {
 
     const cleanups: Array<() => void> = [];
 
-    for (const [messageId, handoffPreviewUrls] of Object.entries(
+    for (const [messageId, handoffAttachments] of Object.entries(
       attachmentPreviewHandoffByMessageId,
     )) {
       if (attachmentPreviewPromotionInFlightByMessageIdRef.current[messageId]) {
@@ -1342,7 +1335,7 @@ export default function ChatView(props: ChatViewProps) {
       );
       if (
         serverPreviewUrls.length === 0 ||
-        serverPreviewUrls.length !== handoffPreviewUrls.length ||
+        serverPreviewUrls.length !== handoffAttachments.length ||
         serverPreviewUrls.some((previewUrl) => previewUrl.startsWith("blob:"))
       ) {
         continue;
@@ -1374,7 +1367,7 @@ export default function ChatView(props: ChatViewProps) {
           if (cancelled) {
             return;
           }
-          clearAttachmentPreviewHandoff(messageId as MessageId, handoffPreviewUrls);
+          clearAttachmentPreviewHandoff(messageId as MessageId, handoffAttachments);
         })
         .catch(() => {
           if (!cancelled) {
@@ -1399,46 +1392,10 @@ export default function ChatView(props: ChatViewProps) {
   }, [attachmentPreviewHandoffByMessageId, clearAttachmentPreviewHandoff, serverMessages]);
   const timelineMessages = useMemo(() => {
     const messages = serverMessages ?? [];
-    const serverMessagesWithPreviewHandoff =
-      Object.keys(attachmentPreviewHandoffByMessageId).length === 0
-        ? messages
-        : // Spread only fires for the few messages that actually changed;
-          // unchanged ones early-return their original reference.
-          // In-place mutation would break React's immutable state contract.
-          // oxlint-disable-next-line no-map-spread
-          messages.map((message) => {
-            if (
-              message.role !== "user" ||
-              !message.attachments ||
-              message.attachments.length === 0
-            ) {
-              return message;
-            }
-            const handoffPreviewUrls = attachmentPreviewHandoffByMessageId[message.id];
-            if (!handoffPreviewUrls || handoffPreviewUrls.length === 0) {
-              return message;
-            }
-
-            let changed = false;
-            let imageIndex = 0;
-            const attachments = message.attachments.map((attachment) => {
-              if (attachment.type !== "image") {
-                return attachment;
-              }
-              const handoffPreviewUrl = handoffPreviewUrls[imageIndex];
-              imageIndex += 1;
-              if (!handoffPreviewUrl || attachment.previewUrl === handoffPreviewUrl) {
-                return attachment;
-              }
-              changed = true;
-              return {
-                ...attachment,
-                previewUrl: handoffPreviewUrl,
-              };
-            });
-
-            return changed ? { ...message, attachments } : message;
-          });
+    const serverMessagesWithPreviewHandoff = applyAttachmentPreviewHandoffs(
+      messages,
+      attachmentPreviewHandoffByMessageId,
+    );
 
     if (optimisticUserMessages.length === 0) {
       return serverMessagesWithPreviewHandoff;
@@ -1541,23 +1498,6 @@ export default function ChatView(props: ChatViewProps) {
   const gitStatusQuery = useGitStatus({ environmentId, cwd: gitCwd });
   const keybindings = useServerKeybindings();
   const availableEditors = useServerAvailableEditors();
-  const modelOptionsByProvider = useMemo(
-    () => ({
-      codex: getProviderModels(providerStatuses, "codex").filter(
-        (model) => !settings.providers.codex.hiddenModels.includes(model.slug),
-      ),
-      claudeAgent: getProviderModels(providerStatuses, "claudeAgent").filter(
-        (model) => !settings.providers.claudeAgent.hiddenModels.includes(model.slug),
-      ),
-      opencode: getProviderModels(providerStatuses, "opencode").filter(
-        (model) => !settings.providers.opencode.hiddenModels.includes(model.slug),
-      ),
-      forgecode: getProviderModels(providerStatuses, "forgecode").filter(
-        (model) => !settings.providers.forgecode.hiddenModels.includes(model.slug),
-      ),
-    }),
-    [providerStatuses, settings.providers],
-  );
   const activeProviderStatus = useMemo(
     () => providerStatuses.find((status) => status.provider === selectedProvider) ?? null,
     [selectedProvider, providerStatuses],
@@ -2368,9 +2308,9 @@ export default function ChatView(props: ChatViewProps) {
       );
     }, 0);
     for (const removedMessage of removedMessages) {
-      const previewUrls = collectUserMessageBlobPreviewUrls(removedMessage);
-      if (previewUrls.length > 0) {
-        handoffAttachmentPreviews(removedMessage.id, previewUrls);
+      const handoffAttachments = collectUserMessageAttachmentPreviewHandoff(removedMessage);
+      if (handoffAttachments.length > 0) {
+        handoffAttachmentPreviews(removedMessage.id, handoffAttachments);
         continue;
       }
       revokeUserMessagePreviewUrls(removedMessage);
@@ -3751,6 +3691,11 @@ export default function ChatView(props: ChatViewProps) {
                   composerTerminalContextsRef={composerTerminalContextsRef}
                   shouldAutoScrollRef={shouldAutoScrollRef}
                   scheduleStickToBottom={scheduleStickToBottom}
+                  queuedFollowupCount={queuedFollowupCount}
+                  firstQueuedFollowup={firstQueuedFollowup}
+                  queuedFollowupPreview={queuedFollowupPreview}
+                  onRemoveQueuedFollowup={onRemoveQueuedFollowup}
+                  onSteerQueuedFollowup={onSteerQueuedFollowup}
                   onSend={onSend}
                   onInterrupt={onInterrupt}
                   onImplementPlanInNewThread={onImplementPlanInNewThread}

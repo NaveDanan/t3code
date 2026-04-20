@@ -5,8 +5,6 @@ import {
   DownloadIcon,
   LoaderIcon,
   RefreshCwIcon,
-  Undo2Icon,
-  XIcon,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";

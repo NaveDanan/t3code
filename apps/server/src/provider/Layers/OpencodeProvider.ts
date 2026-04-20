@@ -5,7 +5,7 @@ import type {
   ServerProviderModel,
   UpstreamProvider,
 } from "@t3tools/contracts";
-import { Effect, Equal, Layer, Result, Stream } from "effect";
+import { Data, Effect, Equal, Layer, Result, Stream } from "effect";
 import { execFile } from "node:child_process";
 
 import {
@@ -23,6 +23,11 @@ const PROVIDER = "opencode" as const;
 const OPENCODE_RUNTIME_CAPABILITIES = {
   busyFollowupMode: "native-steer" as const,
 };
+
+class OpencodeProviderUpdateError extends Data.TaggedError("OpencodeProviderUpdateError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 const DEFAULT_OPENCODE_REASONING_VARIANTS = ["low", "medium", "high"] as const;
 
@@ -360,7 +365,11 @@ export const OpencodeProviderLive = Layer.effect(
               },
             );
           }),
-        catch: (error) => error,
+        catch: (cause) =>
+          new OpencodeProviderUpdateError({
+            message: "Failed to run opencode upgrade.",
+            ...(cause !== undefined ? { cause } : {}),
+          }),
       });
       return {
         provider: "opencode" as const,

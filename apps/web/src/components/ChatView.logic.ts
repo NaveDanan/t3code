@@ -123,17 +123,90 @@ export function revokeUserMessagePreviewUrls(message: ChatMessage): void {
   }
 }
 
-export function collectUserMessageBlobPreviewUrls(message: ChatMessage): string[] {
+export interface AttachmentPreviewHandoffImage {
+  type: "image";
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  previewUrl: string;
+}
+
+export type AttachmentPreviewHandoff = ReadonlyArray<AttachmentPreviewHandoffImage>;
+
+export function collectUserMessageAttachmentPreviewHandoff(
+  message: ChatMessage,
+): AttachmentPreviewHandoff {
   if (message.role !== "user" || !message.attachments) {
     return [];
   }
-  const previewUrls: string[] = [];
+  const handoffAttachments: AttachmentPreviewHandoffImage[] = [];
   for (const attachment of message.attachments) {
     if (attachment.type !== "image") continue;
     if (!attachment.previewUrl || !attachment.previewUrl.startsWith("blob:")) continue;
-    previewUrls.push(attachment.previewUrl);
+    handoffAttachments.push({
+      ...attachment,
+      previewUrl: attachment.previewUrl,
+    });
   }
-  return previewUrls;
+  return handoffAttachments;
+}
+
+export function applyAttachmentPreviewHandoffs(
+  messages: ReadonlyArray<ChatMessage>,
+  handoffsByMessageId: Readonly<Record<string, AttachmentPreviewHandoff>>,
+): ChatMessage[] {
+  if (messages.length === 0 || Object.keys(handoffsByMessageId).length === 0) {
+    return [...messages];
+  }
+
+  return messages.map((message) => {
+    if (message.role !== "user") {
+      return message;
+    }
+
+    const handoffAttachments = handoffsByMessageId[message.id];
+    if (!handoffAttachments || handoffAttachments.length === 0) {
+      return message;
+    }
+
+    if (!message.attachments || message.attachments.length === 0) {
+      return {
+        ...message,
+        attachments: [...handoffAttachments],
+      };
+    }
+
+    const imageAttachmentCount = message.attachments.filter(
+      (attachment) => attachment.type === "image",
+    ).length;
+    if (imageAttachmentCount !== handoffAttachments.length) {
+      return {
+        ...message,
+        attachments: [...handoffAttachments],
+      };
+    }
+
+    let changed = false;
+    let imageIndex = 0;
+    const attachments = message.attachments.map((attachment) => {
+      if (attachment.type !== "image") {
+        return attachment;
+      }
+      const handoffAttachment = handoffAttachments[imageIndex];
+      imageIndex += 1;
+      if (!handoffAttachment || attachment.previewUrl === handoffAttachment.previewUrl) {
+        return attachment;
+      }
+      changed = true;
+      return {
+        ...attachment,
+        previewUrl: handoffAttachment.previewUrl,
+      };
+    });
+
+    return changed ? { ...message, attachments } : message;
+  });
 }
 
 export interface PullRequestDialogState {

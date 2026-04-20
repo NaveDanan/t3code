@@ -7,6 +7,40 @@ import { estimateTimelineMessageHeight } from "../timelineHeight";
 
 export const MAX_VISIBLE_WORK_LOG_ENTRIES = 6;
 
+export function deriveGroupCardSummary(entries: ReadonlyArray<WorkLogEntry>): string {
+  // Thinking entries capture the model's intent most directly
+  const thinkingEntry = entries.find((e) => e.tone === "thinking");
+  if (thinkingEntry) {
+    return truncateToWords(thinkingEntry.label, 5);
+  }
+
+  // Use the most frequently occurring toolTitle across entries
+  const toolTitleCounts = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.toolTitle) {
+      toolTitleCounts.set(entry.toolTitle, (toolTitleCounts.get(entry.toolTitle) ?? 0) + 1);
+    }
+  }
+  if (toolTitleCounts.size > 0) {
+    const dominantTitle = [...toolTitleCounts.entries()].toSorted((a, b) => b[1] - a[1])[0]?.[0];
+    if (dominantTitle) return truncateToWords(dominantTitle, 5);
+  }
+
+  // Fall back to the first entry's label
+  const firstLabel = entries[0]?.label;
+  if (firstLabel) {
+    return truncateToWords(firstLabel, 5);
+  }
+
+  return entries.every((e) => e.tone === "tool") ? "Tool calls" : "Work log";
+}
+
+function truncateToWords(text: string, maxWords: number): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text.trim();
+  return words.slice(0, maxWords).join(" ") + "…";
+}
+
 export interface TimelineDurationMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -168,15 +202,13 @@ function estimateWorkRowHeight(
   const hasOverflow = row.groupedEntries.length > MAX_VISIBLE_WORK_LOG_ENTRIES;
   const visibleEntries =
     hasOverflow && !isExpanded ? MAX_VISIBLE_WORK_LOG_ENTRIES : row.groupedEntries.length;
-  const onlyToolEntries = row.groupedEntries.every((entry) => entry.tone === "tool");
-  const showHeader = hasOverflow || !onlyToolEntries;
   const reviewCardsHeight = row.groupedEntries
     .slice(hasOverflow && !isExpanded ? -MAX_VISIBLE_WORK_LOG_ENTRIES : 0)
     .slice(0, visibleEntries)
     .reduce((total, entry) => total + estimateWorkEntryReviewHeight(entry), 0);
 
-  // Card chrome, optional header, and one compact work-entry row per visible entry.
-  return 28 + (showHeader ? 26 : 0) + visibleEntries * 32 + reviewCardsHeight;
+  // Card chrome, header (always shown with summary title), and one compact work-entry row per visible entry.
+  return 28 + 26 + visibleEntries * 32 + reviewCardsHeight;
 }
 
 function estimateTimelineProposedPlanHeight(proposedPlan: ProposedPlan): number {

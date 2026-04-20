@@ -131,4 +131,67 @@ describe("deriveOrchestrationBatchEffects", () => {
     expect(effects.clearDeletedThreadIds).toEqual([]);
     expect(effects.removeTerminalStateThreadIds).toEqual([]);
   });
+
+  it("triggers provider invalidation for file_change activity-appended events", () => {
+    const threadId = ThreadId.make("thread-1");
+
+    const effects = deriveOrchestrationBatchEffects([
+      makeEvent("thread.activity-appended", {
+        threadId,
+        activity: {
+          id: EventId.make("activity-1"),
+          tone: "tool",
+          kind: "tool.completed",
+          summary: "Wrote file src/index.ts",
+          payload: { itemType: "file_change" },
+          turnId: TurnId.make("turn-1"),
+          createdAt: "2026-02-27T00:00:01.000Z",
+        },
+      }),
+    ]);
+
+    expect(effects.needsProviderInvalidation).toBe(true);
+  });
+
+  it("triggers provider invalidation for turn.diff.updated activity", () => {
+    const threadId = ThreadId.make("thread-1");
+
+    const effects = deriveOrchestrationBatchEffects([
+      makeEvent("thread.activity-appended", {
+        threadId,
+        activity: {
+          id: EventId.make("activity-2"),
+          tone: "info",
+          kind: "turn.diff.updated",
+          summary: "Turn diff updated",
+          payload: { unifiedDiff: "diff content" },
+          turnId: TurnId.make("turn-1"),
+          createdAt: "2026-02-27T00:00:01.000Z",
+        },
+      }),
+    ]);
+
+    expect(effects.needsProviderInvalidation).toBe(true);
+  });
+
+  it("does not trigger provider invalidation for non-file activity-appended events", () => {
+    const threadId = ThreadId.make("thread-1");
+
+    const effects = deriveOrchestrationBatchEffects([
+      makeEvent("thread.activity-appended", {
+        threadId,
+        activity: {
+          id: EventId.make("activity-3"),
+          tone: "info",
+          kind: "context-window.updated",
+          summary: "Context window updated",
+          payload: {},
+          turnId: TurnId.make("turn-1"),
+          createdAt: "2026-02-27T00:00:01.000Z",
+        },
+      }),
+    ]);
+
+    expect(effects.needsProviderInvalidation).toBe(false);
+  });
 });

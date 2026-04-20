@@ -5,19 +5,28 @@ import type * as React from "react";
 
 import { cn } from "~/lib/utils";
 
-type InputProps = Omit<InputPrimitive.Props & React.RefAttributes<HTMLInputElement>, "size"> & {
-  size?: "sm" | "default" | "lg" | number;
+type InputSize = "sm" | "default" | "lg" | number;
+
+type InputSharedProps = {
+  size?: InputSize;
   unstyled?: boolean;
-  nativeInput?: boolean;
 };
 
-function Input({
-  className,
-  size = "default",
-  unstyled = false,
-  nativeInput = false,
-  ...props
-}: InputProps) {
+type PrimitiveInputProps = Omit<InputPrimitive.Props, "size"> &
+  InputSharedProps & {
+    nativeInput?: false;
+  };
+
+type NativeInputProps = Omit<React.ComponentPropsWithRef<"input">, "size"> &
+  InputSharedProps & {
+    nativeInput: true;
+  };
+
+type InputProps = PrimitiveInputProps | NativeInputProps;
+
+function Input(props: InputProps) {
+  const { className, size = "default", unstyled = false } = props;
+  const sizeAttribute = typeof size === "number" ? size : undefined;
   const inputClassName = cn(
     "h-8.5 w-full min-w-0 rounded-[inherit] px-[calc(--spacing(3)-1px)] leading-8.5 outline-none placeholder:text-muted-foreground/72 sm:h-7.5 sm:leading-7.5 [transition:background-color_5000000s_ease-in-out_0s]",
     size === "sm" && "h-7.5 px-[calc(--spacing(2.5)-1px)] leading-7.5 sm:h-6.5 sm:leading-6.5",
@@ -27,6 +36,36 @@ function Input({
     props.type === "file" &&
       "text-muted-foreground file:me-3 file:bg-transparent file:font-medium file:text-foreground file:text-sm",
   );
+
+  let control: React.ReactNode;
+  if (props.nativeInput) {
+    const {
+      className: _className,
+      nativeInput: _nativeInput,
+      size: _size,
+      unstyled: _unstyled,
+      ...nativeProps
+    } = props;
+    control = (
+      <input className={inputClassName} data-slot="input" size={sizeAttribute} {...nativeProps} />
+    );
+  } else {
+    const {
+      className: _className,
+      nativeInput: _nativeInput,
+      size: _size,
+      unstyled: _unstyled,
+      ...primitiveProps
+    } = props;
+    control = (
+      <InputPrimitive
+        className={inputClassName}
+        data-slot="input"
+        size={sizeAttribute}
+        {...primitiveProps}
+      />
+    );
+  }
 
   return (
     <span
@@ -40,21 +79,7 @@ function Input({
       data-size={size}
       data-slot="input-control"
     >
-      {nativeInput ? (
-        <input
-          className={inputClassName}
-          data-slot="input"
-          size={typeof size === "number" ? size : undefined}
-          {...props}
-        />
-      ) : (
-        <InputPrimitive
-          className={inputClassName}
-          data-slot="input"
-          size={typeof size === "number" ? size : undefined}
-          {...props}
-        />
-      )}
+      {control}
     </span>
   );
 }

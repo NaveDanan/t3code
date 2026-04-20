@@ -256,6 +256,7 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain("example.ts");
+    expect(markup).toContain("Apply patch - src/example.ts (+1/-1)");
     expect(markup).toContain("diffs-container");
   });
 

@@ -8,6 +8,18 @@ import { syncShellEnvironment } from "./syncShellEnvironment";
 
 const noRegistryPath = () => undefined;
 
+function createReadRegistryPath(paths: { currentUser?: string; localMachine?: string }) {
+  return (key: string) => {
+    if (key.includes("HKCU")) {
+      return paths.currentUser;
+    }
+    if (key.includes("HKLM")) {
+      return paths.localMachine;
+    }
+    return undefined;
+  };
+}
+
 describe("syncShellEnvironment", () => {
   it("hydrates PATH and missing SSH_AUTH_SOCK from the login shell on macOS", () => {
     const env: NodeJS.ProcessEnv = {
@@ -142,15 +154,10 @@ describe("syncShellEnvironment", () => {
   });
 
   it("merges new PATH entries from the Windows registry", () => {
-    const readRegistryPath = (key: string) => {
-      if (key.includes("HKCU")) {
-        return "C:\\Users\\test\\.npm-global;C:\\Windows\\System32";
-      }
-      if (key.includes("HKLM")) {
-        return "C:\\Windows\\System32;C:\\ProgramData\\copilot";
-      }
-      return undefined;
-    };
+    const readRegistryPath = createReadRegistryPath({
+      currentUser: "C:\\Users\\test\\.npm-global;C:\\Windows\\System32",
+      localMachine: "C:\\Windows\\System32;C:\\ProgramData\\copilot",
+    });
 
     const env: NodeJS.ProcessEnv = {
       PATH: "C:\\Windows\\System32",
@@ -164,12 +171,9 @@ describe("syncShellEnvironment", () => {
   });
 
   it("expands %VAR% references in Windows registry PATH values", () => {
-    const readRegistryPath = (key: string) => {
-      if (key.includes("HKCU")) {
-        return "%USERPROFILE%\\.local\\bin";
-      }
-      return undefined;
-    };
+    const readRegistryPath = createReadRegistryPath({
+      currentUser: "%USERPROFILE%\\.local\\bin",
+    });
 
     const env: NodeJS.ProcessEnv = {
       USERPROFILE: "C:\\Users\\dev",

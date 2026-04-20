@@ -11,6 +11,15 @@ export interface ParsedUnifiedDiffFile {
 const APPLY_PATCH_PATH_REGEX = /^\*\*\*\s+(Add|Update|Delete)\s+File:\s+(.+?)\s*$/;
 const APPLY_PATCH_MOVE_REGEX = /^\*\*\*\s+Move to:\s+(.+?)\s*$/;
 
+interface MutableApplyPatchFile {
+  path: string;
+  previousPath?: string;
+  additions: number;
+  deletions: number;
+  status: ParsedUnifiedDiffFile["status"];
+  order: number;
+}
+
 function normalizeDiffPath(pathValue: string | undefined): string | null {
   if (typeof pathValue !== "string") {
     return null;
@@ -134,4 +143,117 @@ export function extractApplyPatchPaths(text: string): ReadonlyArray<string> {
   }
 
   return paths;
+}
+
+function applyPatchStatus(action: string): ParsedUnifiedDiffFile["status"] {
+  if (action === "Add") {
+    return "added";
+  }
+  if (action === "Delete") {
+    return "deleted";
+  }
+  return "modified";
+}
+
+function mergeApplyPatchStatus(
+  current: ParsedUnifiedDiffFile["status"],
+  next: ParsedUnifiedDiffFile["status"],
+): ParsedUnifiedDiffFile["status"] {
+  if (current === next) {
+    return current;
+  }
+  if (current === "moved" || next === "moved") {
+    return "moved";
+  }
+  if (current === "added" || next === "added") {
+    return "added";
+  }
+  if (current === "deleted" || next === "deleted") {
+    return "deleted";
+  }
+  return "modified";
+}
+
+function normalizeApplyPatchFiles(
+  files: ReadonlyArray<MutableApplyPatchFile>,
+): ReadonlyArray<ParsedUnifiedDiffFile> {
+  const byPath = new Map<string, MutableApplyPatchFile>();
+
+  for (const file of files) {
+    const existing = byPath.get(file.path);
+    if (!existing) {
+      byPath.set(file.path, { ...file });
+      continue;
+    }
+
+    existing.additions += file.additions;
+    existing.deletions += file.deletions;
+    existing.status = mergeApplyPatchStatus(existing.status, file.status);
+    existing.order = Math.min(existing.order, file.order);
+    if (!existing.previousPath && file.previousPath) {
+      existing.previousPath = file.previousPath;
+    }
+  }
+
+  return [...byPath.values()]
+    .toSorted((left, right) => left.order - right.order || left.path.localeCompare(right.path))
+    .map(({ order: _order, ...file }) => file);
+}
+
+export function parseApplyPatchFiles(text: string): ReadonlyArray<ParsedUnifiedDiffFile> {
+  const files: MutableApplyPatchFile[] = [];
+  let current: MutableApplyPatchFile | null = null;
+
+  const commitCurrent = () => {
+    if (!current) {
+      return;
+    }
+    files.push(current);
+    current = null;
+  };
+
+  for (const line of text.replace(/\r\n/g, "\n").split("\n")) {
+    const fileMatch = APPLY_PATCH_PATH_REGEX.exec(line);
+    if (fileMatch) {
+      commitCurrent();
+      const path = normalizeApplyPatchPath(fileMatch[2] ?? "");
+      if (!path) {
+        continue;
+      }
+      current = {
+        path,
+        additions: 0,
+        deletions: 0,
+        status: applyPatchStatus(fileMatch[1] ?? ""),
+        order: files.length,
+      };
+      continue;
+    }
+
+    const moveMatch = APPLY_PATCH_MOVE_REGEX.exec(line);
+    if (moveMatch && current) {
+      const path = normalizeApplyPatchPath(moveMatch[1] ?? "");
+      if (path && path !== current.path) {
+        current.previousPath = current.path;
+        current.path = path;
+      }
+      current.status = "moved";
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    if (line.startsWith("+")) {
+      current.additions += 1;
+      continue;
+    }
+    if (line.startsWith("-")) {
+      current.deletions += 1;
+    }
+  }
+
+  commitCurrent();
+  return normalizeApplyPatchFiles(files);
 }

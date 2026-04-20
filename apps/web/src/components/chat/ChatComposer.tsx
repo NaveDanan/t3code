@@ -408,6 +408,13 @@ export interface ChatComposerProps {
   shouldAutoScrollRef: React.MutableRefObject<boolean>;
   scheduleStickToBottom: () => void;
 
+  // Queued follow-ups
+  queuedFollowupCount: number;
+  firstQueuedFollowup: Thread["queuedFollowups"][number] | null;
+  queuedFollowupPreview: string | null;
+  onRemoveQueuedFollowup: (queuedFollowupId: string) => void;
+  onSteerQueuedFollowup: (queuedFollowupId: string) => void;
+
   // Callbacks
   onSend: (e?: { preventDefault: () => void }) => void;
   onInterrupt: () => void;
@@ -489,6 +496,11 @@ export const ChatComposer = memo(
       composerTerminalContextsRef,
       shouldAutoScrollRef,
       scheduleStickToBottom,
+      queuedFollowupCount,
+      firstQueuedFollowup,
+      queuedFollowupPreview,
+      onRemoveQueuedFollowup,
+      onSteerQueuedFollowup,
       onSend,
       onInterrupt,
       onImplementPlanInNewThread,
@@ -1621,6 +1633,39 @@ export const ChatComposer = memo(
         className="mx-auto w-full min-w-0 max-w-208"
         data-chat-composer-form="true"
       >
+        {!isComposerApprovalState &&
+          pendingUserInputs.length === 0 &&
+          queuedFollowupCount > 0 &&
+          firstQueuedFollowup && (
+            <div className="mb-2 rounded-full border border-border/70 bg-background/96 px-3 py-1.5 shadow-xs">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-none">
+                <span className="font-medium text-foreground/80">
+                  {queuedFollowupCount} message{queuedFollowupCount === 1 ? "" : "s"} queued
+                </span>
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                  {queuedFollowupPreview}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 rounded-full px-2 text-[11px] text-muted-foreground"
+                  onClick={() => void onSteerQueuedFollowup(firstQueuedFollowup.id)}
+                >
+                  Steer
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 rounded-full px-2 text-[11px] text-muted-foreground"
+                  onClick={() => void onRemoveQueuedFollowup(firstQueuedFollowup.id)}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
         <div
           className={cn(
             "group rounded-[22px] p-px transition-colors duration-200",

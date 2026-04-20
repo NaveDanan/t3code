@@ -11,7 +11,6 @@ import {
   resolveFileDiffPath,
 } from "../../lib/diffRendering";
 import { cn } from "~/lib/utils";
-import { Button } from "../ui/button";
 import { Collapsible, CollapsibleContent } from "../ui/collapsible";
 import { DiffStatLabel } from "./DiffStatLabel";
 import { VscodeEntryIcon } from "./VscodeEntryIcon";
@@ -66,7 +65,7 @@ function statusBadge(status: Exclude<ReviewFileStatus, "modified">): string {
 }
 
 export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
-  entry: Pick<WorkLogEntry, "id" | "turnId" | "changedFiles" | "unifiedDiff">;
+  entry: Pick<WorkLogEntry, "id" | "turnId" | "changedFiles" | "changedFileStats" | "unifiedDiff">;
   resolvedTheme: "light" | "dark";
   onOpenTurnDiff: (turnId: NonNullable<WorkLogEntry["turnId"]>, filePath?: string) => void;
   onLayoutChange?: () => void;
@@ -94,6 +93,17 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
         status: normalizeReviewFileStatus(fileDiff.type),
       }));
     }
+    const changedFileStats = entry.changedFileStats ?? [];
+    if (changedFileStats.length > 0) {
+      return changedFileStats.map<ReviewFileRow>((file) => ({
+        fileKey: file.path,
+        path: file.path,
+        previousPath: file.previousPath ?? null,
+        additions: file.additions,
+        deletions: file.deletions,
+        status: file.status,
+      }));
+    }
     return (entry.changedFiles ?? []).map<ReviewFileRow>((path) => ({
       fileKey: path,
       path,
@@ -102,7 +112,7 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
       deletions: 0,
       status: "updated" as const,
     }));
-  }, [diffFiles, entry.changedFiles]);
+  }, [diffFiles, entry.changedFileStats, entry.changedFiles]);
   const fallbackFiles = entry.changedFiles ?? [];
   const hasInlineDiff = diffFiles.length > 0;
   const hasFallbackFiles = fallbackFiles.length > 0;
@@ -110,7 +120,6 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
     diffFiles.length === 1 ? resolveFileDiffPath(diffFiles[0]!) : null,
   );
   const [rawPatchOpen, setRawPatchOpen] = useState(false);
-  const primaryFilePath = reviewFiles[0]?.path ?? null;
   const turnId = entry.turnId;
 
   useEffect(() => {
@@ -137,35 +146,9 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-border/60 bg-background/55 p-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">
-            File review
-          </p>
-          <p className="truncate text-[11px] text-muted-foreground/75">
-            {hasInlineDiff
-              ? `${reviewFiles.length} file${reviewFiles.length === 1 ? "" : "s"} changed`
-              : hasFallbackFiles
-                ? `${fallbackFiles.length} file${fallbackFiles.length === 1 ? "" : "s"} updated`
-                : "Raw patch"}
-          </p>
-        </div>
-        {turnId && primaryFilePath && (
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            onClick={() => onOpenTurnDiff(turnId, primaryFilePath)}
-          >
-            <ExternalLinkIcon className="size-3" />
-            Open diff
-          </Button>
-        )}
-      </div>
-
+    <div className="mt-1.5">
       {(hasInlineDiff || hasFallbackFiles) && (
-        <div className="mt-2 space-y-2">
+        <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/50">
           {reviewFiles.map((file) => {
             const fileDiff = file.fileDiff;
             const path = file.path;
@@ -175,13 +158,10 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
               file.previousPath && file.previousPath !== path ? file.previousPath : null;
             const hasInlinePreview = Boolean(fileDiff);
             return (
-              <div
-                key={`${file.fileKey}:${path}`}
-                className="overflow-hidden rounded-lg border border-border/65 bg-card/65"
-              >
+              <div key={`${file.fileKey}:${path}`} className="overflow-hidden">
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-background/60"
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/40"
                   onClick={() => {
                     if (!hasInlinePreview) {
                       if (turnId) {
@@ -194,27 +174,27 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
                 >
                   <ChevronRightIcon
                     className={cn(
-                      "size-3.5 shrink-0 text-muted-foreground/70 transition-transform",
-                      hasInlinePreview ? isOpen && "rotate-90" : "opacity-40",
+                      "size-3 shrink-0 text-muted-foreground/60 transition-transform",
+                      hasInlinePreview ? isOpen && "rotate-90" : "opacity-30",
                     )}
                   />
                   <VscodeEntryIcon
                     pathValue={path}
                     kind="file"
                     theme={resolvedTheme}
-                    className="size-3.5 shrink-0 text-muted-foreground/75"
+                    className="size-3.5 shrink-0 text-muted-foreground/70"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-[11px] text-foreground/88">{filename}</p>
+                    <span className="font-mono text-[11px] text-foreground/85">{filename}</span>
                     {directory && (
-                      <p className="truncate font-mono text-[10px] text-muted-foreground/60">
+                      <span className="ml-1.5 font-mono text-[10px] text-muted-foreground/50">
                         {directory}
-                      </p>
+                      </span>
                     )}
                     {previousPath && (
-                      <p className="truncate font-mono text-[10px] text-muted-foreground/55">
-                        from {previousPath}
-                      </p>
+                      <span className="ml-1.5 font-mono text-[10px] text-muted-foreground/50">
+                        ← {previousPath}
+                      </span>
                     )}
                   </div>
                   <div className="shrink-0 text-[10px] font-medium">
@@ -223,24 +203,27 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
                     ) : (
                       <span
                         className={cn(
-                          "rounded-full px-2 py-0.5",
+                          "rounded-full px-1.5 py-0.5",
                           file.status === "added" &&
-                            "bg-success/12 text-success ring-1 ring-inset ring-success/20",
+                            "bg-success/10 text-success ring-1 ring-inset ring-success/20",
                           file.status === "deleted" &&
-                            "bg-destructive/12 text-destructive ring-1 ring-inset ring-destructive/20",
+                            "bg-destructive/10 text-destructive ring-1 ring-inset ring-destructive/20",
                           file.status === "moved" &&
-                            "bg-sky-500/12 text-sky-600 ring-1 ring-inset ring-sky-500/20 dark:text-sky-400",
+                            "bg-sky-500/10 text-sky-600 ring-1 ring-inset ring-sky-500/20 dark:text-sky-400",
                           file.status === "updated" &&
-                            "bg-muted text-muted-foreground ring-1 ring-inset ring-border/70",
+                            "text-muted-foreground ring-1 ring-inset ring-border/60",
                         )}
                       >
                         {statusBadge(file.status)}
                       </span>
                     )}
                   </div>
+                  {!hasInlinePreview && turnId && (
+                    <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground/40" />
+                  )}
                 </button>
                 {isOpen && fileDiff && (
-                  <div className="border-t border-border/65 bg-background/50 p-2">
+                  <div className="border-t border-border/40">
                     <FileDiff
                       fileDiff={fileDiff}
                       options={{
@@ -262,30 +245,25 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
 
       {renderablePatch?.kind === "raw" && (
         <Collapsible open={rawPatchOpen} onOpenChange={setRawPatchOpen}>
-          <div className="mt-2 rounded-lg border border-border/65 bg-card/65 p-2.5">
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 text-left text-[11px] text-muted-foreground/75"
-              onClick={() => setRawPatchOpen((open) => !open)}
-            >
-              <ChevronRightIcon
-                className={cn(
-                  "size-3.5 shrink-0 transition-transform",
-                  rawPatchOpen && "rotate-90",
-                )}
-              />
-              <FileCode2Icon className="size-3.5 shrink-0" />
-              <span className="truncate">Show raw patch</span>
-              <span className="truncate text-muted-foreground/55">{renderablePatch.reason}</span>
-            </button>
-            <CollapsibleContent>
-              {rawPatchOpen && (
-                <pre className="mt-2 max-h-[28rem] overflow-auto whitespace-pre-wrap wrap-break-word rounded-md border border-border/60 bg-background/70 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground/90">
-                  {renderablePatch.text}
-                </pre>
-              )}
-            </CollapsibleContent>
-          </div>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] text-muted-foreground/70 transition-colors hover:bg-muted/40"
+            onClick={() => setRawPatchOpen((open) => !open)}
+          >
+            <ChevronRightIcon
+              className={cn("size-3 shrink-0 transition-transform", rawPatchOpen && "rotate-90")}
+            />
+            <FileCode2Icon className="size-3.5 shrink-0" />
+            <span className="truncate">Show raw patch</span>
+            <span className="truncate text-muted-foreground/45">{renderablePatch.reason}</span>
+          </button>
+          <CollapsibleContent>
+            {rawPatchOpen && (
+              <pre className="mt-1 max-h-[28rem] overflow-auto whitespace-pre-wrap wrap-break-word rounded-md border border-border/50 bg-background/60 p-2.5 font-mono text-[11px] leading-relaxed text-muted-foreground/85">
+                {renderablePatch.text}
+              </pre>
+            )}
+          </CollapsibleContent>
         </Collapsible>
       )}
     </div>

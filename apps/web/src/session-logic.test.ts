@@ -911,6 +911,134 @@ describe("deriveWorkLogEntries", () => {
     expect(entry?.changedFiles).toEqual(["apps/web/src/components/ChatView.tsx"]);
   });
 
+  it("extracts Claude-style edit stats from snake_case tool input", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "claude-edit-tool",
+        kind: "tool.updated",
+        summary: "Edit",
+        payload: {
+          itemId: "claude-edit-1",
+          itemType: "file_change",
+          title: "Edit",
+          data: {
+            toolName: "Edit",
+            input: {
+              file_path: "src/claude.ts",
+              old_string: "const value = 1;",
+              new_string: "const value = 1;\nconst nextValue = 2;",
+            },
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.changedFiles).toEqual(["src/claude.ts"]);
+    expect(entry?.changedFileStats).toEqual([
+      { path: "src/claude.ts", additions: 2, deletions: 1, status: "modified" },
+    ]);
+  });
+
+  it("sums Claude-style MultiEdit line stats from parent file_path", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "claude-multiedit-tool",
+        kind: "tool.updated",
+        summary: "MultiEdit",
+        payload: {
+          itemId: "claude-multiedit-1",
+          itemType: "file_change",
+          title: "MultiEdit",
+          data: {
+            toolName: "MultiEdit",
+            input: {
+              file_path: "src/multi.ts",
+              edits: [
+                {
+                  old_string: "alpha",
+                  new_string: "alpha\nbeta",
+                },
+                {
+                  old_string: "gamma\ndelta",
+                  new_string: "gamma",
+                },
+              ],
+            },
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.changedFiles).toEqual(["src/multi.ts"]);
+    expect(entry?.changedFileStats).toEqual([
+      { path: "src/multi.ts", additions: 3, deletions: 3, status: "modified" },
+    ]);
+  });
+
+  it("extracts OpenCode in-progress edit stats from nested tool state input", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "opencode-edit-tool",
+        kind: "tool.updated",
+        summary: "edit",
+        payload: {
+          itemId: "opencode-edit-1",
+          itemType: "file_change",
+          title: "edit",
+          data: {
+            id: "opencode-part-1",
+            tool: "edit",
+            state: {
+              status: "running",
+              input: {
+                filePath: "src/open.ts",
+                oldString: "before",
+                newString: "after\nnext",
+              },
+            },
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.changedFiles).toEqual(["src/open.ts"]);
+    expect(entry?.changedFileStats).toEqual([
+      { path: "src/open.ts", additions: 2, deletions: 1, status: "modified" },
+    ]);
+  });
+
+  it("extracts Forge-style file content stats from snake_case tool args", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "forge-write-tool",
+        kind: "tool.updated",
+        summary: "WriteFile",
+        payload: {
+          itemId: "forge-write-1",
+          itemType: "file_change",
+          title: "WriteFile",
+          data: {
+            toolName: "WriteFile",
+            callId: "forge-call-1",
+            input: {
+              file_path: "src/forge.ts",
+              content: "one\ntwo",
+            },
+          },
+        },
+      }),
+    ];
+
+    const [entry] = deriveWorkLogEntries(activities, undefined);
+    expect(entry?.changedFiles).toEqual(["src/forge.ts"]);
+    expect(entry?.changedFileStats).toEqual([
+      { path: "src/forge.ts", additions: 2, deletions: 0, status: "modified" },
+    ]);
+  });
+
   it("extracts changed file paths from apply_patch marker text", () => {
     const activities: OrchestrationThreadActivity[] = [
       makeActivity({
@@ -936,6 +1064,17 @@ describe("deriveWorkLogEntries", () => {
 
     const [entry] = deriveWorkLogEntries(activities, undefined);
     expect(entry?.changedFiles).toEqual(["src/new-file.ts", "src/new.ts", "src/obsolete.ts"]);
+    expect(entry?.changedFileStats).toEqual([
+      { path: "src/new-file.ts", additions: 1, deletions: 0, status: "added" },
+      {
+        path: "src/new.ts",
+        previousPath: "src/old.ts",
+        additions: 0,
+        deletions: 0,
+        status: "moved",
+      },
+      { path: "src/obsolete.ts", additions: 0, deletions: 0, status: "deleted" },
+    ]);
   });
 
   it("extracts changed file paths from unified diff payload text", () => {
@@ -970,6 +1109,10 @@ describe("deriveWorkLogEntries", () => {
 
     const [entry] = deriveWorkLogEntries(activities, undefined);
     expect(entry?.changedFiles).toEqual(["src/alpha.ts", "src/created.ts"]);
+    expect(entry?.changedFileStats).toEqual([
+      { path: "src/alpha.ts", additions: 1, deletions: 1, status: "modified" },
+      { path: "src/created.ts", additions: 1, deletions: 0, status: "added" },
+    ]);
   });
 
   it("collapses repeated lifecycle updates for the same tool call into one entry", () => {
@@ -1025,6 +1168,58 @@ describe("deriveWorkLogEntries", () => {
       command: "sed -n 1,40p /tmp/app.ts",
       itemType: "dynamic_tool_call",
       toolTitle: "Tool call",
+    });
+  });
+
+  it("collapses file-change lifecycle rows by item id and keeps in-progress file stats", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "file-update",
+        createdAt: "2026-02-23T00:00:01.000Z",
+        kind: "tool.updated",
+        summary: "Edit",
+        payload: {
+          itemId: "item-edit-1",
+          itemType: "file_change",
+          title: "Edit",
+          detail: "Editing src/catalog.test.ts",
+          data: {
+            patchText: [
+              "*** Begin Patch",
+              "*** Update File: src/catalog.test.ts",
+              "-old",
+              "+new",
+              "+extra",
+              "*** End Patch",
+            ].join("\n"),
+          },
+        },
+      }),
+      makeActivity({
+        id: "file-complete",
+        createdAt: "2026-02-23T00:00:02.000Z",
+        kind: "tool.completed",
+        summary: "Edit",
+        payload: {
+          itemId: "item-edit-1",
+          itemType: "file_change",
+          title: "Edit",
+          detail: "Edit applied successfully.",
+        },
+      }),
+    ];
+
+    const entries = deriveWorkLogEntries(activities, undefined);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      id: "file-complete",
+      itemId: "item-edit-1",
+      detail: "Edit applied successfully.",
+      changedFiles: ["src/catalog.test.ts"],
+      changedFileStats: [
+        { path: "src/catalog.test.ts", additions: 2, deletions: 1, status: "modified" },
+      ],
     });
   });
 
@@ -1518,16 +1713,18 @@ describe("deriveActiveWorkStartedAt", () => {
 });
 
 describe("PROVIDER_OPTIONS", () => {
-  it("advertises ForgeCode and OpenCode alongside Claude while keeping Cursor as a placeholder", () => {
+  it("advertises active providers while keeping Cursor as a placeholder", () => {
     const claude = PROVIDER_OPTIONS.find((option) => option.value === "claudeAgent");
     const forge = PROVIDER_OPTIONS.find((option) => option.value === "forgecode");
     const opencode = PROVIDER_OPTIONS.find((option) => option.value === "opencode");
+    const githubCopilot = PROVIDER_OPTIONS.find((option) => option.value === "githubCopilot");
     const cursor = PROVIDER_OPTIONS.find((option) => option.value === "cursor");
     expect(PROVIDER_OPTIONS).toEqual([
       { value: "codex", label: "Codex", available: true },
       { value: "claudeAgent", label: "Claude", available: true },
       { value: "opencode", label: "OpenCode", available: true },
       { value: "forgecode", label: "ForgeCode", available: true },
+      { value: "githubCopilot", label: "GitHub Copilot", available: true },
       { value: "cursor", label: "Cursor", available: false },
     ]);
     expect(claude).toEqual({
@@ -1543,6 +1740,11 @@ describe("PROVIDER_OPTIONS", () => {
     expect(opencode).toEqual({
       value: "opencode",
       label: "OpenCode",
+      available: true,
+    });
+    expect(githubCopilot).toEqual({
+      value: "githubCopilot",
+      label: "GitHub Copilot",
       available: true,
     });
     expect(cursor).toEqual({

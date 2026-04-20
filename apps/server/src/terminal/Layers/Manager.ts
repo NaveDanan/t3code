@@ -2074,6 +2074,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               cwd: input.cwd,
               worktreePath: input.worktreePath ?? null,
               executionBackend: input.executionBackend,
+              launchProfile: input.launchProfile,
               status: "starting",
               pid: null,
               history: "",

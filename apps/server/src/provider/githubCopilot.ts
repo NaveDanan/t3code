@@ -160,7 +160,9 @@ export type CopilotAuthStatus =
     };
 
 function formatCopilotAuthType(value: string | null | undefined): string | undefined {
-  switch (value?.trim()) {
+  const trimmedValue = value?.trim();
+
+  switch (trimmedValue) {
     case undefined:
     case "":
       return undefined;
@@ -177,7 +179,7 @@ function formatCopilotAuthType(value: string | null | undefined): string | undef
     case "token":
       return "Token";
     default:
-      return value
+      return trimmedValue
         .split(/[-_\s]+/g)
         .filter(Boolean)
         .map((part) => part[0]!.toUpperCase() + part.slice(1))

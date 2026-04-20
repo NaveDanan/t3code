@@ -103,6 +103,7 @@ interface OpencodeSessionContext {
   readonly startedItemIds: Set<string>;
   readonly completedItemIds: Set<string>;
   readonly partsWithDelta: Set<string>;
+  readonly toolUpdateFingerprintByItemId: Map<string, string>;
   lastTodoFingerprint: string | undefined;
   lastThreadUsage: ThreadTokenUsageSnapshot | undefined;
   lastResolvedModel: OpencodeResolvedModel | undefined;
@@ -119,6 +120,7 @@ function resetTurnTracking(context: OpencodeSessionContext) {
   context.startedItemIds.clear();
   context.completedItemIds.clear();
   context.partsWithDelta.clear();
+  context.toolUpdateFingerprintByItemId.clear();
   context.lastTodoFingerprint = undefined;
 }
 
@@ -152,6 +154,7 @@ function opencodeDebugContext(context: OpencodeSessionContext | undefined) {
     startedItems: context?.startedItemIds.size,
     completedItems: context?.completedItemIds.size,
     partsWithDelta: context?.partsWithDelta.size,
+    toolUpdateFingerprints: context?.toolUpdateFingerprintByItemId.size,
   };
 }
 
@@ -181,6 +184,17 @@ function toMessage(cause: unknown, fallback: string): string {
     }
   }
   return fallback;
+}
+
+function opencodeToolPartUpdateFingerprint(part: Extract<Part, { readonly type: "tool" }>) {
+  try {
+    return JSON.stringify({
+      tool: part.tool,
+      state: part.state,
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 const OPENCODE_IDENTIFIER_RANDOM_LENGTH = 14;
@@ -2443,6 +2457,41 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
             });
           }
 
+          if (part.state.status !== "completed" && part.state.status !== "error") {
+            const updateFingerprint = opencodeToolPartUpdateFingerprint(part);
+            if (
+              !updateFingerprint ||
+              context.toolUpdateFingerprintByItemId.get(itemId) !== updateFingerprint
+            ) {
+              if (updateFingerprint) {
+                context.toolUpdateFingerprintByItemId.set(itemId, updateFingerprint);
+              }
+              const updatedStamp = makeEventStamp();
+              yield* offerRuntimeEvent({
+                type: "item.updated",
+                eventId: updatedStamp.eventId,
+                provider: PROVIDER,
+                threadId,
+                createdAt: updatedStamp.createdAt,
+                ...(context.activeTurn ? { turnId: context.activeTurn.turnId } : {}),
+                itemId: asRuntimeItemId(itemId),
+                providerRefs: {
+                  ...(context.activeTurn
+                    ? { providerTurnId: String(context.activeTurn.turnId) }
+                    : {}),
+                  providerItemId: asProviderItemId(itemId),
+                },
+                raw: rawEvent(serverEvent.payload),
+                payload: {
+                  itemType,
+                  title: part.tool,
+                  status: "inProgress",
+                  data: part,
+                },
+              });
+            }
+          }
+
           const output =
             part.state.status === "completed"
               ? part.state.output
@@ -2482,6 +2531,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
             !context.completedItemIds.has(itemId)
           ) {
             context.completedItemIds.add(itemId);
+            context.toolUpdateFingerprintByItemId.delete(itemId);
             const completedStamp = makeEventStamp();
             yield* offerRuntimeEvent({
               type: "item.completed",
@@ -2750,6 +2800,7 @@ const makeOpencodeAdapter = Effect.fn("makeOpencodeAdapter")(function* (
         startedItemIds: new Set(),
         completedItemIds: new Set(),
         partsWithDelta: new Set(),
+        toolUpdateFingerprintByItemId: new Map(),
         lastTodoFingerprint: undefined,
         lastThreadUsage: undefined,
         lastResolvedModel: undefined,

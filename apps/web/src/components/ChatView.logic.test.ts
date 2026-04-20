@@ -1,12 +1,14 @@
 import { scopeThreadRef } from "@t3tools/client-runtime";
-import { EnvironmentId, ProjectId, ThreadId, TurnId } from "@t3tools/contracts";
+import { EnvironmentId, MessageId, ProjectId, ThreadId, TurnId } from "@t3tools/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type EnvironmentState, useStore } from "../store";
-import { type Thread } from "../types";
+import { type ChatMessage, type Thread } from "../types";
 
 import {
+  applyAttachmentPreviewHandoffs,
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   buildExpiredTerminalContextToastCopy,
+  collectUserMessageAttachmentPreviewHandoff,
   createLocalDispatchSnapshot,
   deriveComposerSendState,
   hasServerAcknowledgedLocalDispatch,
@@ -63,6 +65,123 @@ describe("deriveComposerSendState", () => {
     expect(state.trimmedPrompt).toBe("yoo  waddup");
     expect(state.expiredTerminalContextCount).toBe(1);
     expect(state.hasSendableContent).toBe(true);
+  });
+});
+
+describe("attachment preview handoffs", () => {
+  it("captures blob-backed user image attachments for handoff", () => {
+    const message: ChatMessage = {
+      id: MessageId.make("message-1"),
+      role: "user",
+      text: "",
+      attachments: [
+        {
+          type: "image",
+          id: "image-1",
+          name: "clipboard.png",
+          mimeType: "image/png",
+          sizeBytes: 128,
+          previewUrl: "blob:clipboard-preview",
+        },
+      ],
+      createdAt: "2026-04-21T00:00:00.000Z",
+      streaming: false,
+    };
+
+    expect(collectUserMessageAttachmentPreviewHandoff(message)).toEqual([
+      {
+        type: "image",
+        id: "image-1",
+        name: "clipboard.png",
+        mimeType: "image/png",
+        sizeBytes: 128,
+        previewUrl: "blob:clipboard-preview",
+      },
+    ]);
+  });
+
+  it("keeps clipboard image previews visible when the server message exists before attachments hydrate", () => {
+    const messageId = MessageId.make("message-clipboard");
+    const messages: ChatMessage[] = [
+      {
+        id: messageId,
+        role: "user",
+        text: "",
+        createdAt: "2026-04-21T00:00:00.000Z",
+        streaming: false,
+      },
+    ];
+
+    const result = applyAttachmentPreviewHandoffs(messages, {
+      [messageId]: [
+        {
+          type: "image",
+          id: "optimistic-image-1",
+          name: "clipboard.png",
+          mimeType: "image/png",
+          sizeBytes: 128,
+          previewUrl: "blob:clipboard-preview",
+        },
+      ],
+    });
+
+    expect(result[0]?.attachments).toEqual([
+      {
+        type: "image",
+        id: "optimistic-image-1",
+        name: "clipboard.png",
+        mimeType: "image/png",
+        sizeBytes: 128,
+        previewUrl: "blob:clipboard-preview",
+      },
+    ]);
+  });
+
+  it("overlays blob previews onto persisted server attachments while keeping server ids", () => {
+    const messageId = MessageId.make("message-server");
+    const messages: ChatMessage[] = [
+      {
+        id: messageId,
+        role: "user",
+        text: "",
+        attachments: [
+          {
+            type: "image",
+            id: "server-image-1",
+            name: "clipboard.png",
+            mimeType: "image/png",
+            sizeBytes: 128,
+            previewUrl: "/attachments/server-image-1",
+          },
+        ],
+        createdAt: "2026-04-21T00:00:00.000Z",
+        streaming: false,
+      },
+    ];
+
+    const result = applyAttachmentPreviewHandoffs(messages, {
+      [messageId]: [
+        {
+          type: "image",
+          id: "optimistic-image-1",
+          name: "clipboard.png",
+          mimeType: "image/png",
+          sizeBytes: 128,
+          previewUrl: "blob:clipboard-preview",
+        },
+      ],
+    });
+
+    expect(result[0]?.attachments).toEqual([
+      {
+        type: "image",
+        id: "server-image-1",
+        name: "clipboard.png",
+        mimeType: "image/png",
+        sizeBytes: 128,
+        previewUrl: "blob:clipboard-preview",
+      },
+    ]);
   });
 });
 

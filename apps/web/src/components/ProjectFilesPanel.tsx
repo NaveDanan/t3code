@@ -38,6 +38,7 @@ const FILES_PANEL_FETCH_LIMIT = 5000;
 const FILES_PANEL_QUERY_DEBOUNCE_MS = 120;
 const COMPOSER_COMPACT_MIN_LEFT_CONTROLS_WIDTH_PX = 208;
 const EMPTY_PROJECT_ENTRIES: ReadonlyArray<ProjectEntry> = [];
+const EMPTY_PROJECT_TEXT_SEARCH_FILES: ReadonlyArray<ProjectSearchTextFileResult> = [];
 const EMPTY_DIRECTORY_OVERRIDES: Record<string, boolean> = {};
 
 export function acceptInlineThreadPanelWidth(options: {
@@ -346,7 +347,7 @@ export function ProjectFilesPanel(props: {
     }),
   );
   const entries = projectEntriesQuery.data?.entries ?? EMPTY_PROJECT_ENTRIES;
-  const textSearchFiles = projectTextSearchQuery.data?.files ?? [];
+  const textSearchFiles = projectTextSearchQuery.data?.files ?? EMPTY_PROJECT_TEXT_SEARCH_FILES;
   const mergedEntries = useMemo(() => {
     if (!showSearchResults || textSearchFiles.length === 0) return entries;
     const existingPaths = new Set(entries.map((e) => e.path));

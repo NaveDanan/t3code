@@ -12,7 +12,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { ServerSettings, ServerSettingsPatch } from "@t3tools/contracts";
 import {
-  AppFontSize,
   type ClientSettings,
   DEFAULT_CLIENT_SETTINGS,
   DEFAULT_UNIFIED_SETTINGS,

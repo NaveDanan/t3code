@@ -52,6 +52,7 @@ describe("ProjectSetupScriptRunner", () => {
               Layer.succeed(TerminalManager, {
                 open,
                 write,
+                listProfiles: () => Effect.succeed([]),
                 resize: () => Effect.void,
                 clear: () => Effect.void,
                 restart: () => Effect.die(new Error("unused")),
@@ -120,6 +121,7 @@ describe("ProjectSetupScriptRunner", () => {
               Layer.succeed(TerminalManager, {
                 open,
                 write,
+                listProfiles: () => Effect.succeed([]),
                 resize: () => Effect.void,
                 clear: () => Effect.void,
                 restart: () => Effect.die(new Error("unused")),

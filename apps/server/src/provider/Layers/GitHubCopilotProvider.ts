@@ -14,7 +14,7 @@ import type {
   HarnessUpdateResult,
   ServerProviderModel,
 } from "@t3tools/contracts";
-import { Effect, Equal, Layer, Result, Stream } from "effect";
+import { Data, Effect, Equal, Layer, Result, Stream } from "effect";
 import { existsSync } from "node:fs";
 import { basename, delimiter, extname, isAbsolute, join } from "node:path";
 import { isWindowsCommandNotFound, runProcess } from "../../processRunner";
@@ -36,6 +36,11 @@ import {
 
 const PROVIDER = "githubCopilot" as const;
 const DEFAULT_TIMEOUT_MS = 4_000;
+
+class GitHubCopilotProviderError extends Data.TaggedError("GitHubCopilotProviderError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 const GITHUB_COPILOT_RUNTIME_CAPABILITIES = {
   busyFollowupMode: "native-steer" as const,
@@ -193,7 +198,7 @@ export function resolveGitHubCopilotSdkLaunchConfig(
   const platform = options?.platform ?? process.platform;
   const runningInElectron = options?.runningInElectron ?? isElectronNodeRuntime();
   const resolvedCliPath = resolveCliPathForSdk(binaryPath, {
-    pathValue: options?.pathValue,
+    ...(options?.pathValue !== undefined ? { pathValue: options.pathValue } : {}),
     platform,
   });
 
@@ -245,7 +250,7 @@ function toServerProviderModel(model: ModelInfo): ServerProviderModel {
 }
 
 function createGitHubCopilotClient(binaryPath: string): CopilotClient {
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     COPILOT_AUTO_UPDATE: "false",
     NODE_NO_WARNINGS: "1",
@@ -269,13 +274,14 @@ function createGitHubCopilotClient(binaryPath: string): CopilotClient {
   const bundledCliPath = (bundledClient as unknown as { options?: { readonly cliPath?: string } })
     .options?.cliPath;
   const launchConfig = resolveGitHubCopilotSdkLaunchConfig(binaryPath, {
-    bundledCliPath,
-    pathValue: env.PATH,
+    ...(bundledCliPath !== undefined ? { bundledCliPath } : {}),
+    ...(env.PATH !== undefined ? { pathValue: env.PATH } : {}),
   });
 
   if (launchConfig.cliArgs && launchConfig.cliArgs.length > 0) {
     return new CopilotClient({
-      ...launchConfig,
+      ...(launchConfig.cliPath ? { cliPath: launchConfig.cliPath } : {}),
+      cliArgs: [...launchConfig.cliArgs],
       autoStart: false,
       logLevel: "none",
       env,
@@ -326,7 +332,7 @@ export function setGitHubCopilotProviderRuntimeProbeForTests(
 function runCopilotCommand(
   binaryPath: string,
   args: ReadonlyArray<string>,
-): Effect.Effect<{ stdout: string; stderr: string; code: number }, Error> {
+): Effect.Effect<{ stdout: string; stderr: string; code: number }, GitHubCopilotProviderError> {
   return Effect.tryPromise({
     try: () =>
       ghCopilotProcessRunner(binaryPath, [...args], {
@@ -336,7 +342,10 @@ function runCopilotCommand(
         allowNonZeroExit: true,
       }),
     catch: (cause) =>
-      cause instanceof Error ? cause : new Error(`Failed to run ${binaryPath}: ${String(cause)}`),
+      new GitHubCopilotProviderError({
+        message: `Failed to run ${binaryPath}`,
+        ...(cause !== undefined ? { cause } : {}),
+      }),
   }).pipe(
     Effect.map((result) => ({
       stdout: result.stdout,
@@ -440,9 +449,10 @@ export const checkGitHubCopilotProviderStatus = Effect.gen(function* () {
   const runtimeProbeResult = yield* Effect.tryPromise({
     try: () => ghCopilotRuntimeProbe(copilotSettings.binaryPath),
     catch: (cause) =>
-      cause instanceof Error
-        ? cause
-        : new Error(`Failed to probe GitHub Copilot runtime: ${String(cause)}`),
+      new GitHubCopilotProviderError({
+        message: "Failed to probe GitHub Copilot runtime.",
+        ...(cause !== undefined ? { cause } : {}),
+      }),
   }).pipe(Effect.timeoutOption(DEFAULT_TIMEOUT_MS), Effect.result);
 
   const authResolution = Result.isFailure(runtimeProbeResult)
@@ -453,12 +463,17 @@ export const checkGitHubCopilotProviderStatus = Effect.gen(function* () {
       ? normalizeAuthStatus({
           error: "GitHub Copilot authentication check timed out.",
         })
-      : normalizeAuthStatus({
-          authenticated: runtimeProbeResult.success.value.auth.isAuthenticated,
-          user: runtimeProbeResult.success.value.auth.login,
-          authType: runtimeProbeResult.success.value.auth.authType,
-          statusMessage: runtimeProbeResult.success.value.auth.statusMessage,
-        });
+      : (() => {
+          const auth = runtimeProbeResult.success.value.auth;
+          return normalizeAuthStatus({
+            authenticated: auth.isAuthenticated,
+            ...(auth.login !== undefined ? { user: auth.login ?? null } : {}),
+            ...(auth.authType !== undefined ? { authType: auth.authType ?? null } : {}),
+            ...(auth.statusMessage !== undefined
+              ? { statusMessage: auth.statusMessage ?? null }
+              : {}),
+          });
+        })();
 
   const discoveredModels =
     Result.isSuccess(runtimeProbeResult) && runtimeProbeResult.success._tag === "Some"

@@ -10,7 +10,12 @@ import {
   type ThreadId,
   type TurnId,
 } from "@t3tools/contracts";
-import { extractApplyPatchPaths, parseUnifiedDiffFiles } from "@t3tools/shared/diff";
+import {
+  extractApplyPatchPaths,
+  parseApplyPatchFiles,
+  parseUnifiedDiffFiles,
+  type ParsedUnifiedDiffFile,
+} from "@t3tools/shared/diff";
 
 import type {
   ChatMessage,
@@ -41,10 +46,12 @@ export interface WorkLogEntry {
   createdAt: string;
   label: string;
   turnId?: TurnId | null;
+  itemId?: string;
   detail?: string;
   command?: string;
   rawCommand?: string;
   changedFiles?: ReadonlyArray<string>;
+  changedFileStats?: ReadonlyArray<ParsedUnifiedDiffFile>;
   unifiedDiff?: string;
   tone: "thinking" | "tool" | "info" | "error";
   toolTitle?: string;
@@ -504,8 +511,13 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
       ? (activity.payload as Record<string, unknown>)
       : null;
   const commandPreview = extractToolCommand(payload);
-  const changedFiles = extractChangedFiles(payload);
+  const changedFileStats = extractChangedFileStats(payload);
+  const changedFiles = mergeChangedFiles(
+    extractChangedFiles(payload),
+    changedFileStats.map((file) => file.path),
+  );
   const title = extractToolTitle(payload);
+  const itemId = extractWorkLogItemId(payload);
   const entry: DerivedWorkLogEntry = {
     id: activity.id,
     createdAt: activity.createdAt,
@@ -516,6 +528,9 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   };
   const itemType = extractWorkLogItemType(payload);
   const requestKind = extractWorkLogRequestKind(payload);
+  if (itemId) {
+    entry.itemId = itemId;
+  }
   if (payload && typeof payload.detail === "string" && payload.detail.length > 0) {
     const detail = stripTrailingExitCode(payload.detail).output;
     if (detail) {
@@ -530,6 +545,9 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   }
   if (changedFiles.length > 0) {
     entry.changedFiles = changedFiles;
+  }
+  if (changedFileStats.length > 0) {
+    entry.changedFileStats = changedFileStats;
   }
   if (title) {
     entry.toolTitle = title;
@@ -586,20 +604,24 @@ function mergeDerivedWorkLogEntries(
   const detail = next.detail ?? previous.detail;
   const command = next.command ?? previous.command;
   const rawCommand = next.rawCommand ?? previous.rawCommand;
+  const itemId = next.itemId ?? previous.itemId;
   const toolTitle = next.toolTitle ?? previous.toolTitle;
   const itemType = next.itemType ?? previous.itemType;
   const requestKind = next.requestKind ?? previous.requestKind;
   const collapseKey = next.collapseKey ?? previous.collapseKey;
   const turnId = next.turnId ?? previous.turnId;
   const unifiedDiff = next.unifiedDiff ?? previous.unifiedDiff;
+  const changedFileStats = mergeChangedFileStats(previous.changedFileStats, next.changedFileStats);
   return {
     ...previous,
     ...next,
     ...(turnId !== undefined ? { turnId } : {}),
+    ...(itemId ? { itemId } : {}),
     ...(detail ? { detail } : {}),
     ...(command ? { command } : {}),
     ...(rawCommand ? { rawCommand } : {}),
     ...(changedFiles.length > 0 ? { changedFiles } : {}),
+    ...(changedFileStats.length > 0 ? { changedFileStats } : {}),
     ...(unifiedDiff ? { unifiedDiff } : {}),
     ...(toolTitle ? { toolTitle } : {}),
     ...(itemType ? { itemType } : {}),
@@ -619,9 +641,35 @@ function mergeChangedFiles(
   return [...new Set(merged)];
 }
 
+function mergeChangedFileStats(
+  previous: ReadonlyArray<ParsedUnifiedDiffFile> | undefined,
+  next: ReadonlyArray<ParsedUnifiedDiffFile> | undefined,
+): ParsedUnifiedDiffFile[] {
+  const merged = [...(previous ?? []), ...(next ?? [])];
+  if (merged.length === 0) {
+    return [];
+  }
+
+  const byPath = new Map<string, ParsedUnifiedDiffFile>();
+  const orderedPaths: string[] = [];
+  for (const file of merged) {
+    if (!byPath.has(file.path)) {
+      orderedPaths.push(file.path);
+    }
+    byPath.set(file.path, file);
+  }
+  return orderedPaths.flatMap((path) => {
+    const file = byPath.get(path);
+    return file ? [file] : [];
+  });
+}
+
 function deriveToolLifecycleCollapseKey(entry: DerivedWorkLogEntry): string | undefined {
   if (entry.activityKind !== "tool.updated" && entry.activityKind !== "tool.completed") {
     return undefined;
+  }
+  if (entry.itemId) {
+    return `item:${entry.itemId}`;
   }
   const normalizedLabel = normalizeCompactToolLabel(entry.toolTitle ?? entry.label);
   const detail = entry.detail?.trim() ?? "";
@@ -684,7 +732,20 @@ function attachLiveTurnDiffs(
     if (!unifiedDiff) {
       return entry;
     }
-    return { ...entry, unifiedDiff };
+    const liveChangedFileStats = parseChangedFileStatsFromPatchText(unifiedDiff);
+    return {
+      ...entry,
+      unifiedDiff,
+      ...(liveChangedFileStats.length > 0
+        ? {
+            changedFileStats: mergeChangedFileStats(entry.changedFileStats, liveChangedFileStats),
+            changedFiles: mergeChangedFiles(
+              entry.changedFiles,
+              liveChangedFileStats.map((file) => file.path),
+            ),
+          }
+        : {}),
+    };
   });
 }
 
@@ -915,6 +976,35 @@ function extractToolTitle(payload: Record<string, unknown> | null): string | nul
   return asTrimmedString(payload?.title);
 }
 
+function extractWorkLogItemId(payload: Record<string, unknown> | null): string | undefined {
+  const data = asRecord(payload?.data);
+  const item = asRecord(data?.item);
+  const input = asRecord(data?.input);
+  const result = asRecord(data?.result);
+  const candidates = [
+    payload?.itemId,
+    data?.itemId,
+    data?.id,
+    data?.callId,
+    item?.id,
+    item?.itemId,
+    item?.callId,
+    input?.id,
+    input?.itemId,
+    result?.id,
+    result?.callId,
+  ];
+
+  for (const candidate of candidates) {
+    const value = asTrimmedString(candidate);
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 function stripTrailingExitCode(value: string): {
   output: string | null;
   exitCode?: number | undefined;
@@ -967,6 +1057,327 @@ function pushChangedFile(target: string[], seen: Set<string>, value: unknown) {
   target.push(normalized);
 }
 
+const CHANGED_FILE_PATH_KEYS = [
+  "path",
+  "filePath",
+  "file_path",
+  "filepath",
+  "relativePath",
+  "relative_path",
+  "filename",
+  "fileName",
+  "file_name",
+  "newPath",
+  "new_path",
+  "oldPath",
+  "old_path",
+] as const;
+
+const ADDITION_COUNT_KEYS = [
+  "additions",
+  "insertions",
+  "added",
+  "addedLines",
+  "added_lines",
+  "additionLines",
+  "addition_lines",
+  "insertedLines",
+  "inserted_lines",
+] as const;
+
+const DELETION_COUNT_KEYS = [
+  "deletions",
+  "deleted",
+  "removed",
+  "removedLines",
+  "removed_lines",
+  "deletedLines",
+  "deleted_lines",
+  "deletionLines",
+  "deletion_lines",
+] as const;
+
+const OLD_TEXT_KEYS = [
+  "oldString",
+  "old_string",
+  "oldText",
+  "old_text",
+  "original",
+  "originalText",
+  "original_text",
+  "before",
+] as const;
+
+const NEW_TEXT_KEYS = [
+  "newString",
+  "new_string",
+  "newText",
+  "new_text",
+  "replacement",
+  "replacementText",
+  "replacement_text",
+  "after",
+] as const;
+
+const CONTENT_TEXT_KEYS = ["content", "contents"] as const;
+
+const CHANGED_FILE_NESTED_KEYS = [
+  "item",
+  "result",
+  "input",
+  "args",
+  "arguments",
+  "data",
+  "state",
+  "changes",
+  "files",
+  "edits",
+  "patch",
+  "patches",
+  "operations",
+] as const;
+
+function toNonNegativeInteger(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return Math.trunc(value);
+}
+
+function extractFileStatNumber(record: Record<string, unknown>, keys: ReadonlyArray<string>) {
+  for (const key of keys) {
+    const value = toNonNegativeInteger(record[key]);
+    if (value !== null) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function normalizeChangedFileStatus(value: unknown): ParsedUnifiedDiffFile["status"] | null {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : value;
+  if (
+    normalized === "added" ||
+    normalized === "deleted" ||
+    normalized === "modified" ||
+    normalized === "moved"
+  ) {
+    return normalized;
+  }
+  if (normalized === "new" || normalized === "created" || normalized === "create") {
+    return "added";
+  }
+  if (normalized === "new file" || normalized === "created file") {
+    return "added";
+  }
+  if (normalized === "removed" || normalized === "delete" || normalized === "deleted file") {
+    return "deleted";
+  }
+  if (normalized === "removed file" || normalized === "delete file") {
+    return "deleted";
+  }
+  if (
+    normalized === "renamed" ||
+    normalized === "rename" ||
+    normalized === "rename-pure" ||
+    normalized === "rename-changed"
+  ) {
+    return "moved";
+  }
+  if (normalized === "updated" || normalized === "changed" || normalized === "change") {
+    return "modified";
+  }
+  return null;
+}
+
+function firstChangedFilePath(record: Record<string, unknown>): string | null {
+  for (const key of CHANGED_FILE_PATH_KEYS) {
+    const path = asTrimmedString(record[key]);
+    if (path) {
+      return path;
+    }
+  }
+  return null;
+}
+
+function firstRecordString(
+  record: Record<string, unknown>,
+  keys: ReadonlyArray<string>,
+): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+  return null;
+}
+
+function countTextLines(value: string): number {
+  const normalized = value.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+  if (normalized.length === 0) {
+    return 0;
+  }
+  const withoutFinalNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
+  if (withoutFinalNewline.length === 0) {
+    return 1;
+  }
+  return withoutFinalNewline.split("\n").length;
+}
+
+function extractTextEditLineStats(
+  record: Record<string, unknown>,
+): Pick<ParsedUnifiedDiffFile, "additions" | "deletions"> | null {
+  const oldText = firstRecordString(record, OLD_TEXT_KEYS);
+  const newText = firstRecordString(record, NEW_TEXT_KEYS);
+  if (oldText !== null || newText !== null) {
+    const additions = countTextLines(newText ?? "");
+    const deletions = countTextLines(oldText ?? "");
+    return additions > 0 || deletions > 0 ? { additions, deletions } : null;
+  }
+
+  const content = firstRecordString(record, CONTENT_TEXT_KEYS);
+  if (content !== null) {
+    const additions = countTextLines(content);
+    return additions > 0 ? { additions, deletions: 0 } : null;
+  }
+
+  return null;
+}
+
+function extractNestedTextEditLineStats(
+  record: Record<string, unknown>,
+): Pick<ParsedUnifiedDiffFile, "additions" | "deletions"> | null {
+  if (!Array.isArray(record.edits)) {
+    return null;
+  }
+
+  let additions = 0;
+  let deletions = 0;
+  for (const edit of record.edits) {
+    const editRecord = asRecord(edit);
+    if (!editRecord) {
+      continue;
+    }
+    const stats = extractTextEditLineStats(editRecord);
+    if (!stats) {
+      continue;
+    }
+    additions += stats.additions;
+    deletions += stats.deletions;
+  }
+
+  return additions > 0 || deletions > 0 ? { additions, deletions } : null;
+}
+
+function parseChangedFileStatsFromPatchText(text: string): ReadonlyArray<ParsedUnifiedDiffFile> {
+  const applyPatchFiles = parseApplyPatchFiles(text);
+  if (applyPatchFiles.length > 0) {
+    return applyPatchFiles;
+  }
+  try {
+    return parseUnifiedDiffFiles(text);
+  } catch {
+    return [];
+  }
+}
+
+function pushChangedFileStat(
+  target: ParsedUnifiedDiffFile[],
+  seen: Set<string>,
+  file: ParsedUnifiedDiffFile,
+) {
+  const normalizedPath = file.path.trim().replaceAll("\\", "/");
+  if (normalizedPath.length === 0) {
+    return;
+  }
+  const normalizedFile: ParsedUnifiedDiffFile = {
+    ...file,
+    path: normalizedPath,
+    ...(file.previousPath ? { previousPath: file.previousPath.trim().replaceAll("\\", "/") } : {}),
+  };
+  const existingIndex = target.findIndex((entry) => entry.path === normalizedPath);
+  if (existingIndex >= 0) {
+    target[existingIndex] = normalizedFile;
+    return;
+  }
+  seen.add(normalizedPath);
+  target.push(normalizedFile);
+}
+
+function collectChangedFileStats(
+  value: unknown,
+  target: ParsedUnifiedDiffFile[],
+  seen: Set<string>,
+  depth: number,
+) {
+  if (depth > 4 || target.length >= 12) {
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectChangedFileStats(entry, target, seen, depth + 1);
+      if (target.length >= 12) {
+        return;
+      }
+    }
+    return;
+  }
+
+  const record = asRecord(value);
+  if (!record) {
+    return;
+  }
+
+  const path = firstChangedFilePath(record);
+  const numericAdditions = extractFileStatNumber(record, ADDITION_COUNT_KEYS);
+  const numericDeletions = extractFileStatNumber(record, DELETION_COUNT_KEYS);
+  const textEditStats =
+    numericAdditions === null && numericDeletions === null
+      ? (extractTextEditLineStats(record) ?? extractNestedTextEditLineStats(record))
+      : null;
+  const additions = numericAdditions ?? textEditStats?.additions ?? null;
+  const deletions = numericDeletions ?? textEditStats?.deletions ?? null;
+  if (path && (additions !== null || deletions !== null)) {
+    pushChangedFileStat(target, seen, {
+      path,
+      additions: additions ?? 0,
+      deletions: deletions ?? 0,
+      status: normalizeChangedFileStatus(record.status ?? record.kind ?? record.type) ?? "modified",
+    });
+  }
+
+  for (const patchKey of ["patch", "patchText", "diff", "unifiedDiff"] as const) {
+    const patchValue = record[patchKey];
+    if (typeof patchValue !== "string" || patchValue.trim().length === 0) {
+      continue;
+    }
+    for (const file of parseChangedFileStatsFromPatchText(patchValue)) {
+      pushChangedFileStat(target, seen, file);
+      if (target.length >= 12) {
+        return;
+      }
+    }
+  }
+
+  for (const nestedKey of CHANGED_FILE_NESTED_KEYS) {
+    if (!(nestedKey in record)) {
+      continue;
+    }
+    collectChangedFileStats(record[nestedKey], target, seen, depth + 1);
+    if (target.length >= 12) {
+      return;
+    }
+  }
+}
+
+function extractChangedFileStats(payload: Record<string, unknown> | null): ParsedUnifiedDiffFile[] {
+  const changedFileStats: ParsedUnifiedDiffFile[] = [];
+  const seen = new Set<string>();
+  collectChangedFileStats(payload, changedFileStats, seen, 0);
+  return changedFileStats;
+}
+
 function collectChangedFiles(value: unknown, target: string[], seen: Set<string>, depth: number) {
   if (depth > 4 || target.length >= 12) {
     return;
@@ -986,12 +1397,9 @@ function collectChangedFiles(value: unknown, target: string[], seen: Set<string>
     return;
   }
 
-  pushChangedFile(target, seen, record.path);
-  pushChangedFile(target, seen, record.filePath);
-  pushChangedFile(target, seen, record.relativePath);
-  pushChangedFile(target, seen, record.filename);
-  pushChangedFile(target, seen, record.newPath);
-  pushChangedFile(target, seen, record.oldPath);
+  for (const key of CHANGED_FILE_PATH_KEYS) {
+    pushChangedFile(target, seen, record[key]);
+  }
 
   for (const patchKey of ["patch", "patchText", "diff", "unifiedDiff"] as const) {
     const patchValue = record[patchKey];
@@ -1004,19 +1412,7 @@ function collectChangedFiles(value: unknown, target: string[], seen: Set<string>
     }
   }
 
-  for (const nestedKey of [
-    "item",
-    "result",
-    "input",
-    "args",
-    "data",
-    "changes",
-    "files",
-    "edits",
-    "patch",
-    "patches",
-    "operations",
-  ]) {
+  for (const nestedKey of CHANGED_FILE_NESTED_KEYS) {
     if (!(nestedKey in record)) {
       continue;
     }

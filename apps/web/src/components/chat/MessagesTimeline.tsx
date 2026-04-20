@@ -18,6 +18,7 @@ import { deriveTimelineEntries, formatElapsed } from "../../session-logic";
 import { AUTO_SCROLL_BOTTOM_THRESHOLD_PX } from "../../chat-scroll";
 import { type TurnDiffSummary } from "../../types";
 import { summarizeTurnDiffStats } from "../../lib/turnDiffTree";
+import { parseUnifiedDiffFiles, type ParsedUnifiedDiffFile } from "@t3tools/shared/diff";
 import ChatMarkdown from "../ChatMarkdown";
 import {
   BotIcon,
@@ -43,6 +44,7 @@ import { MessageCopyButton } from "./MessageCopyButton";
 import { WorkEntryDiffReview } from "./WorkEntryDiffReview";
 import {
   MAX_VISIBLE_WORK_LOG_ENTRIES,
+  deriveGroupCardSummary,
   deriveMessagesTimelineRows,
   estimateMessagesTimelineRowHeight,
   normalizeCompactToolLabel,
@@ -57,6 +59,7 @@ import {
 import { cn } from "~/lib/utils";
 import { type TimestampFormat } from "@t3tools/contracts/settings";
 import { formatTimestamp } from "../../timestampFormat";
+import { basenameOfPath } from "../../vscode-icons";
 import {
   buildInlineTerminalContextText,
   formatInlineTerminalContextLabel,
@@ -323,28 +326,24 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               ? groupedEntries.slice(-MAX_VISIBLE_WORK_LOG_ENTRIES)
               : groupedEntries;
           const hiddenCount = groupedEntries.length - visibleEntries.length;
-          const onlyToolEntries = groupedEntries.every((entry) => entry.tone === "tool");
-          const showHeader = hasOverflow || !onlyToolEntries;
-          const groupLabel = onlyToolEntries ? "Tool calls" : "Work log";
+          const groupLabel = deriveGroupCardSummary(groupedEntries);
 
           return (
             <div className="rounded-xl border border-border/45 bg-card/25 px-2 py-1.5">
-              {showHeader && (
-                <div className="mb-1.5 flex items-center justify-between gap-2 px-0.5">
-                  <p className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground/55">
-                    {groupLabel} ({groupedEntries.length})
-                  </p>
-                  {hasOverflow && (
-                    <button
-                      type="button"
-                      className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/55 transition-colors duration-150 hover:text-foreground/75"
-                      onClick={() => onToggleWorkGroup(groupId)}
-                    >
-                      {isExpanded ? "Show less" : `Show ${hiddenCount} more`}
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="mb-1.5 flex items-center justify-between gap-2 px-0.5">
+                <p className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground/55">
+                  {groupLabel} ({groupedEntries.length})
+                </p>
+                {hasOverflow && (
+                  <button
+                    type="button"
+                    className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/55 transition-colors duration-150 hover:text-foreground/75"
+                    onClick={() => onToggleWorkGroup(groupId)}
+                  >
+                    {isExpanded ? "Show less" : `Show ${hiddenCount} more`}
+                  </button>
+                )}
+              </div>
               <div className="space-y-0.5">
                 {visibleEntries.map((workEntry) => (
                   <SimpleWorkEntryRow
@@ -814,6 +813,56 @@ function workEntryRawCommand(
   return rawCommand === workEntry.command.trim() ? null : rawCommand;
 }
 
+interface WorkEntryFileSummary {
+  label: string;
+  title: string;
+  additions: number;
+  deletions: number;
+  hasStats: boolean;
+}
+
+function parseUnifiedDiffFileStats(
+  unifiedDiff: string | undefined,
+): ReadonlyArray<ParsedUnifiedDiffFile> {
+  if (typeof unifiedDiff !== "string" || unifiedDiff.trim().length === 0) {
+    return [];
+  }
+  try {
+    return parseUnifiedDiffFiles(unifiedDiff);
+  } catch {
+    return [];
+  }
+}
+
+function summarizeWorkEntryFileChanges(
+  workEntry: Pick<TimelineWorkEntry, "changedFiles" | "changedFileStats" | "unifiedDiff">,
+): WorkEntryFileSummary | null {
+  const diffFiles = parseUnifiedDiffFileStats(workEntry.unifiedDiff);
+  const statFiles = diffFiles.length > 0 ? diffFiles : (workEntry.changedFileStats ?? []);
+  const changedFiles =
+    statFiles.length > 0 ? statFiles.map((file) => file.path) : (workEntry.changedFiles ?? []);
+  const [firstPath] = changedFiles;
+  if (!firstPath) {
+    return null;
+  }
+
+  const additions = statFiles.reduce((total, file) => total + file.additions, 0);
+  const deletions = statFiles.reduce((total, file) => total + file.deletions, 0);
+  const fileCount = changedFiles.length;
+  const label =
+    fileCount === 1
+      ? basenameOfPath(firstPath)
+      : `${basenameOfPath(firstPath)} +${fileCount - 1} more`;
+  const statLabel = statFiles.length > 0 ? ` (+${additions}/-${deletions})` : "";
+  return {
+    label,
+    title: fileCount === 1 ? `${firstPath}${statLabel}` : `${changedFiles.join(", ")}${statLabel}`,
+    additions,
+    deletions,
+    hasStats: statFiles.length > 0,
+  };
+}
+
 function workEntryIcon(workEntry: TimelineWorkEntry): LucideIcon {
   if (workEntry.requestKind === "command") return TerminalIcon;
   if (workEntry.requestKind === "file-read") return EyeIcon;
@@ -867,8 +916,10 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
   const rawCommand = workEntryRawCommand(workEntry);
   const hasChangedFiles = (workEntry.changedFiles?.length ?? 0) > 0;
   const showDiffReview = hasChangedFiles || typeof workEntry.unifiedDiff === "string";
-  const preview = showDiffReview ? null : workEntryPreview(workEntry);
-  const displayText = preview ? `${heading} - ${preview}` : heading;
+  const fileSummary = useMemo(() => summarizeWorkEntryFileChanges(workEntry), [workEntry]);
+  const preview = fileSummary?.label ?? (showDiffReview ? null : workEntryPreview(workEntry));
+  const previewTitle = fileSummary?.title ?? preview ?? heading;
+  const displayText = preview ? `${heading} - ${previewTitle}` : heading;
   const previewIsChangedFiles = hasChangedFiles && !workEntry.command && !workEntry.detail;
 
   return (
@@ -916,8 +967,25 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
                     </TooltipPopup>
                   </Tooltip>
                 ) : (
-                  <span className="text-muted-foreground/55"> - {preview}</span>
+                  <span
+                    className={cn(
+                      "text-muted-foreground/55",
+                      fileSummary && "font-mono text-muted-foreground/75",
+                    )}
+                  >
+                    {" "}
+                    - {preview}
+                  </span>
                 ))}
+              {fileSummary?.hasStats && (
+                <span className="ml-1 font-mono text-[11px]">
+                  <DiffStatLabel
+                    additions={fileSummary.additions}
+                    deletions={fileSummary.deletions}
+                    showParentheses
+                  />
+                </span>
+              )}
             </p>
           </div>
         </div>

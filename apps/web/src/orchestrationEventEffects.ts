@@ -1,5 +1,24 @@
 import type { OrchestrationEvent, ThreadId } from "@t3tools/contracts";
 
+/** Activity kinds that indicate the project file tree may have changed. */
+const FILE_CHANGE_ACTIVITY_KINDS = new Set([
+  "tool.started",
+  "tool.updated",
+  "tool.completed",
+  "turn.diff.updated",
+]);
+
+/** Provider item types that represent file mutations. */
+const FILE_MUTATION_ITEM_TYPES = new Set(["file_change", "command_execution"]);
+
+function isFileChangeActivity(activity: { kind: string; payload: unknown }): boolean {
+  if (activity.kind === "turn.diff.updated") return true;
+  if (!FILE_CHANGE_ACTIVITY_KINDS.has(activity.kind)) return false;
+  const payload = activity.payload;
+  if (typeof payload !== "object" || payload === null) return false;
+  return FILE_MUTATION_ITEM_TYPES.has((payload as { itemType?: string }).itemType ?? "");
+}
+
 export interface OrchestrationBatchEffects {
   promoteDraftThreadIds: ThreadId[];
   clearDeletedThreadIds: ThreadId[];
@@ -25,6 +44,13 @@ export function deriveOrchestrationBatchEffects(
       case "thread.turn-diff-completed":
       case "thread.reverted": {
         needsProviderInvalidation = true;
+        break;
+      }
+
+      case "thread.activity-appended": {
+        if (!needsProviderInvalidation && isFileChangeActivity(event.payload.activity)) {
+          needsProviderInvalidation = true;
+        }
         break;
       }
 

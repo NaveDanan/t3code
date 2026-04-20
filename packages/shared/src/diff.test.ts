@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractApplyPatchPaths, parseUnifiedDiffFiles } from "./diff";
+import { extractApplyPatchPaths, parseApplyPatchFiles, parseUnifiedDiffFiles } from "./diff";
 
 describe("extractApplyPatchPaths", () => {
   it("extracts add, update, delete, and move targets in order", () => {
@@ -33,6 +33,53 @@ describe("extractApplyPatchPaths", () => {
     ].join("\n");
 
     expect(extractApplyPatchPaths(patch)).toEqual(["src/feature.ts"]);
+  });
+});
+
+describe("parseApplyPatchFiles", () => {
+  it("parses file stats and statuses from apply_patch marker text", () => {
+    const patch = [
+      "*** Begin Patch",
+      "*** Add File: src/new-file.ts",
+      "+export const value = 1;",
+      "+export const more = 2;",
+      "*** Update File: src/old-name.ts",
+      "*** Move to: src/new-name.ts",
+      "@@",
+      "-old",
+      "+new",
+      "*** Delete File: src/obsolete.ts",
+      "-old",
+      "*** End Patch",
+    ].join("\n");
+
+    expect(parseApplyPatchFiles(patch)).toEqual([
+      { path: "src/new-file.ts", additions: 2, deletions: 0, status: "added" },
+      {
+        path: "src/new-name.ts",
+        previousPath: "src/old-name.ts",
+        additions: 1,
+        deletions: 1,
+        status: "moved",
+      },
+      { path: "src/obsolete.ts", additions: 0, deletions: 1, status: "deleted" },
+    ]);
+  });
+
+  it("normalizes windows separators and combines repeated paths", () => {
+    const patch = [
+      "*** Begin Patch",
+      "*** Update File: src\\feature.ts",
+      "-old",
+      "+new",
+      "*** Update File: src/feature.ts",
+      "+extra",
+      "*** End Patch",
+    ].join("\n");
+
+    expect(parseApplyPatchFiles(patch)).toEqual([
+      { path: "src/feature.ts", additions: 2, deletions: 1, status: "modified" },
+    ]);
   });
 });
 

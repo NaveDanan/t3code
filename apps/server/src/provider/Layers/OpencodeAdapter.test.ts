@@ -2048,6 +2048,94 @@ describe("OpencodeAdapterLive", () => {
     }).pipe(Effect.provide(harness.layer));
   });
 
+  it.effect("emits deduplicated in-progress updates for tool part changes", () => {
+    const harness = makeHarness();
+    return Effect.gen(function* () {
+      const adapter = yield* OpencodeAdapter;
+      const runtimeEvents: Array<ProviderRuntimeEvent> = [];
+      const runtimeEventsFiber = yield* Stream.runForEach(adapter.streamEvents, (event) =>
+        Effect.sync(() => {
+          runtimeEvents.push(event);
+        }),
+      ).pipe(Effect.forkChild);
+
+      yield* adapter.startSession({
+        threadId: THREAD_ID,
+        provider: "opencode",
+        cwd: "D:/repo",
+        runtimeMode: "full-access",
+      });
+
+      const turn = yield* adapter.sendTurn({
+        threadId: THREAD_ID,
+        input: "edit src/open.ts",
+        attachments: [],
+      });
+
+      const firstToolPart = {
+        id: "tool-part-1",
+        sessionID: "sdk-session-1",
+        messageID: "assistant-message-1",
+        type: "tool",
+        tool: "edit",
+        state: {
+          status: "running",
+          input: {
+            filePath: "src/open.ts",
+            oldString: "before",
+            newString: "after",
+          },
+        },
+        time: {
+          start: 1,
+        },
+      };
+      const secondToolPart = {
+        ...firstToolPart,
+        state: {
+          status: "running",
+          input: {
+            filePath: "src/open.ts",
+            oldString: "before",
+            newString: "after\nnext",
+          },
+        },
+      };
+
+      for (const part of [firstToolPart, firstToolPart, secondToolPart]) {
+        harness.eventStream.emit({
+          directory: "D:/repo",
+          payload: {
+            type: "message.part.updated",
+            properties: {
+              sessionID: "sdk-session-1",
+              part,
+              time: 1,
+            },
+          },
+        } as unknown as GlobalEvent);
+      }
+
+      try {
+        yield* flushAsyncWork;
+        yield* flushAsyncWork;
+
+        const toolUpdates = runtimeEvents.filter(
+          (event): event is Extract<ProviderRuntimeEvent, { type: "item.updated" }> =>
+            event.type === "item.updated" && event.itemId === "tool-part-1",
+        );
+
+        assert.equal(toolUpdates.length, 2);
+        assert.equal(toolUpdates[0]?.turnId, turn.turnId);
+        assert.equal(toolUpdates[0]?.payload.itemType, "file_change");
+        assert.equal(toolUpdates[0]?.payload.title, "edit");
+        assert.deepEqual(toolUpdates[1]?.payload.data, secondToolPart);
+      } finally {
+        yield* Fiber.interrupt(runtimeEventsFiber);
+      }
+    }).pipe(Effect.provide(harness.layer));
+  });
+
   it.effect("ignores user text-part replay so prompts are not echoed as assistant output", () => {
     const harness = makeHarness();
     return Effect.gen(function* () {
