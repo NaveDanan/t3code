@@ -45,64 +45,6 @@ function normalizeApplyPatchPath(pathValue: string): string | null {
   return normalized;
 }
 
-export function parseApplyPatchFiles(text: string): ReadonlyArray<ParsedUnifiedDiffFile> {
-  const files: MutableApplyPatchFile[] = [];
-  let currentFileIndex = -1;
-
-  const startFile = (action: string, pathValue: string) => {
-    const path = normalizeApplyPatchPath(pathValue);
-    if (!path) {
-      currentFileIndex = -1;
-      return;
-    }
-    const status =
-      action === "Add" ? "added" : action === "Delete" ? "deleted" : ("modified" as const);
-    currentFileIndex = files.length;
-    files.push({
-      path,
-      additions: 0,
-      deletions: 0,
-      status,
-      order: currentFileIndex,
-    });
-  };
-
-  for (const line of text.replace(/\r\n/g, "\n").split("\n")) {
-    const fileMatch = APPLY_PATCH_PATH_REGEX.exec(line);
-    if (fileMatch) {
-      startFile(fileMatch[1] ?? "", fileMatch[2] ?? "");
-      continue;
-    }
-
-    const moveMatch = APPLY_PATCH_MOVE_REGEX.exec(line);
-    const currentFile = currentFileIndex >= 0 ? files[currentFileIndex] : undefined;
-    if (moveMatch && currentFile) {
-      const path = normalizeApplyPatchPath(moveMatch[1] ?? "");
-      if (path) {
-        currentFile.previousPath = currentFile.path;
-        currentFile.path = path;
-        currentFile.status = "moved";
-      }
-      continue;
-    }
-
-    if (!currentFile) {
-      continue;
-    }
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      currentFile.additions += 1;
-      continue;
-    }
-    if (line.startsWith("-") && !line.startsWith("---")) {
-      currentFile.deletions += 1;
-    }
-  }
-
-  return files
-    .toSorted((left, right) => left.order - right.order)
-    .map(({ order: _order, ...file }) => file);
-}
-
 export function parseUnifiedDiffFiles(diff: string): ReadonlyArray<ParsedUnifiedDiffFile> {
   const normalized = diff.replace(/\r\n/g, "\n").trim();
   if (normalized.length === 0) {

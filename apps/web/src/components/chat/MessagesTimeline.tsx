@@ -803,37 +803,6 @@ function workEntryPreview(
     : `${firstPath} +${workEntry.changedFiles!.length - 1} more`;
 }
 
-function compactPathLabel(pathValue: string): string {
-  const normalized = pathValue.replace(/\/+$/, "");
-  const separatorIndex = normalized.lastIndexOf("/");
-  return separatorIndex >= 0 ? normalized.slice(separatorIndex + 1) : normalized;
-}
-
-function workEntryFileSummary(
-  workEntry: Pick<TimelineWorkEntry, "changedFiles" | "changedFileStats">,
-): {
-  readonly path: string;
-  readonly label: string;
-  readonly additions?: number;
-  readonly deletions?: number;
-} | null {
-  const firstStat = workEntry.changedFileStats?.[0];
-  const path = firstStat?.path ?? workEntry.changedFiles?.[0] ?? null;
-  if (!path) {
-    return null;
-  }
-  return {
-    path,
-    label:
-      (workEntry.changedFileStats?.length ?? workEntry.changedFiles?.length ?? 0) > 1
-        ? `${compactPathLabel(path)} +${
-            (workEntry.changedFileStats?.length ?? workEntry.changedFiles?.length ?? 1) - 1
-          }`
-        : compactPathLabel(path),
-    ...(firstStat ? { additions: firstStat.additions, deletions: firstStat.deletions } : {}),
-  };
-}
-
 function workEntryRawCommand(
   workEntry: Pick<TimelineWorkEntry, "command" | "rawCommand">,
 ): string | null {
@@ -977,7 +946,7 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
               {fileSummary && (
                 <>
                   <span className="text-muted-foreground/55"> - </span>
-                  <span className="font-mono text-muted-foreground/75" title={fileSummary.path}>
+                  <span className="font-mono text-muted-foreground/75" title={fileSummary.title}>
                     {fileSummary.label}
                   </span>
                   {fileSummary.additions !== undefined && fileSummary.deletions !== undefined && (

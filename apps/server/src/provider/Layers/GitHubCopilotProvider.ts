@@ -37,11 +37,6 @@ import {
 const PROVIDER = "githubCopilot" as const;
 const DEFAULT_TIMEOUT_MS = 4_000;
 
-class GitHubCopilotProviderError extends Data.TaggedError("GitHubCopilotProviderError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
 const GITHUB_COPILOT_RUNTIME_CAPABILITIES = {
   busyFollowupMode: "native-steer" as const,
 };
