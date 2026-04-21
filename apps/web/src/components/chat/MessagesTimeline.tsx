@@ -24,6 +24,7 @@ import {
   BotIcon,
   CheckIcon,
   CircleAlertIcon,
+  ExternalLinkIcon,
   EyeIcon,
   GlobeIcon,
   HammerIcon,
@@ -915,12 +916,19 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
   const heading = toolWorkEntryHeading(workEntry);
   const rawCommand = workEntryRawCommand(workEntry);
   const hasChangedFiles = (workEntry.changedFiles?.length ?? 0) > 0;
-  const showDiffReview = hasChangedFiles || typeof workEntry.unifiedDiff === "string";
+  const hasInlineDiff = typeof workEntry.unifiedDiff === "string";
+  const hasMultipleFileStats = (workEntry.changedFileStats?.length ?? 0) > 1;
+  // Only render the bordered diff review panel for multi-file changes or expandable inline diffs.
+  // Single-file stat entries already show the file in the label; read-only entries need no panel.
+  const showDiffReview = hasInlineDiff || hasMultipleFileStats;
+  const singleStatFile =
+    !hasInlineDiff && (workEntry.changedFileStats?.length ?? 0) === 1
+      ? workEntry.changedFileStats![0]!
+      : null;
   const fileSummary = useMemo(() => summarizeWorkEntryFileChanges(workEntry), [workEntry]);
-  const preview = fileSummary?.label ?? (showDiffReview ? null : workEntryPreview(workEntry));
+  const preview = fileSummary?.label ?? workEntryPreview(workEntry);
   const previewTitle = fileSummary?.title ?? preview ?? heading;
   const displayText = preview ? `${heading} - ${previewTitle}` : heading;
-  const previewIsChangedFiles = hasChangedFiles && !workEntry.command && !workEntry.detail;
 
   return (
     <div className="rounded-lg px-1 py-1">
@@ -989,8 +997,18 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
             </p>
           </div>
         </div>
+        {singleStatFile && workEntry.turnId && (
+          <button
+            type="button"
+            className="shrink-0 cursor-pointer text-muted-foreground/35 transition-colors hover:text-muted-foreground/60"
+            title={`Open diff: ${singleStatFile.path}`}
+            onClick={() => props.onOpenTurnDiff(workEntry.turnId!, singleStatFile.path)}
+          >
+            <ExternalLinkIcon className="size-3" />
+          </button>
+        )}
       </div>
-      {hasChangedFiles && !previewIsChangedFiles && !showDiffReview && (
+      {hasChangedFiles && !fileSummary && !showDiffReview && (
         <div className="mt-1 flex flex-wrap gap-1 pl-6">
           {workEntry.changedFiles?.slice(0, 4).map((filePath) => (
             <span
