@@ -46,6 +46,11 @@ const GITHUB_COPILOT_RUNTIME_CAPABILITIES = {
   busyFollowupMode: "native-steer" as const,
 };
 
+class GitHubCopilotProviderProbeError extends Data.TaggedError("GitHubCopilotProviderProbeError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
 type GitHubCopilotProcessRunner = (
   command: string,
   args: ReadonlyArray<string>,
@@ -73,7 +78,7 @@ type GitHubCopilotRuntimeProbe = (binaryPath: string) => Promise<GitHubCopilotRu
 
 interface GitHubCopilotSdkLaunchConfig {
   readonly cliPath?: string;
-  readonly cliArgs?: ReadonlyArray<string>;
+  readonly cliArgs?: string[];
 }
 
 function shouldUseBundledSdkCli(binaryPath: string): boolean {
@@ -198,8 +203,8 @@ export function resolveGitHubCopilotSdkLaunchConfig(
   const platform = options?.platform ?? process.platform;
   const runningInElectron = options?.runningInElectron ?? isElectronNodeRuntime();
   const resolvedCliPath = resolveCliPathForSdk(binaryPath, {
-    ...(options?.pathValue !== undefined ? { pathValue: options.pathValue } : {}),
     platform,
+    ...(options?.pathValue !== undefined ? { pathValue: options.pathValue } : {}),
   });
 
   if (resolvedCliPath) {
@@ -332,7 +337,10 @@ export function setGitHubCopilotProviderRuntimeProbeForTests(
 function runCopilotCommand(
   binaryPath: string,
   args: ReadonlyArray<string>,
-): Effect.Effect<{ stdout: string; stderr: string; code: number }, GitHubCopilotProviderError> {
+): Effect.Effect<
+  { stdout: string; stderr: string; code: number },
+  GitHubCopilotProviderProbeError
+> {
   return Effect.tryPromise({
     try: () =>
       ghCopilotProcessRunner(binaryPath, [...args], {
@@ -342,9 +350,10 @@ function runCopilotCommand(
         allowNonZeroExit: true,
       }),
     catch: (cause) =>
-      new GitHubCopilotProviderError({
-        message: `Failed to run ${binaryPath}`,
-        ...(cause !== undefined ? { cause } : {}),
+      new GitHubCopilotProviderProbeError({
+        message:
+          cause instanceof Error ? cause.message : `Failed to run ${binaryPath}: ${String(cause)}`,
+        cause,
       }),
   }).pipe(
     Effect.map((result) => ({
@@ -449,9 +458,12 @@ export const checkGitHubCopilotProviderStatus = Effect.gen(function* () {
   const runtimeProbeResult = yield* Effect.tryPromise({
     try: () => ghCopilotRuntimeProbe(copilotSettings.binaryPath),
     catch: (cause) =>
-      new GitHubCopilotProviderError({
-        message: "Failed to probe GitHub Copilot runtime.",
-        ...(cause !== undefined ? { cause } : {}),
+      new GitHubCopilotProviderProbeError({
+        message:
+          cause instanceof Error
+            ? cause.message
+            : `Failed to probe GitHub Copilot runtime: ${String(cause)}`,
+        cause,
       }),
   }).pipe(Effect.timeoutOption(DEFAULT_TIMEOUT_MS), Effect.result);
 
@@ -463,17 +475,12 @@ export const checkGitHubCopilotProviderStatus = Effect.gen(function* () {
       ? normalizeAuthStatus({
           error: "GitHub Copilot authentication check timed out.",
         })
-      : (() => {
-          const auth = runtimeProbeResult.success.value.auth;
-          return normalizeAuthStatus({
-            authenticated: auth.isAuthenticated,
-            ...(auth.login !== undefined ? { user: auth.login ?? null } : {}),
-            ...(auth.authType !== undefined ? { authType: auth.authType ?? null } : {}),
-            ...(auth.statusMessage !== undefined
-              ? { statusMessage: auth.statusMessage ?? null }
-              : {}),
-          });
-        })();
+      : normalizeAuthStatus({
+          authenticated: runtimeProbeResult.success.value.auth.isAuthenticated,
+          user: runtimeProbeResult.success.value.auth.login ?? null,
+          authType: runtimeProbeResult.success.value.auth.authType ?? null,
+          statusMessage: runtimeProbeResult.success.value.auth.statusMessage ?? null,
+        });
 
   const discoveredModels =
     Result.isSuccess(runtimeProbeResult) && runtimeProbeResult.success._tag === "Some"

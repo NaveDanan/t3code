@@ -1048,6 +1048,28 @@ function extractWorkLogRequestKind(
   return requestKindFromRequestType(payload?.requestType) ?? undefined;
 }
 
+function extractWorkLogItemId(payload: Record<string, unknown> | null): string | null {
+  if (!payload) {
+    return null;
+  }
+  for (const candidate of [
+    payload.itemId,
+    payload.id,
+    asRecord(payload.data)?.itemId,
+    asRecord(payload.data)?.id,
+    asRecord(payload.data)?.callId,
+    asRecord(asRecord(payload.data)?.item)?.id,
+    asRecord(asRecord(payload.data)?.input)?.id,
+    asRecord(asRecord(payload.data)?.result)?.id,
+  ]) {
+    const value = asTrimmedString(candidate);
+    if (value) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function pushChangedFile(target: string[], seen: Set<string>, value: unknown) {
   const normalized = asTrimmedString(value);
   if (!normalized || seen.has(normalized)) {
@@ -1164,16 +1186,22 @@ function normalizeChangedFileStatus(value: unknown): ParsedUnifiedDiffFile["stat
   ) {
     return normalized;
   }
-  if (normalized === "new" || normalized === "created" || normalized === "create") {
+  if (
+    normalized === "new" ||
+    normalized === "created" ||
+    normalized === "create" ||
+    normalized === "new file" ||
+    normalized === "created file"
+  ) {
     return "added";
   }
-  if (normalized === "new file" || normalized === "created file") {
-    return "added";
-  }
-  if (normalized === "removed" || normalized === "delete" || normalized === "deleted file") {
-    return "deleted";
-  }
-  if (normalized === "removed file" || normalized === "delete file") {
+  if (
+    normalized === "removed" ||
+    normalized === "delete" ||
+    normalized === "deleted file" ||
+    normalized === "removed file" ||
+    normalized === "delete file"
+  ) {
     return "deleted";
   }
   if (
@@ -1282,11 +1310,7 @@ function parseChangedFileStatsFromPatchText(text: string): ReadonlyArray<ParsedU
   }
 }
 
-function pushChangedFileStat(
-  target: ParsedUnifiedDiffFile[],
-  seen: Set<string>,
-  file: ParsedUnifiedDiffFile,
-) {
+function pushChangedFileStat(target: ParsedUnifiedDiffFile[], file: ParsedUnifiedDiffFile) {
   const normalizedPath = file.path.trim().replaceAll("\\", "/");
   if (normalizedPath.length === 0) {
     return;
@@ -1301,22 +1325,16 @@ function pushChangedFileStat(
     target[existingIndex] = normalizedFile;
     return;
   }
-  seen.add(normalizedPath);
   target.push(normalizedFile);
 }
 
-function collectChangedFileStats(
-  value: unknown,
-  target: ParsedUnifiedDiffFile[],
-  seen: Set<string>,
-  depth: number,
-) {
+function collectChangedFileStats(value: unknown, target: ParsedUnifiedDiffFile[], depth: number) {
   if (depth > 4 || target.length >= 12) {
     return;
   }
   if (Array.isArray(value)) {
     for (const entry of value) {
-      collectChangedFileStats(entry, target, seen, depth + 1);
+      collectChangedFileStats(entry, target, depth + 1);
       if (target.length >= 12) {
         return;
       }
@@ -1339,7 +1357,7 @@ function collectChangedFileStats(
   const additions = numericAdditions ?? textEditStats?.additions ?? null;
   const deletions = numericDeletions ?? textEditStats?.deletions ?? null;
   if (path && (additions !== null || deletions !== null)) {
-    pushChangedFileStat(target, seen, {
+    pushChangedFileStat(target, {
       path,
       additions: additions ?? 0,
       deletions: deletions ?? 0,
@@ -1353,7 +1371,7 @@ function collectChangedFileStats(
       continue;
     }
     for (const file of parseChangedFileStatsFromPatchText(patchValue)) {
-      pushChangedFileStat(target, seen, file);
+      pushChangedFileStat(target, file);
       if (target.length >= 12) {
         return;
       }
@@ -1364,7 +1382,7 @@ function collectChangedFileStats(
     if (!(nestedKey in record)) {
       continue;
     }
-    collectChangedFileStats(record[nestedKey], target, seen, depth + 1);
+    collectChangedFileStats(record[nestedKey], target, depth + 1);
     if (target.length >= 12) {
       return;
     }
@@ -1373,8 +1391,7 @@ function collectChangedFileStats(
 
 function extractChangedFileStats(payload: Record<string, unknown> | null): ParsedUnifiedDiffFile[] {
   const changedFileStats: ParsedUnifiedDiffFile[] = [];
-  const seen = new Set<string>();
-  collectChangedFileStats(payload, changedFileStats, seen, 0);
+  collectChangedFileStats(payload, changedFileStats, 0);
   return changedFileStats;
 }
 

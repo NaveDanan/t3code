@@ -367,8 +367,8 @@ export const OpencodeProviderLive = Layer.effect(
           }),
         catch: (cause) =>
           new OpencodeProviderUpdateError({
-            message: "Failed to run opencode upgrade.",
-            ...(cause !== undefined ? { cause } : {}),
+            message: cause instanceof Error ? cause.message : String(cause),
+            cause,
           }),
       });
       return {

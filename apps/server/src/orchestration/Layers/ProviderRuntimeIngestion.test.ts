@@ -2032,11 +2032,13 @@ describe("ProviderRuntimeIngestion", () => {
       createdAt: now,
       threadId: asThreadId("thread-1"),
       turnId: asTurnId("turn-9"),
+      itemId: asItemId("item-started-tool"),
       payload: {
         itemType: "command_execution",
         status: "in_progress",
         title: "Read file",
         detail: "/tmp/file.ts",
+        data: { path: "/tmp/file.ts" },
       },
     });
 
@@ -2056,6 +2058,16 @@ describe("ProviderRuntimeIngestion", () => {
         (activity: ProviderRuntimeTestActivity) => activity.kind === "tool.started",
       ),
     ).toBe(true);
+    const toolStarted = thread.activities.find(
+      (activity: ProviderRuntimeTestActivity) => activity.id === "evt-tool-started",
+    );
+    expect(toolStarted?.payload).toMatchObject({
+      itemId: "item-started-tool",
+      itemType: "command_execution",
+      title: "Read file",
+      status: "in_progress",
+      data: { path: "/tmp/file.ts" },
+    });
   });
 
   it("consumes P1 runtime events into thread metadata, diff checkpoints, and activities", async () => {
@@ -2121,6 +2133,23 @@ describe("ProviderRuntimeIngestion", () => {
     });
 
     harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-item-completed"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-p1"),
+      itemId: asItemId("item-p1-tool"),
+      payload: {
+        itemType: "command_execution",
+        status: "completed",
+        title: "Run tests",
+        detail: "done",
+        data: { exitCode: 0 },
+      },
+    });
+
+    harness.emit({
       type: "turn.diff.updated",
       eventId: asEventId("evt-turn-diff-updated"),
       provider: "codex",
@@ -2142,6 +2171,9 @@ describe("ProviderRuntimeIngestion", () => {
         ) &&
         entry.activities.some(
           (activity: ProviderRuntimeTestActivity) => activity.kind === "tool.updated",
+        ) &&
+        entry.activities.some(
+          (activity: ProviderRuntimeTestActivity) => activity.kind === "tool.completed",
         ) &&
         entry.activities.some(
           (activity: ProviderRuntimeTestActivity) => activity.kind === "runtime.warning",
@@ -2174,11 +2206,30 @@ describe("ProviderRuntimeIngestion", () => {
         ? (toolUpdate.payload as Record<string, unknown>)
         : undefined;
     expect(toolUpdate?.kind).toBe("tool.updated");
-    expect(toolUpdatePayload?.itemId).toBe("item-p1-tool");
-    expect(toolUpdatePayload?.itemType).toBe("command_execution");
-    expect(toolUpdatePayload?.status).toBe("in_progress");
-    expect(toolUpdatePayload?.title).toBe("Run tests");
-    expect(toolUpdatePayload?.data).toEqual({ pid: 123 });
+    expect(toolUpdatePayload).toMatchObject({
+      itemId: "item-p1-tool",
+      itemType: "command_execution",
+      title: "Run tests",
+      status: "in_progress",
+      data: { pid: 123 },
+    });
+
+    const toolCompleted = thread.activities.find(
+      (activity: ProviderRuntimeTestActivity) => activity.id === "evt-item-completed",
+    );
+    const toolCompletedPayload =
+      toolCompleted?.payload && typeof toolCompleted.payload === "object"
+        ? (toolCompleted.payload as Record<string, unknown>)
+        : undefined;
+    expect(toolCompleted?.kind).toBe("tool.completed");
+    expect(toolCompletedPayload).toMatchObject({
+      itemId: "item-p1-tool",
+      itemType: "command_execution",
+      title: "Run tests",
+      status: "completed",
+      detail: "done",
+      data: { exitCode: 0 },
+    });
 
     const warning = thread.activities.find(
       (activity: ProviderRuntimeTestActivity) => activity.id === "evt-runtime-warning",

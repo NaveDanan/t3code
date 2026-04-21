@@ -50,6 +50,7 @@ describe("ProjectSetupScriptRunner", () => {
             ),
             Layer.provideMerge(
               Layer.succeed(TerminalManager, {
+                listProfiles: () => Effect.succeed([]),
                 open,
                 write,
                 listProfiles: () => Effect.succeed([]),
@@ -119,6 +120,7 @@ describe("ProjectSetupScriptRunner", () => {
             ),
             Layer.provideMerge(
               Layer.succeed(TerminalManager, {
+                listProfiles: () => Effect.succeed([]),
                 open,
                 write,
                 listProfiles: () => Effect.succeed([]),

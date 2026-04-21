@@ -42,23 +42,23 @@ describe("parseApplyPatchFiles", () => {
       "*** Begin Patch",
       "*** Add File: src/new-file.ts",
       "+export const value = 1;",
-      "+export const more = 2;",
       "*** Update File: src/old-name.ts",
       "*** Move to: src/new-name.ts",
       "@@",
       "-old",
       "+new",
+      "+extra",
       "*** Delete File: src/obsolete.ts",
-      "-old",
+      "-remove me",
       "*** End Patch",
     ].join("\n");
 
     expect(parseApplyPatchFiles(patch)).toEqual([
-      { path: "src/new-file.ts", additions: 2, deletions: 0, status: "added" },
+      { path: "src/new-file.ts", additions: 1, deletions: 0, status: "added" },
       {
         path: "src/new-name.ts",
         previousPath: "src/old-name.ts",
-        additions: 1,
+        additions: 2,
         deletions: 1,
         status: "moved",
       },

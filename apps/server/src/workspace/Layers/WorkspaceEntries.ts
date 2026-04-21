@@ -646,16 +646,14 @@ export const makeWorkspaceEntries = Effect.gen(function* () {
     });
 
     if ((result.code ?? 0) > 1) {
-      return yield* Effect.fail(
-        new WorkspaceEntriesError({
-          cwd,
-          operation: "workspaceEntries.searchText.ripgrep",
-          detail:
-            result.stderr.trim().length > 0
-              ? result.stderr.trim()
-              : `ripgrep exited with code ${result.code ?? "null"}`,
-        }),
-      );
+      return yield* new WorkspaceEntriesError({
+        cwd,
+        operation: "workspaceEntries.searchText.ripgrep",
+        detail:
+          result.stderr.trim().length > 0
+            ? result.stderr.trim()
+            : `ripgrep exited with code ${result.code ?? "null"}`,
+      });
     }
 
     if (result.code === 1) {

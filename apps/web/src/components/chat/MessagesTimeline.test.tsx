@@ -170,6 +170,14 @@ describe("MessagesTimeline", () => {
               tone: "tool",
               turnId: TurnId.make("turn-1"),
               changedFiles: ["apps/web/src/components/ChatView.tsx"],
+              changedFileStats: [
+                {
+                  path: "apps/web/src/components/ChatView.tsx",
+                  additions: 1,
+                  deletions: 1,
+                  status: "modified",
+                },
+              ],
             },
           },
         ]}
@@ -197,7 +205,8 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("File review");
     expect(markup).toContain("ChatView.tsx");
     expect(markup).toContain("apps/web/src/components");
-    expect(markup).toContain("Updated");
+    expect(markup).toContain("+1");
+    expect(markup).toContain("-1");
     expect(markup).toContain("Open diff");
   });
 

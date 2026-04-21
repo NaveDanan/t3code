@@ -93,9 +93,8 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
         status: normalizeReviewFileStatus(fileDiff.type),
       }));
     }
-    const changedFileStats = entry.changedFileStats ?? [];
-    if (changedFileStats.length > 0) {
-      return changedFileStats.map<ReviewFileRow>((file) => ({
+    if ((entry.changedFileStats?.length ?? 0) > 0) {
+      return entry.changedFileStats!.map<ReviewFileRow>((file) => ({
         fileKey: file.path,
         path: file.path,
         previousPath: file.previousPath ?? null,
@@ -113,7 +112,7 @@ export const WorkEntryDiffReview = memo(function WorkEntryDiffReview(props: {
       status: "updated" as const,
     }));
   }, [diffFiles, entry.changedFileStats, entry.changedFiles]);
-  const fallbackFiles = entry.changedFiles ?? [];
+  const fallbackFiles = entry.changedFileStats ?? entry.changedFiles ?? [];
   const hasInlineDiff = diffFiles.length > 0;
   const hasFallbackFiles = fallbackFiles.length > 0;
   const [openFilePath, setOpenFilePath] = useState<string | null>(() =>

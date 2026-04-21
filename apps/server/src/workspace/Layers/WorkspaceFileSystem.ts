@@ -37,25 +37,21 @@ export const makeWorkspaceFileSystem = Effect.gen(function* () {
       );
 
       if (stat.type !== "File") {
-        return yield* Effect.fail(
-          new WorkspaceFileSystemError({
-            cwd: input.cwd,
-            relativePath: input.relativePath,
-            operation: "workspaceFileSystem.readFile",
-            detail: "Only files can be opened in the editor dialog.",
-          }),
-        );
+        return yield* new WorkspaceFileSystemError({
+          cwd: input.cwd,
+          relativePath: input.relativePath,
+          operation: "workspaceFileSystem.readFile",
+          detail: "Only files can be opened in the editor dialog.",
+        });
       }
 
       if (stat.size > INLINE_EDITOR_MAX_FILE_BYTES) {
-        return yield* Effect.fail(
-          new WorkspaceFileSystemError({
-            cwd: input.cwd,
-            relativePath: input.relativePath,
-            operation: "workspaceFileSystem.readFile",
-            detail: "File is larger than 1 MB and cannot be edited in the dialog.",
-          }),
-        );
+        return yield* new WorkspaceFileSystemError({
+          cwd: input.cwd,
+          relativePath: input.relativePath,
+          operation: "workspaceFileSystem.readFile",
+          detail: "File is larger than 1 MB and cannot be edited in the dialog.",
+        });
       }
 
       const contents = yield* fileSystem.readFileString(target.absolutePath).pipe(
@@ -72,14 +68,12 @@ export const makeWorkspaceFileSystem = Effect.gen(function* () {
       );
 
       if (contents.includes("\u0000")) {
-        return yield* Effect.fail(
-          new WorkspaceFileSystemError({
-            cwd: input.cwd,
-            relativePath: input.relativePath,
-            operation: "workspaceFileSystem.readFile",
-            detail: "Binary files cannot be edited in the dialog.",
-          }),
-        );
+        return yield* new WorkspaceFileSystemError({
+          cwd: input.cwd,
+          relativePath: input.relativePath,
+          operation: "workspaceFileSystem.readFile",
+          detail: "Binary files cannot be edited in the dialog.",
+        });
       }
 
       return {
