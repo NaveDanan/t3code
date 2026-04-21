@@ -976,35 +976,6 @@ function extractToolTitle(payload: Record<string, unknown> | null): string | nul
   return asTrimmedString(payload?.title);
 }
 
-function extractWorkLogItemId(payload: Record<string, unknown> | null): string | undefined {
-  const data = asRecord(payload?.data);
-  const item = asRecord(data?.item);
-  const input = asRecord(data?.input);
-  const result = asRecord(data?.result);
-  const candidates = [
-    payload?.itemId,
-    data?.itemId,
-    data?.id,
-    data?.callId,
-    item?.id,
-    item?.itemId,
-    item?.callId,
-    input?.id,
-    input?.itemId,
-    result?.id,
-    result?.callId,
-  ];
-
-  for (const candidate of candidates) {
-    const value = asTrimmedString(candidate);
-    if (value) {
-      return value;
-    }
-  }
-
-  return undefined;
-}
-
 function stripTrailingExitCode(value: string): {
   output: string | null;
   exitCode?: number | undefined;
@@ -1046,6 +1017,28 @@ function extractWorkLogRequestKind(
     return payload.requestKind;
   }
   return requestKindFromRequestType(payload?.requestType) ?? undefined;
+}
+
+function extractWorkLogItemId(payload: Record<string, unknown> | null): string | null {
+  if (!payload) {
+    return null;
+  }
+  for (const candidate of [
+    payload.itemId,
+    payload.id,
+    asRecord(payload.data)?.itemId,
+    asRecord(payload.data)?.id,
+    asRecord(payload.data)?.callId,
+    asRecord(asRecord(payload.data)?.item)?.id,
+    asRecord(asRecord(payload.data)?.input)?.id,
+    asRecord(asRecord(payload.data)?.result)?.id,
+  ]) {
+    const value = asTrimmedString(candidate);
+    if (value) {
+      return value;
+    }
+  }
+  return null;
 }
 
 function pushChangedFile(target: string[], seen: Set<string>, value: unknown) {

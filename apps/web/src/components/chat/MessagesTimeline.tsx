@@ -943,26 +943,6 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
               <span className={cn("text-foreground/80", workToneClass(workEntry.tone))}>
                 {heading}
               </span>
-              {fileSummary && (
-                <>
-                  <span className="text-muted-foreground/55"> - </span>
-                  <span className="font-mono text-muted-foreground/75" title={fileSummary.title}>
-                    {fileSummary.label}
-                  </span>
-                  {fileSummary.additions !== undefined && fileSummary.deletions !== undefined && (
-                    <>
-                      <span> </span>
-                      <span className="font-mono">
-                        <DiffStatLabel
-                          additions={fileSummary.additions}
-                          deletions={fileSummary.deletions}
-                          showParentheses
-                        />
-                      </span>
-                    </>
-                  )}
-                </>
-              )}
               {preview &&
                 (rawCommand ? (
                   <Tooltip>
