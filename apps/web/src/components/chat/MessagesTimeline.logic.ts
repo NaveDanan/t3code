@@ -6,12 +6,18 @@ import { type ChatMessage, type ProposedPlan, type TurnDiffSummary } from "../..
 import { estimateTimelineMessageHeight } from "../timelineHeight";
 
 export const MAX_VISIBLE_WORK_LOG_ENTRIES = 6;
+const MAX_GROUP_CARD_TITLE_WORDS = 7;
 
 export function deriveGroupCardSummary(entries: ReadonlyArray<WorkLogEntry>): string {
+  const generatedGroupTitle = entries.find((entry) => entry.groupTitle)?.groupTitle;
+  if (generatedGroupTitle) {
+    return truncateToWords(generatedGroupTitle, MAX_GROUP_CARD_TITLE_WORDS);
+  }
+
   // Thinking entries capture the model's intent most directly
   const thinkingEntry = entries.find((e) => e.tone === "thinking");
   if (thinkingEntry) {
-    return truncateToWords(thinkingEntry.label, 5);
+    return truncateToWords(thinkingEntry.label, MAX_GROUP_CARD_TITLE_WORDS);
   }
 
   // Use the most frequently occurring toolTitle across entries
@@ -23,13 +29,13 @@ export function deriveGroupCardSummary(entries: ReadonlyArray<WorkLogEntry>): st
   }
   if (toolTitleCounts.size > 0) {
     const dominantTitle = [...toolTitleCounts.entries()].toSorted((a, b) => b[1] - a[1])[0]?.[0];
-    if (dominantTitle) return truncateToWords(dominantTitle, 5);
+    if (dominantTitle) return truncateToWords(dominantTitle, MAX_GROUP_CARD_TITLE_WORDS);
   }
 
   // Fall back to the first entry's label
   const firstLabel = entries[0]?.label;
   if (firstLabel) {
-    return truncateToWords(firstLabel, 5);
+    return truncateToWords(firstLabel, MAX_GROUP_CARD_TITLE_WORDS);
   }
 
   return entries.every((e) => e.tone === "tool") ? "Tool calls" : "Work log";
@@ -38,7 +44,7 @@ export function deriveGroupCardSummary(entries: ReadonlyArray<WorkLogEntry>): st
 function truncateToWords(text: string, maxWords: number): string {
   const words = text.trim().split(/\s+/);
   if (words.length <= maxWords) return text.trim();
-  return words.slice(0, maxWords).join(" ") + "…";
+  return words.slice(0, maxWords).join(" ");
 }
 
 export interface TimelineDurationMessage {

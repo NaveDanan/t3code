@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeMessageDurationStart, normalizeCompactToolLabel } from "./MessagesTimeline.logic";
+import {
+  computeMessageDurationStart,
+  deriveGroupCardSummary,
+  normalizeCompactToolLabel,
+} from "./MessagesTimeline.logic";
 
 describe("computeMessageDurationStart", () => {
   it("returns message createdAt when there is no preceding user message", () => {
@@ -141,5 +145,41 @@ describe("normalizeCompactToolLabel", () => {
 
   it("removes trailing completion wording from other labels", () => {
     expect(normalizeCompactToolLabel("Read file completed")).toBe("Read file");
+  });
+});
+
+describe("deriveGroupCardSummary", () => {
+  it("prefers generated activity group titles", () => {
+    expect(
+      deriveGroupCardSummary([
+        {
+          id: "work-1",
+          createdAt: "2026-01-01T00:00:00Z",
+          label: "Run command",
+          groupTitle: "Inspect package scripts",
+          tone: "tool",
+        },
+        {
+          id: "work-2",
+          createdAt: "2026-01-01T00:00:01Z",
+          label: "Run command",
+          tone: "tool",
+        },
+      ]),
+    ).toBe("Inspect package scripts");
+  });
+
+  it("limits generated group titles to seven words", () => {
+    expect(
+      deriveGroupCardSummary([
+        {
+          id: "work-1",
+          createdAt: "2026-01-01T00:00:00Z",
+          label: "Run command",
+          groupTitle: "Inspect provider runtime activity grouping title generation path",
+          tone: "tool",
+        },
+      ]),
+    ).toBe("Inspect provider runtime activity grouping title generation");
   });
 });

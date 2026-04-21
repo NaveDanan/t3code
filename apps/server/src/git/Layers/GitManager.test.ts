@@ -84,6 +84,16 @@ interface FakeGitTextGeneration {
     message: string;
     modelSelection: ModelSelection;
   }) => Effect.Effect<{ title: string }, TextGenerationError>;
+  generateActivityGroupTitle: (input: {
+    cwd: string;
+    groupKind: "tool-calls" | "work-log";
+    entries: ReadonlyArray<{
+      label: string;
+      kind: string;
+      tone: string;
+    }>;
+    modelSelection: ModelSelection;
+  }) => Effect.Effect<{ title: string }, TextGenerationError>;
 }
 
 type FakePullRequest = NonNullable<FakeGhScenario["pullRequest"]>;
@@ -274,6 +284,10 @@ function createTextGeneration(overrides: Partial<FakeGitTextGeneration> = {}): T
       Effect.succeed({
         title: "Update workflow",
       }),
+    generateActivityGroupTitle: () =>
+      Effect.succeed({
+        title: "Inspect workflow",
+      }),
     ...overrides,
   };
 
@@ -317,6 +331,17 @@ function createTextGeneration(overrides: Partial<FakeGitTextGeneration> = {}): T
           (cause) =>
             new TextGenerationError({
               operation: "generateThreadTitle",
+              detail: "fake text generation failed",
+              ...(cause !== undefined ? { cause } : {}),
+            }),
+        ),
+      ),
+    generateActivityGroupTitle: (input) =>
+      implementation.generateActivityGroupTitle(input).pipe(
+        Effect.mapError(
+          (cause) =>
+            new TextGenerationError({
+              operation: "generateActivityGroupTitle",
               detail: "fake text generation failed",
               ...(cause !== undefined ? { cause } : {}),
             }),

@@ -17,12 +17,14 @@ import {
 } from "../Services/TextGeneration.ts";
 import {
   buildBranchNamePrompt,
+  buildActivityGroupTitlePrompt,
   buildCommitMessagePrompt,
   buildPrContentPrompt,
   buildThreadTitlePrompt,
 } from "../Prompts.ts";
 import {
   normalizeCliError,
+  sanitizeActivityGroupTitle,
   sanitizeCommitSubject,
   sanitizePrTitle,
   sanitizeThreadTitle,
@@ -90,7 +92,8 @@ const makeCodexTextGeneration = Effect.gen(function* () {
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle",
+      | "generateThreadTitle"
+      | "generateActivityGroupTitle",
     attachments: BranchNameGenerationInput["attachments"],
   ): Effect.fn.Return<MaterializedImageAttachments, TextGenerationError> {
     if (!attachments || attachments.length === 0) {
@@ -134,7 +137,8 @@ const makeCodexTextGeneration = Effect.gen(function* () {
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generateActivityGroupTitle";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -405,11 +409,40 @@ const makeCodexTextGeneration = Effect.gen(function* () {
     } satisfies ThreadTitleGenerationResult;
   });
 
+  const generateActivityGroupTitle: TextGenerationShape["generateActivityGroupTitle"] = Effect.fn(
+    "CodexTextGeneration.generateActivityGroupTitle",
+  )(function* (input) {
+    const { prompt, outputSchema } = buildActivityGroupTitlePrompt({
+      groupKind: input.groupKind,
+      entries: input.entries,
+    });
+
+    if (input.modelSelection.provider !== "codex") {
+      return yield* new TextGenerationError({
+        operation: "generateActivityGroupTitle",
+        detail: "Invalid model selection.",
+      });
+    }
+
+    const generated = yield* runCodexJson({
+      operation: "generateActivityGroupTitle",
+      cwd: input.cwd,
+      prompt,
+      outputSchemaJson: outputSchema,
+      modelSelection: input.modelSelection,
+    });
+
+    return {
+      title: sanitizeActivityGroupTitle(generated.title),
+    };
+  });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateActivityGroupTitle,
   } satisfies TextGenerationShape;
 });
 

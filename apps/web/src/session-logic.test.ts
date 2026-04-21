@@ -569,6 +569,25 @@ describe("deriveWorkLogEntries", () => {
     expect(entries.map((entry) => entry.id)).toEqual(["tool-complete"]);
   });
 
+  it("extracts generated activity group titles", () => {
+    const entries = deriveWorkLogEntries(
+      [
+        makeActivity({
+          id: "tool-complete",
+          summary: "Run command",
+          kind: "tool.completed",
+          payload: {
+            title: "Run command",
+            activityGroupTitle: "Inspect package scripts",
+          },
+        }),
+      ],
+      undefined,
+    );
+
+    expect(entries[0]?.groupTitle).toBe("Inspect package scripts");
+  });
+
   it("omits task start and completion lifecycle entries", () => {
     const activities: OrchestrationThreadActivity[] = [
       makeActivity({

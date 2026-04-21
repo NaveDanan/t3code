@@ -14,6 +14,7 @@ import { ServerSettingsService } from "../../serverSettings.ts";
 import { runProcess } from "../../processRunner.ts";
 import { TextGeneration, type TextGenerationShape } from "../Services/TextGeneration.ts";
 import {
+  buildActivityGroupTitlePrompt,
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
   buildPrContentPrompt,
@@ -21,6 +22,7 @@ import {
 } from "../Prompts.ts";
 import {
   normalizeCliError,
+  sanitizeActivityGroupTitle,
   sanitizeCommitSubject,
   sanitizePrTitle,
   sanitizeThreadTitle,
@@ -77,7 +79,8 @@ const makeGitHubCopilotTextGeneration = Effect.gen(function* () {
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generateActivityGroupTitle";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -268,11 +271,33 @@ const makeGitHubCopilotTextGeneration = Effect.gen(function* () {
     };
   });
 
+  const generateActivityGroupTitle: TextGenerationShape["generateActivityGroupTitle"] = Effect.fn(
+    "GitHubCopilotTextGeneration.generateActivityGroupTitle",
+  )(function* (input) {
+    const { prompt, outputSchema } = buildActivityGroupTitlePrompt({
+      groupKind: input.groupKind,
+      entries: input.entries,
+    });
+
+    const result = yield* runCopilotJson({
+      operation: "generateActivityGroupTitle",
+      cwd: input.cwd,
+      prompt,
+      outputSchemaJson: outputSchema,
+      modelSelection: input.modelSelection as GitHubCopilotModelSelection,
+    });
+
+    return {
+      title: sanitizeActivityGroupTitle(result.title),
+    };
+  });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateActivityGroupTitle,
   } satisfies TextGenerationShape;
 });
 

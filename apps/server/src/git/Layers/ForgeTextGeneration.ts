@@ -21,6 +21,7 @@ import {
 } from "../../provider/forgecodeRuntime.ts";
 import { TextGeneration, type TextGenerationShape } from "../Services/TextGeneration.ts";
 import {
+  buildActivityGroupTitlePrompt,
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
   buildPrContentPrompt,
@@ -28,6 +29,7 @@ import {
 } from "../Prompts.ts";
 import {
   normalizeCliError,
+  sanitizeActivityGroupTitle,
   sanitizeCommitSubject,
   sanitizePrTitle,
   sanitizeThreadTitle,
@@ -84,7 +86,8 @@ const makeForgeTextGeneration = Effect.fn("makeForgeTextGeneration")(function* (
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generateActivityGroupTitle";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -369,11 +372,40 @@ const makeForgeTextGeneration = Effect.fn("makeForgeTextGeneration")(function* (
     };
   });
 
+  const generateActivityGroupTitle: TextGenerationShape["generateActivityGroupTitle"] = Effect.fn(
+    "ForgeTextGeneration.generateActivityGroupTitle",
+  )(function* (input) {
+    const { prompt, outputSchema } = buildActivityGroupTitlePrompt({
+      groupKind: input.groupKind,
+      entries: input.entries,
+    });
+
+    if (input.modelSelection.provider !== "forgecode") {
+      return yield* new TextGenerationError({
+        operation: "generateActivityGroupTitle",
+        detail: "Invalid model selection.",
+      });
+    }
+
+    const generated = yield* runForgeJson({
+      operation: "generateActivityGroupTitle",
+      cwd: input.cwd,
+      prompt,
+      outputSchemaJson: outputSchema,
+      modelSelection: input.modelSelection,
+    });
+
+    return {
+      title: sanitizeActivityGroupTitle(generated.title),
+    };
+  });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateActivityGroupTitle,
   } satisfies TextGenerationShape;
 });
 

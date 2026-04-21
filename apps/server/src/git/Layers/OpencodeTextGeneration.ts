@@ -26,6 +26,7 @@ import {
 } from "../../provider/opencode.ts";
 import { TextGeneration, type TextGenerationShape } from "../Services/TextGeneration.ts";
 import {
+  buildActivityGroupTitlePrompt,
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
   buildPrContentPrompt,
@@ -33,6 +34,7 @@ import {
 } from "../Prompts.ts";
 import {
   normalizeCliError,
+  sanitizeActivityGroupTitle,
   sanitizeCommitSubject,
   sanitizePrTitle,
   sanitizeThreadTitle,
@@ -75,7 +77,8 @@ const makeOpencodeTextGeneration = Effect.gen(function* () {
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle",
+      | "generateThreadTitle"
+      | "generateActivityGroupTitle",
     attachments: ReadonlyArray<ChatAttachment> | undefined,
   ) {
     if (!attachments || attachments.length === 0) {
@@ -131,7 +134,8 @@ const makeOpencodeTextGeneration = Effect.gen(function* () {
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generateActivityGroupTitle";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -414,11 +418,41 @@ const makeOpencodeTextGeneration = Effect.gen(function* () {
     };
   });
 
+  const generateActivityGroupTitle: TextGenerationShape["generateActivityGroupTitle"] = Effect.fn(
+    "OpencodeTextGeneration.generateActivityGroupTitle",
+  )(function* (input) {
+    const { prompt, outputSchema } = buildActivityGroupTitlePrompt({
+      groupKind: input.groupKind,
+      entries: input.entries,
+    });
+
+    if (input.modelSelection.provider !== "opencode") {
+      return yield* new TextGenerationError({
+        operation: "generateActivityGroupTitle",
+        detail: "Invalid model selection.",
+      });
+    }
+
+    const generated = yield* runOpencodeJson({
+      operation: "generateActivityGroupTitle",
+      cwd: input.cwd,
+      prompt,
+      outputSchemaJson: outputSchema,
+      attachments: undefined,
+      modelSelection: input.modelSelection,
+    });
+
+    return {
+      title: sanitizeActivityGroupTitle(generated.title),
+    };
+  });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateActivityGroupTitle,
   } satisfies TextGenerationShape;
 });
 

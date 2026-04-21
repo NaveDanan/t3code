@@ -17,6 +17,7 @@ import { sanitizeBranchFragment, sanitizeFeatureBranchName } from "@t3tools/shar
 import { TextGenerationError } from "@t3tools/contracts";
 import { type TextGenerationShape, TextGeneration } from "../Services/TextGeneration.ts";
 import {
+  buildActivityGroupTitlePrompt,
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
   buildPrContentPrompt,
@@ -24,6 +25,7 @@ import {
 } from "../Prompts.ts";
 import {
   normalizeCliError,
+  sanitizeActivityGroupTitle,
   sanitizeCommitSubject,
   sanitizePrTitle,
   sanitizeThreadTitle,
@@ -77,7 +79,8 @@ const makeClaudeTextGeneration = Effect.gen(function* () {
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generateActivityGroupTitle";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -328,11 +331,40 @@ const makeClaudeTextGeneration = Effect.gen(function* () {
     };
   });
 
+  const generateActivityGroupTitle: TextGenerationShape["generateActivityGroupTitle"] = Effect.fn(
+    "ClaudeTextGeneration.generateActivityGroupTitle",
+  )(function* (input) {
+    const { prompt, outputSchema } = buildActivityGroupTitlePrompt({
+      groupKind: input.groupKind,
+      entries: input.entries,
+    });
+
+    if (input.modelSelection.provider !== "claudeAgent") {
+      return yield* new TextGenerationError({
+        operation: "generateActivityGroupTitle",
+        detail: "Invalid model selection.",
+      });
+    }
+
+    const generated = yield* runClaudeJson({
+      operation: "generateActivityGroupTitle",
+      cwd: input.cwd,
+      prompt,
+      outputSchemaJson: outputSchema,
+      modelSelection: input.modelSelection,
+    });
+
+    return {
+      title: sanitizeActivityGroupTitle(generated.title),
+    };
+  });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generateActivityGroupTitle,
   } satisfies TextGenerationShape;
 });
 

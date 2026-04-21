@@ -74,6 +74,29 @@ export function sanitizeThreadTitle(raw: string): string {
   return `${normalized.slice(0, 47).trimEnd()}...`;
 }
 
+/** Normalise a generated work-log group title to seven words or fewer. */
+export function sanitizeActivityGroupTitle(raw: string): string {
+  const normalized = raw
+    .trim()
+    .split(/\r?\n/g)[0]
+    ?.trim()
+    .replace(/^['"`]+|['"`]+$/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[.!?:;,]+$/g, "")
+    .trim();
+
+  if (!normalized || normalized.length === 0) {
+    return "Work log";
+  }
+
+  const words = normalized.split(/\s+/).filter((word) => word.length > 0);
+  if (words.length <= 7) {
+    return normalized;
+  }
+  return words.slice(0, 7).join(" ");
+}
+
 /** CLI name to human-readable label, e.g. "codex" → "Codex CLI (`codex`)" */
 function cliLabel(cliName: string): string {
   const capitalized = cliName.charAt(0).toUpperCase() + cliName.slice(1);

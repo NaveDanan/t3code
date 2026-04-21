@@ -200,3 +200,71 @@ export function buildThreadTitlePrompt(input: ThreadTitlePromptInput) {
 
   return { prompt, outputSchema };
 }
+
+// ---------------------------------------------------------------------------
+// Activity group title
+// ---------------------------------------------------------------------------
+
+export interface ActivityGroupTitlePromptEntry {
+  label: string;
+  kind: string;
+  tone: string;
+  title?: string | undefined;
+  itemType?: string | undefined;
+  detail?: string | undefined;
+  data?: string | undefined;
+}
+
+export interface ActivityGroupTitlePromptInput {
+  groupKind: "tool-calls" | "work-log";
+  entries: ReadonlyArray<ActivityGroupTitlePromptEntry>;
+}
+
+function formatActivityGroupEntry(entry: ActivityGroupTitlePromptEntry, index: number): string {
+  const lines = [
+    `${index + 1}. ${entry.label}`,
+    `   kind: ${entry.kind}`,
+    `   tone: ${entry.tone}`,
+  ];
+  if (entry.title) {
+    lines.push(`   tool title: ${entry.title}`);
+  }
+  if (entry.itemType) {
+    lines.push(`   item type: ${entry.itemType}`);
+  }
+  if (entry.detail) {
+    lines.push(`   detail: ${limitSection(entry.detail, 700)}`);
+  }
+  if (entry.data) {
+    lines.push(`   data: ${limitSection(entry.data, 900)}`);
+  }
+  return lines.join("\n");
+}
+
+export function buildActivityGroupTitlePrompt(input: ActivityGroupTitlePromptInput) {
+  const entryText =
+    input.entries.length > 0
+      ? input.entries.map(formatActivityGroupEntry).join("\n\n")
+      : "(no entries)";
+  const prompt = [
+    "You write compact live status titles for grouped coding-agent work cards.",
+    "Return a JSON object with key: title.",
+    "Rules:",
+    "- title must be 2-7 words",
+    "- summarize the concrete work being done",
+    "- prefer verbs like Inspect, Update, Run, Fix, Review, Configure",
+    "- avoid generic titles like Tool calls, Work log, Running tools, or Agent work",
+    "- no quotes, prefixes, trailing punctuation, or markdown",
+    "",
+    `Group kind: ${input.groupKind === "tool-calls" ? "tool calls" : "work log"}`,
+    "",
+    "Entries:",
+    limitSection(entryText, 8_000),
+  ].join("\n");
+
+  const outputSchema = Schema.Struct({
+    title: Schema.String,
+  });
+
+  return { prompt, outputSchema };
+}

@@ -73,6 +73,28 @@ export interface ThreadTitleGenerationResult {
   title: string;
 }
 
+export interface ActivityGroupTitleEntry {
+  label: string;
+  kind: string;
+  tone: string;
+  title?: string | undefined;
+  itemType?: string | undefined;
+  detail?: string | undefined;
+  data?: string | undefined;
+}
+
+export interface ActivityGroupTitleGenerationInput {
+  cwd: string;
+  groupKind: "tool-calls" | "work-log";
+  entries: ReadonlyArray<ActivityGroupTitleEntry>;
+  /** What model and provider to use for generation. */
+  modelSelection: ModelSelection;
+}
+
+export interface ActivityGroupTitleGenerationResult {
+  title: string;
+}
+
 export interface TextGenerationService {
   generateCommitMessage(
     input: CommitMessageGenerationInput,
@@ -80,6 +102,9 @@ export interface TextGenerationService {
   generatePrContent(input: PrContentGenerationInput): Promise<PrContentGenerationResult>;
   generateBranchName(input: BranchNameGenerationInput): Promise<BranchNameGenerationResult>;
   generateThreadTitle(input: ThreadTitleGenerationInput): Promise<ThreadTitleGenerationResult>;
+  generateActivityGroupTitle(
+    input: ActivityGroupTitleGenerationInput,
+  ): Promise<ActivityGroupTitleGenerationResult>;
 }
 
 /**
@@ -113,6 +138,13 @@ export interface TextGenerationShape {
   readonly generateThreadTitle: (
     input: ThreadTitleGenerationInput,
   ) => Effect.Effect<ThreadTitleGenerationResult, TextGenerationError>;
+
+  /**
+   * Generate a compact title for a grouped tool-call/work-log card.
+   */
+  readonly generateActivityGroupTitle: (
+    input: ActivityGroupTitleGenerationInput,
+  ) => Effect.Effect<ActivityGroupTitleGenerationResult, TextGenerationError>;
 }
 
 /**

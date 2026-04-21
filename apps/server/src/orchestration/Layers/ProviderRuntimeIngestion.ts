@@ -27,6 +27,13 @@ import {
   type ProviderRuntimeIngestionShape,
 } from "../Services/ProviderRuntimeIngestion.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
+import { TextGeneration } from "../../git/Services/TextGeneration.ts";
+import {
+  deriveActivityGroupForTitle,
+  payloadWithActivityGroupTitle,
+  readActivityGroupTitle,
+  readActivityGroupTitleSignature,
+} from "../activityGroupTitles.ts";
 
 const providerTurnKey = (threadId: ThreadId, turnId: TurnId) => `${threadId}:${turnId}`;
 const providerCommandId = (event: ProviderRuntimeEvent, tag: string): CommandId =>
@@ -39,6 +46,7 @@ const BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_TTL = Duration.minutes(120);
 const BUFFERED_PROPOSED_PLAN_BY_ID_CACHE_CAPACITY = 10_000;
 const BUFFERED_PROPOSED_PLAN_BY_ID_TTL = Duration.minutes(120);
 const MAX_BUFFERED_ASSISTANT_CHARS = 24_000;
+const ACTIVITY_GROUP_TITLE_DEBOUNCE = Duration.millis(500);
 const STRICT_PROVIDER_LIFECYCLE_GUARD = process.env.T3CODE_STRICT_PROVIDER_LIFECYCLE_GUARD !== "0";
 
 type TurnStartRequestedDomainEvent = Extract<
@@ -534,6 +542,8 @@ const make = Effect.fn("make")(function* () {
   const providerService = yield* ProviderService;
   const projectionTurnRepository = yield* ProjectionTurnRepository;
   const serverSettingsService = yield* ServerSettingsService;
+  const textGeneration = yield* TextGeneration;
+  const scheduledActivityGroupTitleKeys = new Set<string>();
 
   const turnMessageIdsByTurnKey = yield* Cache.make<string, Set<MessageId>>({
     capacity: TURN_MESSAGE_IDS_BY_TURN_CACHE_CAPACITY,
@@ -569,6 +579,131 @@ const make = Effect.fn("make")(function* () {
     return yield* checkpointStore
       .isGitRepository(workspaceCwd)
       .pipe(Effect.catch(() => Effect.succeed(false)));
+  });
+
+  const generateActivityGroupTitle = Effect.fn("generateActivityGroupTitle")(function* (input: {
+    readonly threadId: ThreadId;
+    readonly activityId: string;
+    readonly groupKey: string;
+  }) {
+    yield* Effect.sleep(ACTIVITY_GROUP_TITLE_DEBOUNCE);
+
+    const readModel = yield* orchestrationEngine.getReadModel();
+    const thread = readModel.threads.find((entry) => entry.id === input.threadId);
+    if (!thread) {
+      return;
+    }
+
+    const group = deriveActivityGroupForTitle(thread, input.activityId);
+    if (!group) {
+      return;
+    }
+    const hasCurrentTitle = group.activities.every(
+      (activity) => readActivityGroupTitleSignature(activity.payload) === group.signature,
+    );
+    if (hasCurrentTitle) {
+      return;
+    }
+
+    const cwd =
+      resolveThreadWorkspaceCwd({
+        thread,
+        projects: readModel.projects,
+      }) ?? process.cwd();
+    const { textGenerationModelSelection: modelSelection } =
+      yield* serverSettingsService.getSettings;
+    const generated = yield* textGeneration.generateActivityGroupTitle({
+      cwd,
+      groupKind: group.groupKind,
+      entries: group.entries,
+      modelSelection,
+    });
+    const title = generated.title.trim();
+    if (title.length === 0) {
+      return;
+    }
+
+    yield* Effect.forEach(
+      group.activities,
+      (activity) => {
+        if (
+          readActivityGroupTitle(activity.payload) === title &&
+          readActivityGroupTitleSignature(activity.payload) === group.signature
+        ) {
+          return Effect.void;
+        }
+
+        return orchestrationEngine
+          .dispatch({
+            type: "thread.activity.append",
+            commandId: CommandId.make(
+              `provider:${activity.id}:thread-activity-group-title:${crypto.randomUUID()}`,
+            ),
+            threadId: thread.id,
+            activity: {
+              ...activity,
+              payload: payloadWithActivityGroupTitle(activity.payload, title, group.signature),
+            },
+            createdAt: new Date().toISOString(),
+          })
+          .pipe(Effect.asVoid);
+      },
+      { concurrency: 1 },
+    ).pipe(Effect.asVoid);
+  });
+
+  const generateActivityGroupTitleSafely = (input: {
+    readonly threadId: ThreadId;
+    readonly activityId: string;
+    readonly groupKey: string;
+  }) =>
+    generateActivityGroupTitle(input).pipe(
+      Effect.catchCause((cause) => {
+        if (Cause.hasInterruptsOnly(cause)) {
+          return Effect.failCause(cause);
+        }
+        return Effect.logWarning("provider runtime ingestion failed to generate activity title", {
+          threadId: input.threadId,
+          activityId: input.activityId,
+          groupKey: input.groupKey,
+          cause: Cause.pretty(cause),
+        });
+      }),
+      Effect.ensuring(Effect.sync(() => scheduledActivityGroupTitleKeys.delete(input.groupKey))),
+    );
+
+  const activityGroupTitleWorker = yield* makeDrainableWorker(generateActivityGroupTitleSafely);
+
+  const scheduleActivityGroupTitle = Effect.fn("scheduleActivityGroupTitle")(function* (
+    threadId: ThreadId,
+    activityId: string,
+  ) {
+    const readModel = yield* orchestrationEngine.getReadModel();
+    const thread = readModel.threads.find((entry) => entry.id === threadId);
+    if (!thread) {
+      return;
+    }
+    const group = deriveActivityGroupForTitle(thread, activityId);
+    if (!group) {
+      return;
+    }
+    if (
+      group.activities.every(
+        (activity) => readActivityGroupTitleSignature(activity.payload) === group.signature,
+      )
+    ) {
+      return;
+    }
+    if (scheduledActivityGroupTitleKeys.has(group.groupKey)) {
+      return;
+    }
+
+    scheduledActivityGroupTitleKeys.add(group.groupKey);
+    yield* activityGroupTitleWorker.enqueue({
+      threadId,
+      activityId,
+      groupKey: group.groupKey,
+    });
   });
 
   const rememberAssistantMessageId = (threadId: ThreadId, turnId: TurnId, messageId: MessageId) =>
@@ -1240,14 +1375,20 @@ const make = Effect.fn("make")(function* () {
     }
 
     const activities = runtimeEventToActivities(event);
-    yield* Effect.forEach(activities, (activity) =>
-      orchestrationEngine.dispatch({
-        type: "thread.activity.append",
-        commandId: providerCommandId(event, "thread-activity-append"),
-        threadId: thread.id,
-        activity,
-        createdAt: activity.createdAt,
-      }),
+    yield* Effect.forEach(
+      activities,
+      (activity) =>
+        Effect.gen(function* () {
+          yield* orchestrationEngine.dispatch({
+            type: "thread.activity.append",
+            commandId: providerCommandId(event, "thread-activity-append"),
+            threadId: thread.id,
+            activity,
+            createdAt: activity.createdAt,
+          });
+          yield* scheduleActivityGroupTitle(thread.id, activity.id);
+        }),
+      { concurrency: 1 },
     ).pipe(Effect.asVoid);
   });
 

@@ -49,6 +49,7 @@ import {
 } from "../Services/OrchestrationEngine.ts";
 import { ProviderRuntimeIngestionService } from "../Services/ProviderRuntimeIngestion.ts";
 import { ServerConfig } from "../../config.ts";
+import { TextGeneration, type TextGenerationShape } from "../../git/Services/TextGeneration.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 
@@ -247,10 +248,27 @@ describe("ProviderRuntimeIngestion", () => {
   async function createHarness(options?: {
     serverSettings?: Partial<ServerSettings>;
     gitAvailable?: boolean;
+    activityGroupTitle?: string;
   }) {
     const workspaceRoot = makeTempDir("t3-provider-project-");
     fs.mkdirSync(path.join(workspaceRoot, ".git"));
     const provider = createProviderServiceHarness();
+    const activityGroupTitleRequests: Array<
+      Parameters<TextGenerationShape["generateActivityGroupTitle"]>[0]
+    > = [];
+    const unsupportedTextGeneration = <A>() =>
+      Effect.die(new Error("Unsupported text generation call in test")) as Effect.Effect<A, never>;
+    const textGeneration: TextGenerationShape = {
+      generateCommitMessage: () => unsupportedTextGeneration(),
+      generatePrContent: () => unsupportedTextGeneration(),
+      generateBranchName: () => unsupportedTextGeneration(),
+      generateThreadTitle: () => unsupportedTextGeneration(),
+      generateActivityGroupTitle: (input) =>
+        Effect.sync(() => {
+          activityGroupTitleRequests.push(input);
+          return { title: options?.activityGroupTitle ?? "Inspect workspace activity" };
+        }),
+    };
     const orchestrationLayer = OrchestrationEngineLive.pipe(
       Layer.provide(OrchestrationProjectionSnapshotQueryLive),
       Layer.provide(OrchestrationProjectionPipelineLive),
@@ -264,6 +282,7 @@ describe("ProviderRuntimeIngestion", () => {
       Layer.provideMerge(ProjectionTurnRepositoryLive),
       Layer.provideMerge(SqlitePersistenceMemory),
       Layer.provideMerge(Layer.succeed(ProviderService, provider.service)),
+      Layer.provideMerge(Layer.succeed(TextGeneration, textGeneration)),
       Layer.provideMerge(makeTestCheckpointStoreLayer(options?.gitAvailable ?? true)),
       Layer.provideMerge(makeTestServerSettingsLayer(options?.serverSettings)),
       Layer.provideMerge(ServerConfig.layerTest(process.cwd(), process.cwd())),
@@ -343,6 +362,7 @@ describe("ProviderRuntimeIngestion", () => {
       emit: provider.emit,
       setProviderSession: provider.setSession,
       projectionTurnRepository,
+      activityGroupTitleRequests,
       drain,
     };
   }
@@ -2257,6 +2277,81 @@ describe("ProviderRuntimeIngestion", () => {
         : undefined;
     expect(turnDiffActivity?.kind).toBe("turn.diff.updated");
     expect(turnDiffPayload?.unifiedDiff).toBe("diff --git a/file.txt b/file.txt\n+hello\n");
+  });
+
+  it("generates activity group titles through the configured text generation model", async () => {
+    const harness = await createHarness({ activityGroupTitle: "Inspect package scripts" });
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-group-title-tool-1"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-group-title"),
+      itemId: asItemId("item-group-title-tool-1"),
+      payload: {
+        itemType: "command_execution",
+        status: "completed",
+        title: "Run command",
+        detail: "Get-Content -Raw package.json",
+        data: { command: "Get-Content -Raw package.json" },
+      },
+    });
+    harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-group-title-tool-2"),
+      provider: "codex",
+      createdAt: new Date(Date.now() + 1).toISOString(),
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-group-title"),
+      itemId: asItemId("item-group-title-tool-2"),
+      payload: {
+        itemType: "command_execution",
+        status: "completed",
+        title: "Run command",
+        detail: "rg --files",
+        data: { command: "rg --files" },
+      },
+    });
+
+    const thread = await waitForThread(
+      harness.engine,
+      (entry) => {
+        const first = entry.activities.find(
+          (activity: ProviderRuntimeTestActivity) => activity.id === "evt-group-title-tool-1",
+        );
+        const payload =
+          first?.payload && typeof first.payload === "object"
+            ? (first.payload as Record<string, unknown>)
+            : undefined;
+        return payload?.activityGroupTitle === "Inspect package scripts";
+      },
+      3_000,
+    );
+
+    expect(harness.activityGroupTitleRequests.length).toBeGreaterThan(0);
+    expect(harness.activityGroupTitleRequests.at(-1)).toMatchObject({
+      groupKind: "tool-calls",
+    });
+    expect(harness.activityGroupTitleRequests.at(-1)?.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Run command", kind: "tool.completed" }),
+      ]),
+    );
+
+    for (const activityId of ["evt-group-title-tool-1", "evt-group-title-tool-2"]) {
+      const activity = thread.activities.find(
+        (candidate: ProviderRuntimeTestActivity) => candidate.id === activityId,
+      );
+      const payload =
+        activity?.payload && typeof activity.payload === "object"
+          ? (activity.payload as Record<string, unknown>)
+          : undefined;
+      expect(payload?.activityGroupTitle).toBe("Inspect package scripts");
+      expect(typeof payload?.activityGroupTitleSignature).toBe("string");
+    }
   });
 
   it("skips diff checkpoints when git is unavailable for a git workspace", async () => {

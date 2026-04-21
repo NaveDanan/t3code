@@ -45,6 +45,7 @@ export interface WorkLogEntry {
   id: string;
   createdAt: string;
   label: string;
+  groupTitle?: string;
   turnId?: TurnId | null;
   itemId?: string;
   detail?: string;
@@ -63,6 +64,8 @@ interface DerivedWorkLogEntry extends WorkLogEntry {
   activityKind: OrchestrationThreadActivity["kind"];
   collapseKey?: string;
 }
+
+const ACTIVITY_GROUP_TITLE_PAYLOAD_KEY = "activityGroupTitle";
 
 export interface PendingApproval {
   requestId: ApprovalRequestId;
@@ -517,6 +520,7 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
     changedFileStats.map((file) => file.path),
   );
   const title = extractToolTitle(payload);
+  const groupTitle = extractActivityGroupTitle(payload);
   const itemId = extractWorkLogItemId(payload);
   const entry: DerivedWorkLogEntry = {
     id: activity.id,
@@ -551,6 +555,9 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   }
   if (title) {
     entry.toolTitle = title;
+  }
+  if (groupTitle) {
+    entry.groupTitle = groupTitle;
   }
   if (itemType) {
     entry.itemType = itemType;
@@ -606,6 +613,7 @@ function mergeDerivedWorkLogEntries(
   const rawCommand = next.rawCommand ?? previous.rawCommand;
   const itemId = next.itemId ?? previous.itemId;
   const toolTitle = next.toolTitle ?? previous.toolTitle;
+  const groupTitle = next.groupTitle ?? previous.groupTitle;
   const itemType = next.itemType ?? previous.itemType;
   const requestKind = next.requestKind ?? previous.requestKind;
   const collapseKey = next.collapseKey ?? previous.collapseKey;
@@ -624,6 +632,7 @@ function mergeDerivedWorkLogEntries(
     ...(changedFileStats.length > 0 ? { changedFileStats } : {}),
     ...(unifiedDiff ? { unifiedDiff } : {}),
     ...(toolTitle ? { toolTitle } : {}),
+    ...(groupTitle ? { groupTitle } : {}),
     ...(itemType ? { itemType } : {}),
     ...(requestKind ? { requestKind } : {}),
     ...(collapseKey ? { collapseKey } : {}),
@@ -974,6 +983,10 @@ function extractToolCommand(payload: Record<string, unknown> | null): {
 
 function extractToolTitle(payload: Record<string, unknown> | null): string | null {
   return asTrimmedString(payload?.title);
+}
+
+function extractActivityGroupTitle(payload: Record<string, unknown> | null): string | null {
+  return asTrimmedString(payload?.[ACTIVITY_GROUP_TITLE_PAYLOAD_KEY]);
 }
 
 function stripTrailingExitCode(value: string): {

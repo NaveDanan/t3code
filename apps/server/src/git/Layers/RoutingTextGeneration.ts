@@ -106,6 +106,20 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return githubCopilot.generateThreadTitle(input);
       }
     },
+    generateActivityGroupTitle: (input) => {
+      switch (input.modelSelection.provider) {
+        case "codex":
+          return codex.generateActivityGroupTitle(input);
+        case "claudeAgent":
+          return claude.generateActivityGroupTitle(input);
+        case "forgecode":
+          return forge.generateActivityGroupTitle(input);
+        case "opencode":
+          return opencode.generateActivityGroupTitle(input);
+        case "githubCopilot":
+          return githubCopilot.generateActivityGroupTitle(input);
+      }
+    },
   } satisfies TextGenerationShape;
 });
 
