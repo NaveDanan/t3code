@@ -142,6 +142,7 @@ import { SidebarUpdatePill } from "./sidebar/SidebarUpdatePill";
 import { buildRunningTerminalStatusLabel, buildTerminalLabelById } from "../terminalLabels";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { readEnvironmentApi } from "../environmentApi";
+import { writeThreadDragPayload } from "../chatSplitDrag";
 import { useSettings, useUpdateSettings } from "~/hooks/useSettings";
 import { useServerKeybindings } from "../rpc/serverState";
 import { deriveLogicalProjectKey } from "../logicalProject";
@@ -523,6 +524,20 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       threadRef,
     ],
   );
+  const handleRowDragStart = useCallback(
+    (event: React.DragEvent) => {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (
+        renamingThreadKey === threadKey ||
+        target?.closest("[data-thread-selection-safe]") !== null
+      ) {
+        event.preventDefault();
+        return;
+      }
+      writeThreadDragPayload(event.dataTransfer, threadRef);
+    },
+    [renamingThreadKey, threadKey, threadRef],
+  );
   const handlePrClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       if (!prStatus) return;
@@ -634,6 +649,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         onClick={handleRowClick}
         onKeyDown={handleRowKeyDown}
         onContextMenu={handleRowContextMenu}
+        draggable={renamingThreadKey !== threadKey}
+        onDragStart={handleRowDragStart}
       >
         <div className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
           {prStatus && (

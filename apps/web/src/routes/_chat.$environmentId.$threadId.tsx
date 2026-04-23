@@ -2,7 +2,7 @@ import { scopeProjectRef } from "@t3tools/client-runtime";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 
-import ChatView from "../components/ChatView";
+import ChatSplitView from "../components/ChatSplitView";
 import { threadHasStarted } from "../components/ChatView.logic";
 import { DiffWorkerPoolProvider } from "../components/DiffWorkerPoolProvider";
 import {
@@ -168,7 +168,7 @@ function ChatThreadRouteView() {
 
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground">
-      <ChatView
+      <ChatSplitView
         environmentId={threadRef.environmentId}
         threadId={threadRef.threadId}
         routeKind="server"
