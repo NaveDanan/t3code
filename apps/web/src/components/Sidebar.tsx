@@ -5,6 +5,7 @@ import {
   CloudIcon,
   FolderIcon,
   GitPullRequestIcon,
+  GripVerticalIcon,
   PlusIcon,
   SettingsIcon,
   SquarePenIcon,
@@ -150,6 +151,8 @@ import {
   useSavedEnvironmentRuntimeStore,
 } from "../environments/runtime";
 import type { Project, SidebarThreadSummary } from "../types";
+import { THREAD_DRAG_MIME } from "./SplitChatWorkspace";
+import { useSplitViewStore } from "../chatSplitViewStore";
 const THREAD_PREVIEW_LIMIT = 6;
 const SIDEBAR_SORT_LABELS: Record<SidebarProjectSortOrder, string> = {
   updated_at: "Last user message",
@@ -613,6 +616,15 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     },
     [attemptArchiveThread, threadRef],
   );
+  const handleDragStart = useCallback(
+    (event: React.DragEvent<HTMLButtonElement>) => {
+      event.dataTransfer.setData(THREAD_DRAG_MIME, threadKey);
+      event.dataTransfer.effectAllowed = "copy";
+      // Prevent the row click from firing during drag
+      event.stopPropagation();
+    },
+    [threadKey],
+  );
   const rowButtonRender = useMemo(() => <div role="button" tabIndex={0} />, []);
 
   return (
@@ -636,6 +648,18 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         onContextMenu={handleRowContextMenu}
       >
         <div className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+          {/* Drag handle for split-pane drag-to-split */}
+          <button
+            type="button"
+            draggable
+            aria-label={`Drag ${thread.title} to split view`}
+            className="inline-flex shrink-0 cursor-grab items-center justify-center opacity-0 transition-opacity group-hover/menu-sub-item:opacity-50 group-hover/menu-sub-item:hover:opacity-100 active:cursor-grabbing"
+            onDragStart={handleDragStart}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVerticalIcon className="size-3" />
+          </button>
           {prStatus && (
             <Tooltip>
               <TooltipTrigger
@@ -1410,6 +1434,13 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
         clearSelection();
       }
       setSelectionAnchor(scopedThreadKey(threadRef));
+
+      // In split mode, replace the selected pane's thread
+      const splitState = useSplitViewStore.getState();
+      if (splitState.paneThreadKeys.length >= 2) {
+        useSplitViewStore.getState().replaceSelectedPane(scopedThreadKey(threadRef));
+      }
+
       void router.navigate({
         to: "/$environmentId/$threadId",
         params: buildThreadRouteParams(threadRef),
@@ -1446,6 +1477,13 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
         clearSelection();
       }
       setSelectionAnchor(threadKey);
+
+      // In split mode, replace the selected pane's thread
+      const splitState = useSplitViewStore.getState();
+      if (splitState.paneThreadKeys.length >= 2) {
+        useSplitViewStore.getState().replaceSelectedPane(threadKey);
+      }
+
       void router.navigate({
         to: "/$environmentId/$threadId",
         params: buildThreadRouteParams(threadRef),
@@ -1498,6 +1536,13 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
         await deleteThread(scopeThreadRef(thread.environmentId, thread.id), {
           deletedThreadKeys,
         });
+      }
+      // Close any split panes for deleted threads
+      for (const threadKey of threadKeys) {
+        const splitState = useSplitViewStore.getState();
+        if (splitState.paneThreadKeys.includes(threadKey)) {
+          useSplitViewStore.getState().closePane(threadKey);
+        }
       }
       removeFromSelection(threadKeys);
     },
@@ -1566,6 +1611,13 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   const attemptArchiveThread = useCallback(
     async (threadRef: ScopedThreadRef) => {
       try {
+        // Close the pane if this thread is open in split view
+        const threadKey = scopedThreadKey(threadRef);
+        const splitState = useSplitViewStore.getState();
+        if (splitState.paneThreadKeys.includes(threadKey)) {
+          useSplitViewStore.getState().closePane(threadKey);
+        }
+
         await archiveThread(threadRef);
       } catch (error) {
         toastManager.add({

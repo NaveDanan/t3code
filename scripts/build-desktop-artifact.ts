@@ -548,6 +548,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     artifactName: "NJ-Code-${version}-${arch}.${ext}",
     npmRebuild: false,
     nodeGypRebuild: false,
+    asarUnpack: ["node_modules/@github/copilot-*/**/*"],
     directories: {
       buildResources: "apps/desktop/resources",
     },

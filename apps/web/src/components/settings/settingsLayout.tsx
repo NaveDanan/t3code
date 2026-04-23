@@ -113,10 +113,23 @@ export function SettingResetButton({ label, onClick }: { label: string; onClick:
   );
 }
 
-export function SettingsPageContainer({ children }: { children: ReactNode }) {
+export function SettingsPageContainer({
+  children,
+  size = "default",
+}: {
+  children: ReactNode;
+  size?: "default" | "wide";
+}) {
   return (
     <div className="flex-1 overflow-y-auto p-6 sm:p-8">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">{children}</div>
+      <div
+        className={cn(
+          "mx-auto flex w-full flex-col gap-8",
+          size === "wide" ? "max-w-[min(100%,96rem)]" : "max-w-3xl",
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }

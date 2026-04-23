@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -1756,6 +1756,66 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         });
       });
 
+      it("prefers the bundled native Copilot executable in Windows Electron", () => {
+        const tempRoot = mkdtempSync(join(tmpdir(), "t3code-copilot-native-"));
+        const copilotPackageRoot = join(tempRoot, "node_modules", "@github", "copilot");
+        const nativePackageRoot = join(tempRoot, "node_modules", "@github", "copilot-win32-x64");
+        mkdirSync(copilotPackageRoot, { recursive: true });
+        mkdirSync(nativePackageRoot, { recursive: true });
+        const bundledCliPath = join(copilotPackageRoot, "index.js");
+        const nativeCliPath = join(nativePackageRoot, "copilot.exe");
+        writeFileSync(bundledCliPath, "", "utf8");
+        writeFileSync(nativeCliPath, "", "utf8");
+
+        const launchConfig = resolveGitHubCopilotSdkLaunchConfig("copilot", {
+          bundledCliPath,
+          pathValue: "C:\\Program Files\\nodejs;C:\\Tools",
+          platform: "win32",
+          arch: "x64",
+          runningInElectron: true,
+        });
+
+        assert.deepStrictEqual(launchConfig, {
+          cliPath: nativeCliPath,
+        });
+      });
+
+      it("resolves bundled native Copilot executables from app.asar.unpacked", () => {
+        const tempRoot = mkdtempSync(join(tmpdir(), "t3code-copilot-asar-"));
+        const packedCopilotPackageRoot = join(
+          tempRoot,
+          "app.asar",
+          "node_modules",
+          "@github",
+          "copilot",
+        );
+        const unpackedNativePackageRoot = join(
+          tempRoot,
+          "app.asar.unpacked",
+          "node_modules",
+          "@github",
+          "copilot-win32-x64",
+        );
+        mkdirSync(packedCopilotPackageRoot, { recursive: true });
+        mkdirSync(unpackedNativePackageRoot, { recursive: true });
+        const bundledCliPath = join(packedCopilotPackageRoot, "index.js");
+        const nativeCliPath = join(unpackedNativePackageRoot, "copilot.exe");
+        writeFileSync(bundledCliPath, "", "utf8");
+        writeFileSync(nativeCliPath, "", "utf8");
+
+        const launchConfig = resolveGitHubCopilotSdkLaunchConfig("copilot", {
+          bundledCliPath,
+          pathValue: "",
+          platform: "win32",
+          arch: "x64",
+          runningInElectron: true,
+        });
+
+        assert.deepStrictEqual(launchConfig, {
+          cliPath: nativeCliPath,
+        });
+      });
+
       it("keeps the SDK default launch outside the Windows Electron runtime", () => {
         const launchConfig = resolveGitHubCopilotSdkLaunchConfig("copilot", {
           bundledCliPath: "C:\\sdk\\copilot\\index.js",
@@ -1767,10 +1827,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         assert.deepStrictEqual(launchConfig, {});
       });
 
-      it("prefers a Copilot executable resolved from PATH before the bundled SDK CLI", () => {
+      it("uses a directly spawnable Copilot executable resolved from PATH", () => {
         const tempRoot = mkdtempSync(join(tmpdir(), "t3code-copilot-sdk-"));
-        const copilotCmdPath = join(tempRoot, "copilot.cmd");
-        writeFileSync(copilotCmdPath, "@echo off\r\n", "utf8");
+        const copilotExePath = join(tempRoot, "copilot.exe");
+        writeFileSync(copilotExePath, "", "utf8");
 
         const launchConfig = resolveGitHubCopilotSdkLaunchConfig("copilot", {
           bundledCliPath: "C:\\sdk\\copilot\\index.js",
@@ -1780,9 +1840,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         });
 
         assert.deepStrictEqual(launchConfig, {
-          cliPath: copilotCmdPath.toUpperCase().endsWith(".CMD")
-            ? copilotCmdPath.slice(0, -4) + ".CMD"
-            : copilotCmdPath,
+          cliPath: copilotExePath.toUpperCase().endsWith(".EXE")
+            ? copilotExePath.slice(0, -4) + ".EXE"
+            : copilotExePath,
         });
       });
 

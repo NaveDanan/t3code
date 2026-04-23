@@ -39,6 +39,12 @@ interface ChatHeaderProps {
   onDeleteProjectScript: (scriptId: string) => Promise<void>;
   onToggleTerminal: () => void;
   onToggleRightPanel: () => void;
+  showSidebarTrigger?: boolean;
+  showProjectScripts?: boolean;
+  showOpenInPicker?: boolean;
+  showGitActions?: boolean;
+  showTerminalToggle?: boolean;
+  showRightPanelToggle?: boolean;
 }
 
 export const ChatHeader = memo(function ChatHeader({
@@ -64,11 +70,17 @@ export const ChatHeader = memo(function ChatHeader({
   onDeleteProjectScript,
   onToggleTerminal,
   onToggleRightPanel,
+  showSidebarTrigger = true,
+  showProjectScripts = true,
+  showOpenInPicker = true,
+  showGitActions = true,
+  showTerminalToggle = true,
+  showRightPanelToggle = true,
 }: ChatHeaderProps) {
   return (
     <div className="@container/header-actions flex min-w-0 flex-1 items-center gap-2">
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:gap-3">
-        <SidebarTrigger className="size-7 shrink-0 md:hidden" />
+        {showSidebarTrigger ? <SidebarTrigger className="size-7 shrink-0 md:hidden" /> : null}
         <h2
           className="min-w-0 shrink truncate text-sm font-medium text-foreground"
           title={activeThreadTitle}
@@ -87,7 +99,7 @@ export const ChatHeader = memo(function ChatHeader({
         )}
       </div>
       <div className="flex shrink-0 items-center justify-end gap-2 @3xl/header-actions:gap-3">
-        {activeProjectScripts && (
+        {showProjectScripts && activeProjectScripts && (
           <ProjectScriptsControl
             scripts={activeProjectScripts}
             keybindings={keybindings}
@@ -98,64 +110,68 @@ export const ChatHeader = memo(function ChatHeader({
             onDeleteScript={onDeleteProjectScript}
           />
         )}
-        {activeProjectName && (
+        {showOpenInPicker && activeProjectName && (
           <OpenInPicker
             keybindings={keybindings}
             availableEditors={availableEditors}
             openInCwd={openInCwd}
           />
         )}
-        {activeProjectName && (
+        {showGitActions && activeProjectName && (
           <GitActionsControl
             gitCwd={gitCwd}
             activeThreadRef={scopeThreadRef(activeThreadEnvironmentId, activeThreadId)}
           />
         )}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Toggle
-                className="shrink-0"
-                pressed={terminalOpen}
-                onPressedChange={onToggleTerminal}
-                aria-label="Toggle terminal drawer"
-                variant="outline"
-                size="xs"
-                disabled={!terminalAvailable}
-              >
-                <TerminalSquareIcon className="size-3" />
-              </Toggle>
-            }
-          />
-          <TooltipPopup side="bottom">
-            {!terminalAvailable
-              ? "Terminal is unavailable until this thread has an active project."
-              : terminalToggleShortcutLabel
-                ? `Toggle terminal drawer (${terminalToggleShortcutLabel})`
-                : "Toggle terminal drawer"}
-          </TooltipPopup>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Toggle
-                className="shrink-0"
-                pressed={rightPanelOpen}
-                onPressedChange={onToggleRightPanel}
-                aria-label="Toggle right panel"
-                variant="outline"
-                size="xs"
-              >
-                <PanelRightIcon className="size-3" />
-              </Toggle>
-            }
-          />
-          <TooltipPopup side="bottom">
-            {rightPanelShortcutLabel
-              ? `Toggle right panel (${rightPanelShortcutLabel})`
-              : "Toggle right panel"}
-          </TooltipPopup>
-        </Tooltip>
+        {showTerminalToggle ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Toggle
+                  className="shrink-0"
+                  pressed={terminalOpen}
+                  onPressedChange={onToggleTerminal}
+                  aria-label="Toggle terminal drawer"
+                  variant="outline"
+                  size="xs"
+                  disabled={!terminalAvailable}
+                >
+                  <TerminalSquareIcon className="size-3" />
+                </Toggle>
+              }
+            />
+            <TooltipPopup side="bottom">
+              {!terminalAvailable
+                ? "Terminal is unavailable until this thread has an active project."
+                : terminalToggleShortcutLabel
+                  ? `Toggle terminal drawer (${terminalToggleShortcutLabel})`
+                  : "Toggle terminal drawer"}
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
+        {showRightPanelToggle ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Toggle
+                  className="shrink-0"
+                  pressed={rightPanelOpen}
+                  onPressedChange={onToggleRightPanel}
+                  aria-label="Toggle right panel"
+                  variant="outline"
+                  size="xs"
+                >
+                  <PanelRightIcon className="size-3" />
+                </Toggle>
+              }
+            />
+            <TooltipPopup side="bottom">
+              {rightPanelShortcutLabel
+                ? `Toggle right panel (${rightPanelShortcutLabel})`
+                : "Toggle right panel"}
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
       </div>
     </div>
   );

@@ -2,7 +2,6 @@ import { scopeProjectRef } from "@t3tools/client-runtime";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 
-import ChatView from "../components/ChatView";
 import { threadHasStarted } from "../components/ChatView.logic";
 import { DiffWorkerPoolProvider } from "../components/DiffWorkerPoolProvider";
 import {
@@ -12,6 +11,7 @@ import {
   type DiffPanelMode,
 } from "../components/DiffPanelShell";
 import { ProjectFilesPanel } from "../components/ProjectFilesPanel";
+import SplitChatWorkspace from "../components/SplitChatWorkspace";
 import { ThreadRightPanelInlineSidebar, type RightPanelTab } from "../components/ThreadRightPanel";
 import { finalizePromotedDraftThreadByRef, useComposerDraftStore } from "../composerDraftStore";
 import {
@@ -168,10 +168,9 @@ function ChatThreadRouteView() {
 
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground">
-      <ChatView
+      <SplitChatWorkspace
         environmentId={threadRef.environmentId}
         threadId={threadRef.threadId}
-        routeKind="server"
         rightPanel={
           <ThreadRightPanelInlineSidebar
             open={rightPanelOpen}

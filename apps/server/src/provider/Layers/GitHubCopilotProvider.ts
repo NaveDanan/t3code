@@ -16,7 +16,7 @@ import type {
 } from "@t3tools/contracts";
 import { Data, Effect, Equal, Layer, Result, Stream } from "effect";
 import { existsSync } from "node:fs";
-import { basename, delimiter, extname, isAbsolute, join } from "node:path";
+import { basename, delimiter, dirname, extname, isAbsolute, join, sep } from "node:path";
 import { isWindowsCommandNotFound, runProcess } from "../../processRunner";
 
 import {
@@ -36,11 +36,6 @@ import {
 
 const PROVIDER = "githubCopilot" as const;
 const DEFAULT_TIMEOUT_MS = 4_000;
-
-class GitHubCopilotProviderError extends Data.TaggedError("GitHubCopilotProviderError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
 
 const GITHUB_COPILOT_RUNTIME_CAPABILITIES = {
   busyFollowupMode: "native-steer" as const,
@@ -79,6 +74,10 @@ type GitHubCopilotRuntimeProbe = (binaryPath: string) => Promise<GitHubCopilotRu
 interface GitHubCopilotSdkLaunchConfig {
   readonly cliPath?: string;
   readonly cliArgs?: string[];
+}
+
+function getNativeCopilotExecutableName(platform: NodeJS.Platform): string {
+  return platform === "win32" ? "copilot.exe" : "copilot";
 }
 
 function shouldUseBundledSdkCli(binaryPath: string): boolean {
@@ -191,12 +190,64 @@ function resolveCliPathForSdk(
   );
 }
 
+function isSdkDirectlySpawnableCliPath(
+  cliPath: string,
+  options: {
+    readonly platform: NodeJS.Platform;
+    readonly runningInElectron: boolean;
+  },
+): boolean {
+  const { platform, runningInElectron } = options;
+  if (platform !== "win32") {
+    return true;
+  }
+
+  const extension = extname(cliPath).toLowerCase();
+  return extension === ".exe" || (!runningInElectron && extension === ".js");
+}
+
+function resolveSpawnableBundledExecutablePath(candidate: string): string | undefined {
+  const asarSegment = `${sep}app.asar${sep}`;
+  if (candidate.includes(asarSegment)) {
+    const unpackedCandidate = candidate.replace(asarSegment, `${sep}app.asar.unpacked${sep}`);
+    return existsSync(unpackedCandidate) ? unpackedCandidate : undefined;
+  }
+
+  return existsSync(candidate) ? candidate : undefined;
+}
+
+function resolveBundledNativeCopilotCliPath(
+  bundledCliPath: string | undefined,
+  options?: {
+    readonly platform?: NodeJS.Platform;
+    readonly arch?: NodeJS.Architecture;
+  },
+): string | undefined {
+  const trimmedBundledCliPath = bundledCliPath?.trim();
+  if (!trimmedBundledCliPath) {
+    return undefined;
+  }
+
+  const packageRoot = dirname(trimmedBundledCliPath);
+  const platform = options?.platform ?? process.platform;
+  const arch = options?.arch ?? process.arch;
+  const candidate = join(
+    packageRoot,
+    "..",
+    `copilot-${platform}-${arch}`,
+    getNativeCopilotExecutableName(platform),
+  );
+
+  return resolveSpawnableBundledExecutablePath(candidate);
+}
+
 export function resolveGitHubCopilotSdkLaunchConfig(
   binaryPath: string,
   options?: {
     readonly bundledCliPath?: string;
     readonly pathValue?: string;
     readonly platform?: NodeJS.Platform;
+    readonly arch?: NodeJS.Architecture;
     readonly runningInElectron?: boolean;
   },
 ): GitHubCopilotSdkLaunchConfig {
@@ -207,7 +258,10 @@ export function resolveGitHubCopilotSdkLaunchConfig(
     ...(options?.pathValue !== undefined ? { pathValue: options.pathValue } : {}),
   });
 
-  if (resolvedCliPath) {
+  if (
+    resolvedCliPath &&
+    isSdkDirectlySpawnableCliPath(resolvedCliPath, { platform, runningInElectron })
+  ) {
     return { cliPath: resolvedCliPath };
   }
 
@@ -217,6 +271,14 @@ export function resolveGitHubCopilotSdkLaunchConfig(
 
   if (!runningInElectron || platform !== "win32") {
     return {};
+  }
+
+  const bundledNativeCliPath = resolveBundledNativeCopilotCliPath(options?.bundledCliPath, {
+    platform,
+    ...(options?.arch !== undefined ? { arch: options.arch } : {}),
+  });
+  if (bundledNativeCliPath) {
+    return { cliPath: bundledNativeCliPath };
   }
 
   const cliEntrypoint = options?.bundledCliPath?.trim() || binaryPath.trim();
@@ -283,10 +345,10 @@ function createGitHubCopilotClient(binaryPath: string): CopilotClient {
     ...(env.PATH !== undefined ? { pathValue: env.PATH } : {}),
   });
 
-  if (launchConfig.cliArgs && launchConfig.cliArgs.length > 0) {
+  if (launchConfig.cliPath || (launchConfig.cliArgs && launchConfig.cliArgs.length > 0)) {
     return new CopilotClient({
       ...(launchConfig.cliPath ? { cliPath: launchConfig.cliPath } : {}),
-      cliArgs: [...launchConfig.cliArgs],
+      ...(launchConfig.cliArgs ? { cliArgs: [...launchConfig.cliArgs] } : {}),
       autoStart: false,
       logLevel: "none",
       env,

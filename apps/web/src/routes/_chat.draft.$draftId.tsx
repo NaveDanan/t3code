@@ -23,12 +23,23 @@ import {
 } from "../storeSelectors";
 import { useStore } from "../store";
 import { buildThreadRouteParams } from "../threadRoutes";
+import { useSplitViewStore } from "../chatSplitViewStore";
 
 function DraftChatThreadRouteView() {
   const navigate = useNavigate();
   const { draftId: rawDraftId } = Route.useParams();
   const search = Route.useSearch();
   const draftId = DraftId.make(rawDraftId);
+
+  // Collapse split mode when entering a draft route (v1 scope: server threads only).
+  const collapseToSingle = useSplitViewStore((s) => s.collapseToSingle);
+  const splitPaneCount = useSplitViewStore((s) => s.paneThreadKeys.length);
+  useEffect(() => {
+    if (splitPaneCount >= 2) {
+      collapseToSingle();
+    }
+  }, [collapseToSingle, splitPaneCount]);
+
   const draftSession = useComposerDraftStore((store) => store.getDraftSession(draftId));
   const projectRef = useMemo(
     () =>

@@ -354,6 +354,9 @@ type ChatViewProps = (
 ) & {
   /** Rendered beside the chat column, below the desktop title bar. */
   rightPanel?: ReactNode;
+  presentation?: "route" | "benchmarkLane" | "splitPane";
+  /** When presentation is "splitPane", whether this pane is the selected (active) one. */
+  isSelectedPane?: boolean;
 };
 
 interface TerminalLaunchContext {
@@ -436,7 +439,7 @@ function useLocalDispatchState(input: {
   };
 }
 
-interface PersistentThreadTerminalDrawerProps {
+export interface PersistentThreadTerminalDrawerProps {
   threadRef: { environmentId: EnvironmentId; threadId: ThreadId };
   threadId: ThreadId;
   visible: boolean;
@@ -448,7 +451,7 @@ interface PersistentThreadTerminalDrawerProps {
   onAddTerminalContext: (selection: TerminalContextSelection) => void;
 }
 
-const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDrawer({
+export const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDrawer({
   threadRef,
   threadId,
   visible,
@@ -660,6 +663,14 @@ const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerminalDra
 
 export default function ChatView(props: ChatViewProps) {
   const { environmentId, threadId, routeKind } = props;
+  const presentation = props.presentation ?? "route";
+  const isBenchmarkLanePresentation = presentation === "benchmarkLane";
+  const isSplitPanePresentation = presentation === "splitPane";
+  const isSelectedSplitPane = isSplitPanePresentation ? (props.isSelectedPane ?? true) : false;
+  /** True for benchmark lanes AND for non-selected split panes — suppresses global shortcuts,
+   *  visited-state updates, and chrome that should only exist once. */
+  const suppressGlobalBehavior =
+    isBenchmarkLanePresentation || (isSplitPanePresentation && !isSelectedSplitPane);
   const draftId = routeKind === "draft" ? props.draftId : null;
   const routeThreadRef = useMemo(
     () => scopeThreadRef(environmentId, threadId),
@@ -883,7 +894,7 @@ export default function ChatView(props: ChatViewProps) {
     composerInteractionMode ?? activeThread?.interactionMode ?? DEFAULT_INTERACTION_MODE;
   const isLocalDraftThread = !isServerThread && localDraftThread !== undefined;
   const canCheckoutPullRequestIntoThread = isLocalDraftThread;
-  const rightPanelOpen = rawSearch.rightPanel === "1";
+  const rightPanelOpen = isBenchmarkLanePresentation ? false : rawSearch.rightPanel === "1";
   const activeThreadId = activeThread?.id ?? null;
   const activeThreadRef = useMemo(
     () => (activeThread ? scopeThreadRef(activeThread.environmentId, activeThread.id) : null),
@@ -1094,6 +1105,7 @@ export default function ChatView(props: ChatViewProps) {
   );
 
   useEffect(() => {
+    if (suppressGlobalBehavior) return;
     if (!serverThread?.id) return;
     if (!latestTurnSettled) return;
     if (!activeLatestTurn?.completedAt) return;
@@ -1110,6 +1122,7 @@ export default function ChatView(props: ChatViewProps) {
     markThreadVisited,
     serverThread?.environmentId,
     serverThread?.id,
+    suppressGlobalBehavior,
   ]);
 
   const selectedProviderByThreadId = composerActiveProvider ?? null;
@@ -1558,6 +1571,9 @@ export default function ChatView(props: ChatViewProps) {
     [keybindings, nonTerminalShortcutLabelOptions],
   );
   const onToggleRightPanel = useCallback(() => {
+    if (isBenchmarkLanePresentation) {
+      return;
+    }
     if (routeKind === "draft" && draftId) {
       void navigate({
         to: "/draft/$draftId",
@@ -1601,7 +1617,16 @@ export default function ChatView(props: ChatViewProps) {
         };
       },
     });
-  }, [draftId, environmentId, isServerThread, navigate, rightPanelOpen, routeKind, threadId]);
+  }, [
+    draftId,
+    environmentId,
+    isBenchmarkLanePresentation,
+    isServerThread,
+    navigate,
+    rightPanelOpen,
+    routeKind,
+    threadId,
+  ]);
 
   const envLocked = Boolean(
     activeThread &&
@@ -2459,6 +2484,9 @@ export default function ChatView(props: ChatViewProps) {
   }, [activeThreadKey, focusComposer, terminalState.terminalOpen]);
 
   useEffect(() => {
+    if (isBenchmarkLanePresentation || suppressGlobalBehavior) {
+      return;
+    }
     const handler = (event: globalThis.KeyboardEvent) => {
       if (!activeThreadId || event.defaultPrevented) return;
       const shortcutContext = {
@@ -2533,6 +2561,8 @@ export default function ChatView(props: ChatViewProps) {
     setTerminalOpen,
     runProjectScript,
     splitTerminal,
+    isBenchmarkLanePresentation,
+    suppressGlobalBehavior,
     keybindings,
     onToggleRightPanel,
     toggleTerminalVisibility,
@@ -3524,12 +3554,12 @@ export default function ChatView(props: ChatViewProps) {
 
   // Empty state: no active thread
   if (!activeThread) {
-    return <NoActiveThreadState />;
+    return isBenchmarkLanePresentation ? null : <NoActiveThreadState />;
   }
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-background">
-      {isElectron && (
+      {isElectron && !isBenchmarkLanePresentation && !isSplitPanePresentation && (
         <DesktopTitleBar
           title={activeThread.title}
           contextLabel="Project"
@@ -3568,6 +3598,12 @@ export default function ChatView(props: ChatViewProps) {
               onDeleteProjectScript={deleteProjectScript}
               onToggleTerminal={toggleTerminalVisibility}
               onToggleRightPanel={onToggleRightPanel}
+              showSidebarTrigger={!isBenchmarkLanePresentation && !isSplitPanePresentation}
+              showProjectScripts={!isBenchmarkLanePresentation}
+              showOpenInPicker={!isBenchmarkLanePresentation}
+              showGitActions={!isBenchmarkLanePresentation}
+              showTerminalToggle={!isBenchmarkLanePresentation}
+              showRightPanelToggle={!isBenchmarkLanePresentation && !isSplitPanePresentation}
             />
           </header>
 
@@ -3720,7 +3756,7 @@ export default function ChatView(props: ChatViewProps) {
                 />
               </div>
 
-              {isGitRepo && (
+              {isGitRepo && !isBenchmarkLanePresentation && (
                 <BranchToolbar
                   environmentId={activeThread.environmentId}
                   threadId={activeThread.id}
@@ -3739,7 +3775,7 @@ export default function ChatView(props: ChatViewProps) {
                     : {})}
                 />
               )}
-              {pullRequestDialogState ? (
+              {pullRequestDialogState && !isBenchmarkLanePresentation ? (
                 <PullRequestThreadDialog
                   key={pullRequestDialogState.key}
                   open
@@ -3780,26 +3816,28 @@ export default function ChatView(props: ChatViewProps) {
           </div>
           {/* end horizontal flex container (chat content + plan sidebar) */}
 
-          {mountedTerminalThreadRefs.map(
-            ({ key: mountedThreadKey, threadRef: mountedThreadRef }) => (
-              <PersistentThreadTerminalDrawer
-                key={mountedThreadKey}
-                threadRef={mountedThreadRef}
-                threadId={mountedThreadRef.threadId}
-                visible={mountedThreadKey === activeThreadKey && terminalState.terminalOpen}
-                launchContext={
-                  mountedThreadKey === activeThreadKey
-                    ? (activeTerminalLaunchContext ?? null)
-                    : null
-                }
-                focusRequestId={mountedThreadKey === activeThreadKey ? terminalFocusRequestId : 0}
-                splitShortcutLabel={splitTerminalShortcutLabel ?? undefined}
-                newShortcutLabel={newTerminalShortcutLabel ?? undefined}
-                closeShortcutLabel={closeTerminalShortcutLabel ?? undefined}
-                onAddTerminalContext={addTerminalContextToDraft}
-              />
-            ),
-          )}
+          {/* In split-pane mode, terminal drawers are owned by the workspace, not the pane. */}
+          {!isSplitPanePresentation &&
+            mountedTerminalThreadRefs.map(
+              ({ key: mountedThreadKey, threadRef: mountedThreadRef }) => (
+                <PersistentThreadTerminalDrawer
+                  key={mountedThreadKey}
+                  threadRef={mountedThreadRef}
+                  threadId={mountedThreadRef.threadId}
+                  visible={mountedThreadKey === activeThreadKey && terminalState.terminalOpen}
+                  launchContext={
+                    mountedThreadKey === activeThreadKey
+                      ? (activeTerminalLaunchContext ?? null)
+                      : null
+                  }
+                  focusRequestId={mountedThreadKey === activeThreadKey ? terminalFocusRequestId : 0}
+                  splitShortcutLabel={splitTerminalShortcutLabel ?? undefined}
+                  newShortcutLabel={newTerminalShortcutLabel ?? undefined}
+                  closeShortcutLabel={closeTerminalShortcutLabel ?? undefined}
+                  onAddTerminalContext={addTerminalContextToDraft}
+                />
+              ),
+            )}
 
           {expandedImage && (
             <ExpandedImageDialog preview={expandedImage} onClose={closeExpandedImage} />
@@ -3807,8 +3845,9 @@ export default function ChatView(props: ChatViewProps) {
         </div>
         {/* end chat column */}
 
-        {/* Right panel (diff / files) — same row as chat, below title bar */}
-        {props.rightPanel}
+        {/* Right panel (diff / files) — same row as chat, below title bar.
+             In split-pane mode the right panel is rendered by the workspace. */}
+        {isBenchmarkLanePresentation || isSplitPanePresentation ? null : props.rightPanel}
       </div>
       {/* end horizontal split */}
     </div>

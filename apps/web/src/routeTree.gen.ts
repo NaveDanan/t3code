@@ -15,6 +15,7 @@ import { Route as ChatRouteImport } from './routes/_chat'
 import { Route as ChatIndexRouteImport } from './routes/_chat.index'
 import { Route as SettingsGeneralRouteImport } from './routes/settings.general'
 import { Route as SettingsConnectionsRouteImport } from './routes/settings.connections'
+import { Route as SettingsBenchmarksRouteImport } from './routes/settings.benchmarks'
 import { Route as SettingsArchivedRouteImport } from './routes/settings.archived'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
@@ -48,6 +49,11 @@ const SettingsConnectionsRoute = SettingsConnectionsRouteImport.update({
   path: '/connections',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsBenchmarksRoute = SettingsBenchmarksRouteImport.update({
+  id: '/benchmarks',
+  path: '/benchmarks',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsArchivedRoute = SettingsArchivedRouteImport.update({
   id: '/archived',
   path: '/archived',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/archived': typeof SettingsArchivedRoute
+  '/settings/benchmarks': typeof SettingsBenchmarksRoute
   '/settings/connections': typeof SettingsConnectionsRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByTo {
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/archived': typeof SettingsArchivedRoute
+  '/settings/benchmarks': typeof SettingsBenchmarksRoute
   '/settings/connections': typeof SettingsConnectionsRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/': typeof ChatIndexRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/archived': typeof SettingsArchivedRoute
+  '/settings/benchmarks': typeof SettingsBenchmarksRoute
   '/settings/connections': typeof SettingsConnectionsRoute
   '/settings/general': typeof SettingsGeneralRoute
   '/_chat/': typeof ChatIndexRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
     | '/pair'
     | '/settings'
     | '/settings/archived'
+    | '/settings/benchmarks'
     | '/settings/connections'
     | '/settings/general'
     | '/$environmentId/$threadId'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
     | '/pair'
     | '/settings'
     | '/settings/archived'
+    | '/settings/benchmarks'
     | '/settings/connections'
     | '/settings/general'
     | '/'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '/pair'
     | '/settings'
     | '/settings/archived'
+    | '/settings/benchmarks'
     | '/settings/connections'
     | '/settings/general'
     | '/_chat/'
@@ -181,6 +193,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsConnectionsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/benchmarks': {
+      id: '/settings/benchmarks'
+      path: '/benchmarks'
+      fullPath: '/settings/benchmarks'
+      preLoaderRoute: typeof SettingsBenchmarksRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/archived': {
       id: '/settings/archived'
       path: '/archived'
@@ -221,12 +240,14 @@ const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 interface SettingsRouteChildren {
   SettingsArchivedRoute: typeof SettingsArchivedRoute
+  SettingsBenchmarksRoute: typeof SettingsBenchmarksRoute
   SettingsConnectionsRoute: typeof SettingsConnectionsRoute
   SettingsGeneralRoute: typeof SettingsGeneralRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsArchivedRoute: SettingsArchivedRoute,
+  SettingsBenchmarksRoute: SettingsBenchmarksRoute,
   SettingsConnectionsRoute: SettingsConnectionsRoute,
   SettingsGeneralRoute: SettingsGeneralRoute,
 }
