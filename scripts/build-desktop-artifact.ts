@@ -186,6 +186,14 @@ function resolveWorkspacePackageDir(packageName: string, repoRoot: string): stri
 // This function ensures the compiled binary exists in the workspace before
 // staging so the stage install can skip re-compiling with --ignore-scripts.
 const ensureNodePtyBuilt = Effect.fn("ensureNodePtyBuilt")(function* (repoRoot: string) {
+  if (process.platform !== "linux") {
+    return yield* new BuildScriptError({
+      message:
+        `Linux desktop artifacts must be built on a Linux host; current host is '${process.platform}'.\n` +
+        "Use a Linux runner, VM, or WSL environment for --platform linux targets.",
+    });
+  }
+
   const nodePtyDir = resolveWorkspacePackageDir("node-pty", repoRoot);
   if (!nodePtyDir) {
     return yield* new BuildScriptError({ message: "Could not resolve node-pty in workspace." });
