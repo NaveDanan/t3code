@@ -12,6 +12,7 @@ import { TraitsMenuContent, TraitsPicker } from "./TraitsPicker";
 import {
   normalizeClaudeModelOptionsWithCapabilities,
   normalizeCodexModelOptionsWithCapabilities,
+  normalizeCursorAgentModelOptionsWithCapabilities,
   normalizeForgeCodeModelOptionsWithCapabilities,
   normalizeGitHubCopilotModelOptionsWithCapabilities,
   normalizeOpencodeModelOptionsWithCapabilities,
@@ -125,6 +126,21 @@ function getProviderStateFromCapabilities(
         modelOptionsForDispatch: normalizeForgeCodeModelOptionsWithCapabilities(
           caps,
           modelOptions?.forgecode,
+        ),
+        ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
+        ...(ultrathinkActive
+          ? { composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset]" }
+          : {}),
+        ...(ultrathinkActive ? { modelPickerIconClassName: "ultrathink-chroma" } : {}),
+      };
+    }
+    case "cursorAgent": {
+      return {
+        provider,
+        promptEffort: null,
+        modelOptionsForDispatch: normalizeCursorAgentModelOptionsWithCapabilities(
+          caps,
+          modelOptions?.cursorAgent,
         ),
         ...(ultrathinkActive ? { composerFrameClassName: "ultrathink-frame" } : {}),
         ...(ultrathinkActive
@@ -324,6 +340,51 @@ const composerProviderRegistry: Record<ProviderKind, ProviderRegistryEntry> = {
       !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
         <TraitsPicker
           provider="forgecode"
+          models={models}
+          {...(threadRef ? { threadRef } : {})}
+          {...(draftId ? { draftId } : {})}
+          model={model}
+          modelOptions={modelOptions}
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+        />
+      ),
+  },
+  cursorAgent: {
+    getState: (input) => getProviderStateFromCapabilities(input),
+    renderTraitsMenuContent: ({
+      threadRef,
+      draftId,
+      model,
+      models,
+      modelOptions,
+      prompt,
+      onPromptChange,
+    }) =>
+      !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
+        <TraitsMenuContent
+          provider="cursorAgent"
+          models={models}
+          {...(threadRef ? { threadRef } : {})}
+          {...(draftId ? { draftId } : {})}
+          model={model}
+          modelOptions={modelOptions}
+          prompt={prompt}
+          onPromptChange={onPromptChange}
+        />
+      ),
+    renderTraitsPicker: ({
+      threadRef,
+      draftId,
+      model,
+      models,
+      modelOptions,
+      prompt,
+      onPromptChange,
+    }) =>
+      !hasComposerTraitsTarget({ threadRef, draftId }) ? null : (
+        <TraitsPicker
+          provider="cursorAgent"
           models={models}
           {...(threadRef ? { threadRef } : {})}
           {...(draftId ? { draftId } : {})}

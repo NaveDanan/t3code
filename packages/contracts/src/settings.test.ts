@@ -12,11 +12,17 @@ describe("default provider settings", () => {
     expect(DEFAULT_SERVER_SETTINGS.providers.claudeAgent.enabled).toBe(true);
     expect(DEFAULT_SERVER_SETTINGS.providers.opencode.enabled).toBe(true);
     expect(DEFAULT_SERVER_SETTINGS.providers.forgecode.enabled).toBe(true);
+    expect(DEFAULT_SERVER_SETTINGS.providers.cursorAgent.enabled).toBe(true);
+    expect(DEFAULT_SERVER_SETTINGS.providers.cursorAgent.binaryPath).toBe("cursor-agent");
+    expect(DEFAULT_SERVER_SETTINGS.providers.cursorAgent.executionBackend).toBe(
+      process.platform === "win32" ? "wsl" : "native",
+    );
     expect(DEFAULT_SERVER_SETTINGS.providers.forgecode.executionBackend).toBe(
       process.platform === "win32" ? "wsl" : "native",
     );
     expect(DEFAULT_UNIFIED_SETTINGS.providers.opencode.enabled).toBe(true);
     expect(DEFAULT_UNIFIED_SETTINGS.providers.forgecode.enabled).toBe(true);
+    expect(DEFAULT_UNIFIED_SETTINGS.providers.cursorAgent.enabled).toBe(true);
   });
 
   it("defaults busy thread follow-ups to queue", () => {

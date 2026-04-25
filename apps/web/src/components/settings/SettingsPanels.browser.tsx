@@ -16,11 +16,16 @@ import { page } from "vitest/browser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
+import { APP_VERSION, T3_CODE_BASE_VERSION } from "../../branding";
 import { __resetLocalApiForTests } from "../../localApi";
 import { AppAtomRegistryProvider } from "../../rpc/atomRegistry";
 import { resetServerStateForTests, setServerConfigSnapshot } from "../../rpc/serverState";
 import { ConnectionsSettings } from "./ConnectionsSettings";
 import { GeneralSettingsPanel } from "./SettingsPanels";
+
+function formatVersionLabel(version: string) {
+  return version.startsWith("v") ? version : `v${version}`;
+}
 
 const authAccessHarness = vi.hoisted(() => {
   type Snapshot = AuthAccessSnapshot;
@@ -434,6 +439,11 @@ describe("GeneralSettingsPanel observability", () => {
     );
 
     await expect.element(page.getByText("About")).toBeInTheDocument();
+    await expect.element(page.getByText("Version")).toBeInTheDocument();
+    await expect.element(page.getByText(formatVersionLabel(APP_VERSION))).toBeInTheDocument();
+    await expect
+      .element(page.getByText(`Based on T3 Code ${formatVersionLabel(T3_CODE_BASE_VERSION)}.`))
+      .toBeInTheDocument();
     await expect.element(page.getByText("Diagnostics")).toBeInTheDocument();
     await expect.element(page.getByText("Open logs folder")).toBeInTheDocument();
     await expect

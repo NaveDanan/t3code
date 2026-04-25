@@ -1646,6 +1646,16 @@ function getIconOption(): { icon: string } | Record<string, never> {
   return iconPath ? { icon: iconPath } : {};
 }
 
+async function clearDevelopmentRendererCache(window: BrowserWindow): Promise<void> {
+  try {
+    await window.webContents.session.clearCache();
+  } catch (error) {
+    const message = `failed to clear renderer cache before loading dev server (${formatErrorMessage(error)})`;
+    writeDesktopLogHeader(message);
+    console.warn(`[desktop] ${message}`);
+  }
+}
+
 async function loadWindowContent(window: BrowserWindow): Promise<void> {
   const abortController = new AbortController();
   const abortReadinessWait = () => {
@@ -1674,6 +1684,7 @@ async function loadWindowContent(window: BrowserWindow): Promise<void> {
   }
 
   if (isDevelopment) {
+    await clearDevelopmentRendererCache(window);
     await window.loadURL(process.env.VITE_DEV_SERVER_URL as string);
     window.webContents.openDevTools({ mode: "detach" });
     return;

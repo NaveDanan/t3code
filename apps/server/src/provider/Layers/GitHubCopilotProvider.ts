@@ -35,7 +35,8 @@ import {
 } from "../githubCopilot";
 
 const PROVIDER = "githubCopilot" as const;
-const DEFAULT_TIMEOUT_MS = 4_000;
+const HEALTH_CHECK_TIMEOUT_MS = 15_000;
+const HEALTH_CHECK_TIMEOUT_GUARD_MS = HEALTH_CHECK_TIMEOUT_MS + 1_500;
 
 const GITHUB_COPILOT_RUNTIME_CAPABILITIES = {
   busyFollowupMode: "native-steer" as const,
@@ -54,11 +55,13 @@ type GitHubCopilotProcessRunner = (
     readonly cwd: string | undefined;
     readonly shell: boolean;
     readonly allowNonZeroExit?: boolean;
+    readonly timeoutMs?: number;
   },
 ) => Promise<{
   readonly stdout: string;
   readonly stderr: string;
   readonly code: number | null;
+  readonly timedOut?: boolean;
 }>;
 
 let ghCopilotProcessRunner: GitHubCopilotProcessRunner = (command, args, options) =>
@@ -303,7 +306,7 @@ export function resolveGitHubCopilotSdkLaunchConfig(
 function toServerProviderModel(model: ModelInfo): ServerProviderModel {
   const reasoningEfforts =
     model.supportedReasoningEfforts ??
-    (model.capabilities.supports.reasoningEffort ? ["low", "medium", "high", "xhigh"] : []);
+    (model.capabilities?.supports?.reasoningEffort ? ["low", "medium", "high", "xhigh"] : []);
 
   return {
     slug: model.id,
@@ -400,7 +403,7 @@ function runCopilotCommand(
   binaryPath: string,
   args: ReadonlyArray<string>,
 ): Effect.Effect<
-  { stdout: string; stderr: string; code: number },
+  { stdout: string; stderr: string; code: number; timedOut: boolean },
   GitHubCopilotProviderProbeError
 > {
   return Effect.tryPromise({
@@ -410,6 +413,7 @@ function runCopilotCommand(
         cwd: undefined,
         shell: process.platform === "win32",
         allowNonZeroExit: true,
+        timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
       }),
     catch: (cause) =>
       new GitHubCopilotProviderProbeError({
@@ -422,6 +426,7 @@ function runCopilotCommand(
       stdout: result.stdout,
       stderr: result.stderr,
       code: result.code ?? 1,
+      timedOut: result.timedOut ?? false,
     })),
   );
 }
@@ -453,7 +458,7 @@ export const checkGitHubCopilotProviderStatus = Effect.gen(function* () {
 
   // Probe version
   const versionResult = yield* runCopilotCommand(copilotSettings.binaryPath, ["--version"]).pipe(
-    Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
+    Effect.timeoutOption(HEALTH_CHECK_TIMEOUT_GUARD_MS),
     Effect.result,
   );
 
@@ -477,45 +482,38 @@ export const checkGitHubCopilotProviderStatus = Effect.gen(function* () {
     });
   }
 
+  let version: string | null = null;
+  let versionProbeMessage: string | undefined;
+
   if (versionResult.success._tag === "None") {
-    return buildServerProvider({
-      provider: PROVIDER,
-      enabled: true,
-      checkedAt,
-      models: fallbackModels,
-      runtimeCapabilities: GITHUB_COPILOT_RUNTIME_CAPABILITIES,
-      probe: {
-        installed: true,
-        version: null,
-        status: "error",
-        auth: { status: "unknown" },
-        message: "GitHub Copilot CLI is available but timed out during the health check.",
-      },
-    });
+    versionProbeMessage = "GitHub Copilot CLI version check timed out.";
+  } else {
+    const versionOutput = versionResult.success.value;
+    if (versionOutput.timedOut) {
+      versionProbeMessage = "GitHub Copilot CLI version check timed out.";
+    }
+
+    // On Windows with shell: true + allowNonZeroExit, cmd.exe exits 9009
+    // when the command is not found instead of throwing ENOENT.
+    if (isWindowsCommandNotFound(versionOutput.code, versionOutput.stderr)) {
+      return buildServerProvider({
+        provider: PROVIDER,
+        enabled: true,
+        checkedAt,
+        models: fallbackModels,
+        runtimeCapabilities: GITHUB_COPILOT_RUNTIME_CAPABILITIES,
+        probe: {
+          installed: false,
+          version: null,
+          status: "error",
+          auth: { status: "unknown" },
+          message: "GitHub Copilot CLI (`copilot`) is not installed or not on PATH.",
+        },
+      });
+    }
+
+    version = parseGenericCliVersion(versionOutput.stdout || versionOutput.stderr);
   }
-
-  const versionOutput = versionResult.success.value;
-
-  // On Windows with shell: true + allowNonZeroExit, cmd.exe exits 9009
-  // when the command is not found instead of throwing ENOENT.
-  if (isWindowsCommandNotFound(versionOutput.code, versionOutput.stderr)) {
-    return buildServerProvider({
-      provider: PROVIDER,
-      enabled: true,
-      checkedAt,
-      models: fallbackModels,
-      runtimeCapabilities: GITHUB_COPILOT_RUNTIME_CAPABILITIES,
-      probe: {
-        installed: false,
-        version: null,
-        status: "error",
-        auth: { status: "unknown" },
-        message: "GitHub Copilot CLI (`copilot`) is not installed or not on PATH.",
-      },
-    });
-  }
-
-  const version = parseGenericCliVersion(versionOutput.stdout || versionOutput.stderr);
 
   const runtimeProbeResult = yield* Effect.tryPromise({
     try: () => ghCopilotRuntimeProbe(copilotSettings.binaryPath),
@@ -527,7 +525,7 @@ export const checkGitHubCopilotProviderStatus = Effect.gen(function* () {
             : `Failed to probe GitHub Copilot runtime: ${String(cause)}`,
         cause,
       }),
-  }).pipe(Effect.timeoutOption(DEFAULT_TIMEOUT_MS), Effect.result);
+  }).pipe(Effect.timeoutOption(HEALTH_CHECK_TIMEOUT_MS), Effect.result);
 
   const authResolution = Result.isFailure(runtimeProbeResult)
     ? normalizeAuthStatus({
@@ -568,7 +566,7 @@ export const checkGitHubCopilotProviderStatus = Effect.gen(function* () {
           ...(authResolution.type ? { type: authResolution.type } : {}),
         };
 
-  const messageParts = [authResolution.message].filter(
+  const messageParts = [versionProbeMessage, authResolution.message].filter(
     (value): value is string => value !== undefined && value.length > 0,
   );
 

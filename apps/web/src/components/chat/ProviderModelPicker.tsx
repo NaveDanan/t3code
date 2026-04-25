@@ -44,8 +44,8 @@ const PROVIDER_ICON_BY_PROVIDER: Record<ProviderPickerKind, Icon> = {
   claudeAgent: ClaudeAI,
   opencode: OpenCodeIcon,
   forgecode: ForgeCodeIcon,
+  cursorAgent: CursorIcon,
   githubCopilot: GitHubIcon,
-  cursor: CursorIcon,
 };
 
 export const AVAILABLE_PROVIDER_OPTIONS = PROVIDER_OPTIONS.filter(isAvailableProviderOption);
@@ -64,6 +64,9 @@ function providerIconClassName(
   }
   if (provider === "forgecode") {
     return "text-[#c76d3a]";
+  }
+  if (provider === "cursorAgent") {
+    return "text-[#6b8cff]";
   }
   if (provider === "githubCopilot") {
     return "text-[#8b949e]";

@@ -119,7 +119,7 @@ function arraysEqual<T>(left: readonly T[], right: readonly T[]): boolean {
 
 function normalizeModelSelection<
   T extends {
-    provider: "codex" | "claudeAgent" | "opencode" | "forgecode" | "githubCopilot";
+    provider: "codex" | "claudeAgent" | "opencode" | "forgecode" | "cursorAgent" | "githubCopilot";
     model: string;
   },
 >(selection: T): T {

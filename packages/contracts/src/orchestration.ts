@@ -2,6 +2,7 @@ import { Effect, Option, Schema, SchemaIssue, Struct } from "effect";
 import {
   ClaudeModelOptions,
   CodexModelOptions,
+  CursorAgentModelOptions,
   ForgeCodeModelOptions,
   GitHubCopilotModelOptions,
   OpencodeModelOptions,
@@ -35,6 +36,7 @@ export const ProviderKind = Schema.Literals([
   "claudeAgent",
   "opencode",
   "forgecode",
+  "cursorAgent",
   "githubCopilot",
 ]);
 export type ProviderKind = typeof ProviderKind.Type;
@@ -82,6 +84,13 @@ export const ForgeCodeModelSelection = Schema.Struct({
 });
 export type ForgeCodeModelSelection = typeof ForgeCodeModelSelection.Type;
 
+export const CursorAgentModelSelection = Schema.Struct({
+  provider: Schema.Literal("cursorAgent"),
+  model: TrimmedNonEmptyString,
+  options: Schema.optionalKey(CursorAgentModelOptions),
+});
+export type CursorAgentModelSelection = typeof CursorAgentModelSelection.Type;
+
 export const GitHubCopilotModelSelection = Schema.Struct({
   provider: Schema.Literal("githubCopilot"),
   model: TrimmedNonEmptyString,
@@ -94,6 +103,7 @@ export const ModelSelection = Schema.Union([
   ClaudeModelSelection,
   OpencodeModelSelection,
   ForgeCodeModelSelection,
+  CursorAgentModelSelection,
   GitHubCopilotModelSelection,
 ]);
 export type ModelSelection = typeof ModelSelection.Type;

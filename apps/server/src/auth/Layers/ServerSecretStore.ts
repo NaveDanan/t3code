@@ -3,7 +3,7 @@ import * as Crypto from "node:crypto";
 import { Effect, FileSystem, Layer, Path, Predicate } from "effect";
 import * as PlatformError from "effect/PlatformError";
 
-import { ServerConfig } from "../../config.ts";
+import { ensureDirectory, ServerConfig } from "../../config.ts";
 import {
   SecretStoreError,
   ServerSecretStore,
@@ -15,7 +15,15 @@ export const makeServerSecretStore = Effect.gen(function* () {
   const path = yield* Path.Path;
   const serverConfig = yield* ServerConfig;
 
-  yield* fileSystem.makeDirectory(serverConfig.secretsDir, { recursive: true });
+  yield* ensureDirectory(serverConfig.secretsDir).pipe(
+    Effect.mapError(
+      (cause) =>
+        new SecretStoreError({
+          message: `Failed to create secrets directory ${serverConfig.secretsDir}.`,
+          cause,
+        }),
+    ),
+  );
   yield* fileSystem.chmod(serverConfig.secretsDir, 0o700).pipe(
     Effect.mapError(
       (cause) =>

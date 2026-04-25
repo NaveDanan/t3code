@@ -15,11 +15,22 @@ export const OPENCODE_EFFORT_OPTIONS = [
   "xhigh",
 ] as const;
 export type OpencodeEffort = (typeof OPENCODE_EFFORT_OPTIONS)[number];
+export const CURSOR_AGENT_REASONING_EFFORT_OPTIONS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+export type CursorAgentReasoningEffort = (typeof CURSOR_AGENT_REASONING_EFFORT_OPTIONS)[number];
 export const GITHUB_COPILOT_REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
 export type GitHubCopilotReasoningEffort = (typeof GITHUB_COPILOT_REASONING_EFFORT_OPTIONS)[number];
 export type ProviderReasoningEffort =
   | CodexReasoningEffort
   | ClaudeCodeEffort
+  | CursorAgentReasoningEffort
   | OpencodeEffort
   | GitHubCopilotReasoningEffort;
 
@@ -45,6 +56,14 @@ export type OpencodeModelOptions = typeof OpencodeModelOptions.Type;
 export const ForgeCodeModelOptions = Schema.Struct({});
 export type ForgeCodeModelOptions = typeof ForgeCodeModelOptions.Type;
 
+export const CursorAgentModelOptions = Schema.Struct({
+  reasoningEffort: Schema.optional(Schema.Literals(CURSOR_AGENT_REASONING_EFFORT_OPTIONS)),
+  fastMode: Schema.optional(Schema.Boolean),
+  thinking: Schema.optional(Schema.Boolean),
+  contextWindow: Schema.optional(Schema.String),
+});
+export type CursorAgentModelOptions = typeof CursorAgentModelOptions.Type;
+
 export const GitHubCopilotModelOptions = Schema.Struct({
   reasoningEffort: Schema.optional(Schema.Literals(GITHUB_COPILOT_REASONING_EFFORT_OPTIONS)),
 });
@@ -55,6 +74,7 @@ export const ProviderModelOptions = Schema.Struct({
   claudeAgent: Schema.optional(ClaudeModelOptions),
   opencode: Schema.optional(OpencodeModelOptions),
   forgecode: Schema.optional(ForgeCodeModelOptions),
+  cursorAgent: Schema.optional(CursorAgentModelOptions),
   githubCopilot: Schema.optional(GitHubCopilotModelOptions),
 });
 export type ProviderModelOptions = typeof ProviderModelOptions.Type;
@@ -87,6 +107,7 @@ export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderKind, string> = {
   claudeAgent: "claude-sonnet-4-6",
   opencode: "openai/gpt-5",
   forgecode: "gpt-5.4",
+  cursorAgent: "auto",
   githubCopilot: "gpt-5.4",
 };
 
@@ -98,6 +119,7 @@ export const DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER: Record<ProviderKind,
   claudeAgent: "claude-haiku-4-5",
   opencode: "openai/gpt-5",
   forgecode: "gpt-5.4",
+  cursorAgent: "auto",
   githubCopilot: "gpt-5.4",
 };
 
@@ -129,6 +151,7 @@ export const MODEL_SLUG_ALIASES_BY_PROVIDER: Record<ProviderKind, Record<string,
     "gpt-5-mini": "openai/gpt-5-mini",
   },
   forgecode: {},
+  cursorAgent: {},
   githubCopilot: {},
 };
 
@@ -139,5 +162,6 @@ export const PROVIDER_DISPLAY_NAMES: Record<ProviderKind, string> = {
   claudeAgent: "Claude",
   opencode: "OpenCode",
   forgecode: "ForgeCode",
+  cursorAgent: "Cursor",
   githubCopilot: "GitHub Copilot",
 };

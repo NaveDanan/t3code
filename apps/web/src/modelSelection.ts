@@ -62,6 +62,13 @@ const PROVIDER_CUSTOM_MODEL_CONFIG: Record<ProviderKind, ProviderCustomModelConf
     placeholder: "provider-id/model-id",
     example: "github_copilot/gpt-5.4",
   },
+  cursorAgent: {
+    provider: "cursorAgent",
+    title: "Cursor",
+    description: "Save additional Cursor model slugs for the picker and `/model` command.",
+    placeholder: "your-cursor-model-slug",
+    example: "auto",
+  },
   githubCopilot: {
     provider: "githubCopilot",
     title: "GitHub Copilot",
@@ -201,6 +208,12 @@ export function getCustomModelOptionsByProvider(
       providers,
       "forgecode",
       selectedProvider === "forgecode" ? selectedModel : undefined,
+    ),
+    cursorAgent: getAppModelOptions(
+      settings,
+      providers,
+      "cursorAgent",
+      selectedProvider === "cursorAgent" ? selectedModel : undefined,
     ),
     githubCopilot: getAppModelOptions(
       settings,

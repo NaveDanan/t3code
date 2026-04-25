@@ -4,6 +4,7 @@ import {
   type ClaudeCodeEffort,
   type ClaudeModelOptions,
   type CodexModelOptions,
+  type CursorAgentModelOptions,
   type ForgeCodeModelOptions,
   type GitHubCopilotModelOptions,
   type ModelCapabilities,
@@ -15,6 +16,50 @@ import {
 export interface SelectableModelOption {
   slug: string;
   name: string;
+}
+
+const CURSOR_AGENT_EFFORT_SUFFIXES = [
+  ["-extra-high", "xhigh"],
+  ["-xhigh", "xhigh"],
+  ["-high", "high"],
+  ["-medium", "medium"],
+  ["-low", "low"],
+  ["-minimal", "minimal"],
+  ["-none", "none"],
+  ["-max", "max"],
+] as const;
+
+function normalizeCursorAgentVariantSlug(model: string): string {
+  let base = model.trim();
+  if (!base || base === "auto") {
+    return base;
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+
+    if (base.endsWith("-fast")) {
+      base = base.slice(0, -"-fast".length);
+      changed = true;
+    }
+
+    if (base.endsWith("-thinking")) {
+      base = base.slice(0, -"-thinking".length);
+      changed = true;
+    }
+
+    for (const [suffix] of CURSOR_AGENT_EFFORT_SUFFIXES) {
+      if (!base.endsWith(suffix)) {
+        continue;
+      }
+      base = base.slice(0, -suffix.length);
+      changed = true;
+      break;
+    }
+  }
+
+  return base;
 }
 
 // ── Effort helpers ────────────────────────────────────────────────────
@@ -138,6 +183,25 @@ export function normalizeForgeCodeModelOptionsWithCapabilities(
   return undefined;
 }
 
+export function normalizeCursorAgentModelOptionsWithCapabilities(
+  caps: ModelCapabilities,
+  modelOptions: CursorAgentModelOptions | null | undefined,
+): CursorAgentModelOptions | undefined {
+  const reasoningEffort = resolveEffort(caps, modelOptions?.reasoningEffort);
+  const fastMode = caps.supportsFastMode ? modelOptions?.fastMode : undefined;
+  const thinking = caps.supportsThinkingToggle ? modelOptions?.thinking : undefined;
+  const contextWindow = resolveContextWindow(caps, modelOptions?.contextWindow);
+  const nextOptions: CursorAgentModelOptions = {
+    ...(reasoningEffort
+      ? { reasoningEffort: reasoningEffort as CursorAgentModelOptions["reasoningEffort"] }
+      : {}),
+    ...(fastMode !== undefined ? { fastMode } : {}),
+    ...(thinking !== undefined ? { thinking } : {}),
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+  };
+  return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
+}
+
 export function normalizeGitHubCopilotModelOptionsWithCapabilities(
   caps: ModelCapabilities,
   modelOptions: GitHubCopilotModelOptions | null | undefined,
@@ -171,7 +235,9 @@ export function normalizeModelSlug(
   const aliased = Object.prototype.hasOwnProperty.call(aliases, trimmed)
     ? aliases[trimmed]
     : undefined;
-  return typeof aliased === "string" ? aliased : trimmed;
+
+  const normalized = typeof aliased === "string" ? aliased : trimmed;
+  return provider === "cursorAgent" ? normalizeCursorAgentVariantSlug(normalized) : normalized;
 }
 
 export function resolveSelectableModel(

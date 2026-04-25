@@ -5,7 +5,7 @@ import { isTransportConnectionErrorMessage, sanitizeThreadErrorMessage } from ".
 describe("transportError", () => {
   it("detects websocket transport failures", () => {
     expect(isTransportConnectionErrorMessage("SocketCloseError: 1006")).toBe(true);
-    expect(isTransportConnectionErrorMessage("Unable to connect to the T3 server WebSocket.")).toBe(
+    expect(isTransportConnectionErrorMessage("Unable to connect to the NJ server WebSocket.")).toBe(
       true,
     );
     expect(isTransportConnectionErrorMessage("SocketOpenError: Timeout")).toBe(true);

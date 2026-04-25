@@ -29,7 +29,7 @@ This document is written in terms of Effect-native services and layers because a
 
 ### 1. Auth is a server concern
 
-Every privileged surface of the T3 server must go through the same auth policy engine:
+Every privileged surface of the NJ server must go through the same auth policy engine:
 
 - HTTP routes
 - WebSocket upgrades
@@ -619,7 +619,7 @@ Participants:
   DesktopUser   = user at the host machine
   DesktopMain   = desktop app
   Tunnel        = tunnel provider
-  T3Server      = T3 server
+  T3Server      = NJ server
   PhoneBrowser  = mobile browser
 
 DesktopUser -> DesktopMain : enable remote access via tunnel
@@ -653,7 +653,7 @@ The auth flow should stay the same.
 ```text
 Participants:
   DesktopUser   = user at the host machine
-  T3Server      = T3 server
+  T3Server      = NJ server
   PrivateNet    = tailscale / private LAN
   PhoneBrowser  = mobile browser
 
@@ -687,7 +687,7 @@ Participants:
   DesktopMain   = desktop app
   SSH           = ssh transport/session
   RemoteHost    = remote machine
-  RemoteT3      = remote T3 server
+  RemoteT3      = remote NJ server
   Frontend      = desktop renderer
 
 DesktopUser -> DesktopMain : add SSH host
@@ -779,7 +779,7 @@ Remote access is one reason this auth model matters, but the auth model should n
 
 Keep the design focused on:
 
-- one T3 server
+- one NJ server
 - one auth policy
 - multiple credential types
 - multiple future access methods

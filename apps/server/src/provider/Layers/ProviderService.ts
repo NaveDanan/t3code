@@ -45,6 +45,7 @@ import { type EventNdjsonLogger, makeEventNdjsonLogger } from "./EventNdjsonLogg
 import { AnalyticsService } from "../../telemetry/Services/AnalyticsService.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { buildForgeAdapterKey, parseForgeAdapterKey } from "../forgecode.ts";
+import { buildCursorAdapterKey, parseCursorAdapterKey } from "../cursorAgent.ts";
 
 export interface ProviderServiceLiveOptions {
   readonly canonicalEventLogPath?: string;
@@ -174,34 +175,53 @@ function forgeAdapterKeyFromResumeCursor(
   });
 }
 
-function adapterKeyFromSession(session: ProviderSession): string | undefined {
-  if (session.provider !== "forgecode") {
+function cursorAdapterKeyFromResumeCursor(
+  resumeCursor: ProviderSession["resumeCursor"],
+): string | undefined {
+  if (!resumeCursor || typeof resumeCursor !== "object" || Array.isArray(resumeCursor)) {
     return undefined;
   }
-  return forgeAdapterKeyFromResumeCursor(session.resumeCursor);
+  const record = resumeCursor as Record<string, unknown>;
+  const executionBackend =
+    record.executionBackend === "native" || record.executionBackend === "wsl"
+      ? record.executionBackend
+      : undefined;
+  if (!executionBackend) {
+    return undefined;
+  }
+  return buildCursorAdapterKey({
+    executionBackend,
+    ...(typeof record.wslDistro === "string" ? { wslDistro: record.wslDistro } : {}),
+  });
 }
 
-function augmentForgeResumeCursor(
+function adapterKeyFromSession(session: ProviderSession): string | undefined {
+  if (session.provider === "forgecode") {
+    return forgeAdapterKeyFromResumeCursor(session.resumeCursor);
+  }
+  if (session.provider === "cursorAgent") {
+    return cursorAdapterKeyFromResumeCursor(session.resumeCursor);
+  }
+  return undefined;
+}
+
+function augmentCursorResumeCursor(
   provider: ProviderSession["provider"],
   resumeCursor: unknown,
   adapterKey: string | undefined,
 ): unknown {
-  if (provider !== "forgecode") {
+  if (provider !== "cursorAgent") {
     return resumeCursor;
   }
   if (!resumeCursor || typeof resumeCursor !== "object" || Array.isArray(resumeCursor)) {
-    const executionTarget = parseForgeAdapterKey(adapterKey);
+    const executionTarget = parseCursorAdapterKey(adapterKey);
     return executionTarget ?? resumeCursor;
   }
   const record = resumeCursor as Record<string, unknown>;
-  if (
-    record.executionBackend === "native" ||
-    record.executionBackend === "wsl" ||
-    record.executionBackend === "gitbash"
-  ) {
+  if (record.executionBackend === "native" || record.executionBackend === "wsl") {
     return resumeCursor;
   }
-  const executionTarget = parseForgeAdapterKey(adapterKey);
+  const executionTarget = parseCursorAdapterKey(adapterKey);
   if (!executionTarget) {
     return resumeCursor;
   }
@@ -210,6 +230,40 @@ function augmentForgeResumeCursor(
     executionBackend: executionTarget.executionBackend,
     ...(executionTarget.wslDistro ? { wslDistro: executionTarget.wslDistro } : {}),
   };
+}
+
+function augmentResumeCursor(
+  provider: ProviderSession["provider"],
+  resumeCursor: unknown,
+  adapterKey: string | undefined,
+): unknown {
+  if (provider === "forgecode") {
+    if (!resumeCursor || typeof resumeCursor !== "object" || Array.isArray(resumeCursor)) {
+      const executionTarget = parseForgeAdapterKey(adapterKey);
+      return executionTarget ?? resumeCursor;
+    }
+    const record = resumeCursor as Record<string, unknown>;
+    if (
+      record.executionBackend === "native" ||
+      record.executionBackend === "wsl" ||
+      record.executionBackend === "gitbash"
+    ) {
+      return resumeCursor;
+    }
+    const executionTarget = parseForgeAdapterKey(adapterKey);
+    if (!executionTarget) {
+      return resumeCursor;
+    }
+    return {
+      ...record,
+      executionBackend: executionTarget.executionBackend,
+      ...(executionTarget.wslDistro ? { wslDistro: executionTarget.wslDistro } : {}),
+    };
+  }
+  if (provider === "cursorAgent") {
+    return augmentCursorResumeCursor(provider, resumeCursor, adapterKey);
+  }
+  return resumeCursor;
 }
 
 const makeProviderService = Effect.fn("makeProviderService")(function* (
@@ -313,7 +367,7 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         input.binding.provider,
         input.binding.runtimePayload,
       );
-      const resumeCursor = augmentForgeResumeCursor(
+      const resumeCursor = augmentResumeCursor(
         input.binding.provider,
         input.binding.resumeCursor,
         input.binding.adapterKey,
@@ -418,7 +472,7 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
         const effectiveResumeCursor =
           input.resumeCursor ??
           (persistedBinding?.provider === input.provider
-            ? augmentForgeResumeCursor(
+            ? augmentResumeCursor(
                 persistedBinding.provider,
                 persistedBinding.resumeCursor,
                 persistedBinding.adapterKey,
@@ -503,7 +557,9 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
       const adapterKey =
         routed.adapter.provider === "forgecode"
           ? forgeAdapterKeyFromResumeCursor(turn.resumeCursor)
-          : undefined;
+          : routed.adapter.provider === "cursorAgent"
+            ? cursorAdapterKeyFromResumeCursor(turn.resumeCursor)
+            : undefined;
       yield* directory.upsert({
         threadId: input.threadId,
         provider: routed.adapter.provider,

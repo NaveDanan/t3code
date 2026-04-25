@@ -537,6 +537,7 @@ const KNOWN_PROVIDER_KINDS = [
   "claudeAgent",
   "opencode",
   "forgecode",
+  "cursorAgent",
   "githubCopilot",
 ] as const;
 
@@ -666,6 +667,7 @@ function normalizeProviderModelOptions(
     ...(codex ? { codex } : {}),
     ...(claude ? { claudeAgent: claude } : {}),
     ...(opencode ? { opencode } : {}),
+    cursorAgent: undefined,
     ...(githubCopilot ? { githubCopilot } : {}),
   };
 }
@@ -704,7 +706,11 @@ function normalizeModelSelection(
         ? modelOptions?.claudeAgent
         : provider === "opencode"
           ? modelOptions?.opencode
-          : modelOptions?.forgecode;
+          : provider === "forgecode"
+            ? modelOptions?.forgecode
+            : provider === "cursorAgent"
+              ? modelOptions?.cursorAgent
+              : modelOptions?.githubCopilot;
   return buildModelSelection(provider, model, options);
 }
 

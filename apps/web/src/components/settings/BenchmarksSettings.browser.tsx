@@ -21,6 +21,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { render } from "vitest-browser-react";
 
 import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts/settings";
+import { useBenchmarkHistoryStore } from "../../benchmarks/benchmarkHistoryStore";
 import { writePrimaryEnvironmentDescriptor } from "../../environments/primary";
 import { __resetLocalApiForTests } from "../../localApi";
 import { AppAtomRegistryProvider } from "../../rpc/atomRegistry";
@@ -424,6 +425,7 @@ describe("BenchmarksSettings", () => {
     wsRequests.length = 0;
     document.body.innerHTML = "";
     localStorage.clear();
+    useBenchmarkHistoryStore.getState().reset();
   });
 
   afterEach(() => {
@@ -565,6 +567,38 @@ describe("BenchmarksSettings", () => {
             request.type === "thread.turn.start",
         );
         expect(turnStarts).toHaveLength(2);
+      });
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("adds launched runs to expandable benchmark history", async () => {
+    const mounted = await mountBenchmarksRoute();
+
+    try {
+      await selectBaseBranch("main");
+      await page.getByLabelText("Prompt").fill("Benchmark prompt");
+      await page.getByRole("button", { name: "Run" }).click();
+
+      await vi.waitFor(() => {
+        expect(useBenchmarkHistoryStore.getState().runs).toHaveLength(1);
+      });
+
+      const savedRun = useBenchmarkHistoryStore.getState().runs[0]!;
+      await expect.element(page.getByRole("button", { name: /Benchmark · Project/ })).toBeVisible();
+
+      await page.getByRole("button", { name: "Collapse benchmark history" }).click();
+      await expect
+        .element(page.getByRole("button", { name: /Benchmark · Project/ }))
+        .not.toBeInTheDocument();
+
+      await page.getByRole("button", { name: "Expand benchmark history" }).click();
+      await page.getByRole("button", { name: /Benchmark · Project/ }).click();
+
+      await vi.waitFor(() => {
+        expect(mounted.router.state.location.search).toEqual({ runId: savedRun.id });
+        expect(document.body.textContent ?? "").toContain("Benchmark · Project");
       });
     } finally {
       await mounted.cleanup();

@@ -5,7 +5,6 @@ import {
   CloudIcon,
   FolderIcon,
   GitPullRequestIcon,
-  GripVerticalIcon,
   PlusIcon,
   SettingsIcon,
   SquarePenIcon,
@@ -460,6 +459,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     terminalState.runningTerminalIds,
     terminalLabelById,
   );
+  const suppressClickAfterDragRef = useRef(false);
   const isConfirmingArchive = confirmingArchiveThreadKey === threadKey && !isThreadRunning;
   const threadMetaClassName = isConfirmingArchive
     ? "pointer-events-none opacity-0"
@@ -486,6 +486,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   );
   const handleRowClick = useCallback(
     (event: React.MouseEvent) => {
+      if (suppressClickAfterDragRef.current) {
+        event.preventDefault();
+        suppressClickAfterDragRef.current = false;
+        return;
+      }
       handleThreadClick(event, threadRef, orderedProjectThreadKeys);
     },
     [handleThreadClick, orderedProjectThreadKeys, threadRef],
@@ -617,14 +622,30 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     [attemptArchiveThread, threadRef],
   );
   const handleDragStart = useCallback(
-    (event: React.DragEvent<HTMLButtonElement>) => {
+    (event: React.DragEvent<HTMLElement>) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest(
+          "button,input,textarea,select,a,[contenteditable='true'],[data-thread-selection-safe]",
+        )
+      ) {
+        event.preventDefault();
+        return;
+      }
+
+      suppressClickAfterDragRef.current = true;
       event.dataTransfer.setData(THREAD_DRAG_MIME, threadKey);
-      event.dataTransfer.effectAllowed = "copy";
-      // Prevent the row click from firing during drag
+      event.dataTransfer.effectAllowed = "copyMove";
       event.stopPropagation();
     },
     [threadKey],
   );
+  const handleDragEnd = useCallback(() => {
+    requestAnimationFrame(() => {
+      suppressClickAfterDragRef.current = false;
+    });
+  }, []);
   const rowButtonRender = useMemo(() => <div role="button" tabIndex={0} />, []);
 
   return (
@@ -646,20 +667,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         onClick={handleRowClick}
         onKeyDown={handleRowKeyDown}
         onContextMenu={handleRowContextMenu}
+        draggable={renamingThreadKey !== threadKey}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
       >
         <div className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-          {/* Drag handle for split-pane drag-to-split */}
-          <button
-            type="button"
-            draggable
-            aria-label={`Drag ${thread.title} to split view`}
-            className="inline-flex shrink-0 cursor-grab items-center justify-center opacity-0 transition-opacity group-hover/menu-sub-item:opacity-50 group-hover/menu-sub-item:hover:opacity-100 active:cursor-grabbing"
-            onDragStart={handleDragStart}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVerticalIcon className="size-3" />
-          </button>
           {prStatus && (
             <Tooltip>
               <TooltipTrigger

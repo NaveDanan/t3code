@@ -1,8 +1,12 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
-import { ConfigProvider, Effect, Option } from "effect";
+import { ConfigProvider, Effect, FileSystem, Option, Path } from "effect";
 
-import { resolveBuildOptions } from "./build-desktop-artifact.ts";
+import {
+  ensureDirectory,
+  listIcoImageSizes,
+  resolveBuildOptions,
+} from "./build-desktop-artifact.ts";
 
 it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it.effect("preserves explicit false boolean flags over true env defaults", () =>
@@ -42,4 +46,37 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.equal(resolved.mockUpdates, false);
     }),
   );
+
+  it.effect("allows an existing artifact output directory", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const tempRoot = yield* fs.makeTempDirectoryScoped({
+          prefix: "t3-desktop-artifact-test-",
+        });
+        const outputDir = path.join(tempRoot, "release");
+
+        yield* fs.makeDirectory(outputDir);
+        yield* ensureDirectory(outputDir);
+
+        const stat = yield* fs.stat(outputDir);
+        assert.equal(stat.type, "Directory");
+      }),
+    ),
+  );
+
+  it("parses ICO directory sizes including 256x256 entries", () => {
+    const iconDirectory = Uint8Array.from([
+      0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x10, 0x10, 0x00, 0x00, 0x01, 0x00, 0x20, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+      0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ]);
+
+    assert.deepStrictEqual(listIcoImageSizes(iconDirectory), [16, 256]);
+  });
+
+  it("returns an empty size list for invalid ICO headers", () => {
+    assert.deepStrictEqual(listIcoImageSizes(Uint8Array.from([0x01, 0x02, 0x03])), []);
+  });
 });

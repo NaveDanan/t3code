@@ -106,6 +106,13 @@ function createBaseServerConfig(): ServerConfig {
           customModels: [],
           hiddenModels: [],
         },
+        cursorAgent: {
+          enabled: true,
+          binaryPath: "",
+          executionBackend: DEFAULT_SERVER_SETTINGS.providers.cursorAgent.executionBackend,
+          customModels: [],
+          hiddenModels: [],
+        },
         githubCopilot: { enabled: true, binaryPath: "", customModels: [], hiddenModels: [] },
       },
     },

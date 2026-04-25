@@ -19,7 +19,7 @@ import { scopeThreadRef } from "@t3tools/client-runtime";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 import { normalizeModelSlug } from "@t3tools/shared/model";
 import { Equal } from "effect";
-import { APP_VERSION } from "../../branding";
+import { APP_VERSION, T3_CODE_BASE_VERSION } from "../../branding";
 import { APP_FONT_SIZE_OPTIONS } from "../../appFontSize";
 import {
   canCheckForUpdate,
@@ -143,6 +143,12 @@ const PROVIDER_SETTINGS: readonly InstallProviderSettings[] = [
     binaryDescription: "Path or command used to launch the ForgeCode binary",
   },
   {
+    provider: "cursorAgent",
+    title: "Cursor",
+    binaryPlaceholder: "cursor-agent",
+    binaryDescription: "Path or command used to launch the Cursor headless CLI",
+  },
+  {
     provider: "githubCopilot",
     title: "GitHub Copilot",
     binaryPlaceholder: "copilot",
@@ -222,6 +228,11 @@ function getProviderVersionLabel(version: string | null | undefined) {
   return version.startsWith("v") ? version : `v${version}`;
 }
 
+function formatVersionLabel(version: string) {
+  if (version === "unknown") return version;
+  return version.startsWith("v") ? version : `v${version}`;
+}
+
 function ProviderLastChecked({ lastCheckedAt }: { lastCheckedAt: string | null }) {
   useRelativeTimeTick();
   const lastCheckedRelative = lastCheckedAt ? formatRelativeTime(lastCheckedAt) : null;
@@ -248,7 +259,9 @@ function AboutVersionTitle() {
   return (
     <span className="inline-flex items-center gap-2">
       <span>Version</span>
-      <code className="text-[11px] font-medium text-muted-foreground">{APP_VERSION}</code>
+      <code className="text-[11px] font-medium text-muted-foreground">
+        {formatVersionLabel(APP_VERSION)}
+      </code>
     </span>
   );
 }
@@ -343,8 +356,8 @@ function AboutVersionSection() {
     actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? "Check for Updates";
   const description =
     action === "download" || action === "install"
-      ? "Update available."
-      : "Current version of the application.";
+      ? `Update available. Based on T3 Code ${formatVersionLabel(T3_CODE_BASE_VERSION)}.`
+      : `Based on T3 Code ${formatVersionLabel(T3_CODE_BASE_VERSION)}.`;
 
   return (
     <SettingsRow
@@ -462,6 +475,7 @@ export function GeneralSettingsPanel() {
     claudeAgent: false,
     opencode: false,
     forgecode: false,
+    cursorAgent: false,
     githubCopilot: false,
   });
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
@@ -471,6 +485,7 @@ export function GeneralSettingsPanel() {
     claudeAgent: "",
     opencode: "",
     forgecode: "",
+    cursorAgent: "",
     githubCopilot: "",
   });
   const [customModelErrorByProvider, setCustomModelErrorByProvider] = useState<
@@ -1431,23 +1446,34 @@ export function GeneralSettingsPanel() {
                       </div>
                     ) : null}
 
-                    {providerCard.provider === "forgecode" &&
+                    {(providerCard.provider === "forgecode" ||
+                      providerCard.provider === "cursorAgent") &&
                     providerCard.executionBackends.length > 0 ? (
                       <div className="border-t border-border/60 px-4 py-3 sm:px-5">
                         <label
-                          htmlFor="provider-install-forgecode-execution-backend"
+                          htmlFor={`provider-install-${providerCard.provider}-execution-backend`}
                           className="block"
                         >
-                          <span className="text-xs font-medium text-foreground">Forge backend</span>
+                          <span className="text-xs font-medium text-foreground">
+                            {providerCard.title} backend
+                          </span>
                           <Select
-                            value={settings.providers.forgecode.executionBackend}
+                            value={
+                              providerCard.provider === "forgecode"
+                                ? settings.providers.forgecode.executionBackend
+                                : settings.providers.cursorAgent.executionBackend
+                            }
                             onValueChange={(value) => {
-                              if (value === "native" || value === "wsl" || value === "gitbash") {
+                              if (
+                                value === "native" ||
+                                value === "wsl" ||
+                                (providerCard.provider === "forgecode" && value === "gitbash")
+                              ) {
                                 updateSettings({
                                   providers: {
                                     ...settings.providers,
-                                    forgecode: {
-                                      ...settings.providers.forgecode,
+                                    [providerCard.provider]: {
+                                      ...settings.providers[providerCard.provider],
                                       executionBackend: value,
                                     },
                                   },
@@ -1456,15 +1482,21 @@ export function GeneralSettingsPanel() {
                             }}
                           >
                             <SelectTrigger
-                              id="provider-install-forgecode-execution-backend"
+                              id={`provider-install-${providerCard.provider}-execution-backend`}
                               className="mt-1.5 w-full"
-                              aria-label="Forge execution backend"
+                              aria-label={`${providerCard.title} execution backend`}
                             >
                               <SelectValue>
                                 {providerCard.executionBackends.find(
                                   (backend) =>
-                                    backend.id === settings.providers.forgecode.executionBackend,
-                                )?.label ?? settings.providers.forgecode.executionBackend}
+                                    backend.id ===
+                                    (providerCard.provider === "forgecode"
+                                      ? settings.providers.forgecode.executionBackend
+                                      : settings.providers.cursorAgent.executionBackend),
+                                )?.label ??
+                                  (providerCard.provider === "forgecode"
+                                    ? settings.providers.forgecode.executionBackend
+                                    : settings.providers.cursorAgent.executionBackend)}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectPopup align="start" alignItemWithTrigger={false}>
@@ -1483,7 +1515,7 @@ export function GeneralSettingsPanel() {
                             </SelectPopup>
                           </Select>
                           <span className="mt-1 block text-xs text-muted-foreground">
-                            Backend changes apply only to new Forge sessions.
+                            Backend changes apply only to new {providerCard.title} sessions.
                           </span>
                           {providerCard.executionBackends.some((backend) => !backend.available) ? (
                             <div className="mt-2 space-y-1">
@@ -1517,7 +1549,9 @@ export function GeneralSettingsPanel() {
                             ? "claude-sonnet-5-0"
                             : providerCard.provider === "opencode"
                               ? "openai/gpt-5"
-                              : "github_copilot/gpt-5.4"
+                              : providerCard.provider === "cursorAgent"
+                                ? "auto"
+                                : "github_copilot/gpt-5.4"
                       }
                       modelListRef={modelListRefs}
                       onToggleVisibility={toggleModelVisibility}
@@ -1579,7 +1613,7 @@ export function GeneralSettingsPanel() {
         ) : (
           <SettingsRow
             title={<AboutVersionTitle />}
-            description="Current version of the application."
+            description={`Based on T3 Code ${formatVersionLabel(T3_CODE_BASE_VERSION)}.`}
           />
         )}
         <SettingsRow

@@ -20,7 +20,7 @@ It is not a speculative plan. It is the current reference for how the integratio
 The integration is CLI-adapter based, not server based:
 
 ```text
-T3 server
+NJ server
   -> ForgeAdapter
   -> launches `forge` inside WSL per turn
   -> sets provider/model with per-process env overrides

@@ -19,7 +19,7 @@ It replaces the old phase-by-phase plan. The goal here is not to track unfinishe
 The important architecture is:
 
 ```text
-T3 server
+NJ server
   -> OpencodeServerManager
   -> launches `opencode serve`
   -> builds SDK client against loopback HTTP
@@ -479,7 +479,7 @@ Important behavior:
 - The adapter's live session maps are in-memory only.
 - Durable restart behavior comes from persisted provider runtime state owned by the normal T3 provider session infrastructure.
 - The persisted runtime state includes provider, cwd, runtime mode, model selection, and the adapter-owned resume cursor.
-- After a T3 server restart, `ProviderService` can start a fresh OpenCode adapter instance, feed it the persisted resume cursor, and continue routing `sendTurn` through the recovered session.
+- After a NJ server restart, `ProviderService` can start a fresh OpenCode adapter instance, feed it the persisted resume cursor, and continue routing `sendTurn` through the recovered session.
 
 This is the reason the resume cursor is adapter-owned rather than a raw UI concern.
 

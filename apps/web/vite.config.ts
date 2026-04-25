@@ -3,7 +3,6 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig } from "vite";
-import pkg from "./package.json" with { type: "json" };
 
 const port = Number(process.env.PORT ?? 5733);
 const host = process.env.HOST?.trim() || "localhost";
@@ -62,7 +61,6 @@ export default defineConfig({
     "import.meta.env.VITE_HTTP_URL": JSON.stringify(configuredHttpUrl ?? ""),
     // In dev mode, tell the web app where the WebSocket server lives
     "import.meta.env.VITE_WS_URL": JSON.stringify(configuredWsUrl ?? ""),
-    "import.meta.env.APP_VERSION": JSON.stringify(pkg.version),
   },
   resolve: {
     tsconfigPaths: true,

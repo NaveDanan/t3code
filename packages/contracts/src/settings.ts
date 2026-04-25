@@ -5,6 +5,7 @@ import { TrimmedNonEmptyString, TrimmedString } from "./baseSchemas";
 import {
   ClaudeModelOptions,
   CodexModelOptions,
+  CursorAgentModelOptions,
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
   ForgeCodeModelOptions,
   GitHubCopilotModelOptions,
@@ -121,11 +122,21 @@ export const OpencodeSettings = Schema.Struct({
 });
 export type OpencodeSettings = typeof OpencodeSettings.Type;
 
-export const ForgeExecutionBackend = Schema.Literals(["native", "wsl", "gitbash"]);
+export const NativeExecutionBackend = Schema.Literals(["native", "wsl"]);
+export type NativeExecutionBackend = typeof NativeExecutionBackend.Type;
+
+export function defaultNativeExecutionBackend(): NativeExecutionBackend {
+  return typeof process !== "undefined" && process.platform === "win32" ? "wsl" : "native";
+}
+
+export const ProviderExecutionBackend = Schema.Literals(["native", "wsl", "gitbash"]);
+export type ProviderExecutionBackend = typeof ProviderExecutionBackend.Type;
+
+export const ForgeExecutionBackend = ProviderExecutionBackend;
 export type ForgeExecutionBackend = typeof ForgeExecutionBackend.Type;
 
 export function defaultForgeExecutionBackend(): ForgeExecutionBackend {
-  return typeof process !== "undefined" && process.platform === "win32" ? "wsl" : "native";
+  return defaultNativeExecutionBackend();
 }
 
 export const ForgeCodeSettings = Schema.Struct({
@@ -138,6 +149,20 @@ export const ForgeCodeSettings = Schema.Struct({
   hiddenModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
 });
 export type ForgeCodeSettings = typeof ForgeCodeSettings.Type;
+
+export const CursorAgentExecutionBackend = NativeExecutionBackend;
+export type CursorAgentExecutionBackend = typeof CursorAgentExecutionBackend.Type;
+
+export const CursorAgentSettings = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  binaryPath: makeBinaryPathSetting("cursor-agent"),
+  executionBackend: CursorAgentExecutionBackend.pipe(
+    Schema.withDecodingDefault(Effect.succeed(defaultNativeExecutionBackend())),
+  ),
+  customModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  hiddenModels: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+});
+export type CursorAgentSettings = typeof CursorAgentSettings.Type;
 
 export const GitHubCopilotSettings = Schema.Struct({
   enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
@@ -173,6 +198,7 @@ export const ServerSettings = Schema.Struct({
     claudeAgent: ClaudeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     opencode: OpencodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     forgecode: ForgeCodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+    cursorAgent: CursorAgentSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     githubCopilot: GitHubCopilotSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   }).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
@@ -224,6 +250,10 @@ const ForgeCodeModelOptionsPatch = Schema.Struct({
   ...ForgeCodeModelOptions.fields,
 });
 
+const CursorAgentModelOptionsPatch = Schema.Struct({
+  ...CursorAgentModelOptions.fields,
+});
+
 const GitHubCopilotModelOptionsPatch = Schema.Struct({
   ...GitHubCopilotModelOptions.fields,
 });
@@ -248,6 +278,11 @@ const ModelSelectionPatch = Schema.Union([
     provider: Schema.optionalKey(Schema.Literal("forgecode")),
     model: Schema.optionalKey(TrimmedNonEmptyString),
     options: Schema.optionalKey(ForgeCodeModelOptionsPatch),
+  }),
+  Schema.Struct({
+    provider: Schema.optionalKey(Schema.Literal("cursorAgent")),
+    model: Schema.optionalKey(TrimmedNonEmptyString),
+    options: Schema.optionalKey(CursorAgentModelOptionsPatch),
   }),
   Schema.Struct({
     provider: Schema.optionalKey(Schema.Literal("githubCopilot")),
@@ -286,6 +321,14 @@ const ForgeCodeSettingsPatch = Schema.Struct({
   hiddenModels: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
+const CursorAgentSettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(Schema.String),
+  executionBackend: Schema.optionalKey(CursorAgentExecutionBackend),
+  customModels: Schema.optionalKey(Schema.Array(Schema.String)),
+  hiddenModels: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+
 const GitHubCopilotSettingsPatch = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
   binaryPath: Schema.optionalKey(Schema.String),
@@ -309,6 +352,7 @@ export const ServerSettingsPatch = Schema.Struct({
       claudeAgent: Schema.optionalKey(ClaudeSettingsPatch),
       opencode: Schema.optionalKey(OpencodeSettingsPatch),
       forgecode: Schema.optionalKey(ForgeCodeSettingsPatch),
+      cursorAgent: Schema.optionalKey(CursorAgentSettingsPatch),
       githubCopilot: Schema.optionalKey(GitHubCopilotSettingsPatch),
     }),
   ),

@@ -1732,19 +1732,19 @@ describe("deriveActiveWorkStartedAt", () => {
 });
 
 describe("PROVIDER_OPTIONS", () => {
-  it("advertises active providers while keeping Cursor as a placeholder", () => {
+  it("advertises active providers including Cursor", () => {
     const claude = PROVIDER_OPTIONS.find((option) => option.value === "claudeAgent");
     const forge = PROVIDER_OPTIONS.find((option) => option.value === "forgecode");
     const opencode = PROVIDER_OPTIONS.find((option) => option.value === "opencode");
+    const cursor = PROVIDER_OPTIONS.find((option) => option.value === "cursorAgent");
     const githubCopilot = PROVIDER_OPTIONS.find((option) => option.value === "githubCopilot");
-    const cursor = PROVIDER_OPTIONS.find((option) => option.value === "cursor");
     expect(PROVIDER_OPTIONS).toEqual([
       { value: "codex", label: "Codex", available: true },
       { value: "claudeAgent", label: "Claude", available: true },
       { value: "opencode", label: "OpenCode", available: true },
       { value: "forgecode", label: "ForgeCode", available: true },
+      { value: "cursorAgent", label: "Cursor", available: true },
       { value: "githubCopilot", label: "GitHub Copilot", available: true },
-      { value: "cursor", label: "Cursor", available: false },
     ]);
     expect(claude).toEqual({
       value: "claudeAgent",
@@ -1761,15 +1761,15 @@ describe("PROVIDER_OPTIONS", () => {
       label: "OpenCode",
       available: true,
     });
+    expect(cursor).toEqual({
+      value: "cursorAgent",
+      label: "Cursor",
+      available: true,
+    });
     expect(githubCopilot).toEqual({
       value: "githubCopilot",
       label: "GitHub Copilot",
       available: true,
-    });
-    expect(cursor).toEqual({
-      value: "cursor",
-      label: "Cursor",
-      available: false,
     });
   });
 });

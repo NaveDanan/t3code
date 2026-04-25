@@ -26,6 +26,7 @@ const RuntimeEventRawSource = Schema.Literals([
   "codex.sdk.thread-event",
   "opencode.sdk.event",
   "forge.cli.dump",
+  "cursor.cli.stream-json",
   "githubCopilot.sdk.event",
 ]);
 export type RuntimeEventRawSource = typeof RuntimeEventRawSource.Type;

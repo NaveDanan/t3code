@@ -4,6 +4,7 @@ import {
   type ModelSelection,
   ClaudeModelOptions,
   CodexModelOptions,
+  type CursorAgentModelOptions,
   DEFAULT_MODEL_BY_PROVIDER,
   DEFAULT_SERVER_SETTINGS,
   type OpencodeModelOptions,
@@ -174,6 +175,46 @@ const TEST_PROVIDERS: ReadonlyArray<ServerProvider> = [
         capabilities: {
           reasoningEffortLevels: [],
           supportsFastMode: false,
+          supportsThinkingToggle: false,
+          contextWindowOptions: [],
+          promptInjectedEffortLevels: [],
+        },
+      },
+    ],
+  },
+  {
+    provider: "cursorAgent",
+    enabled: true,
+    installed: true,
+    version: "0.1.0",
+    status: "ready",
+    auth: { status: "authenticated" },
+    checkedAt: "2026-01-01T00:00:00.000Z",
+    runtimeCapabilities: { busyFollowupMode: "queue-only" },
+    models: [
+      {
+        slug: "gpt-5.5",
+        name: "GPT-5.5",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [
+            { value: "medium", label: "Medium", isDefault: true },
+            { value: "high", label: "High" },
+            { value: "xhigh", label: "Extra High" },
+          ],
+          supportsFastMode: false,
+          supportsThinkingToggle: false,
+          contextWindowOptions: [{ value: "1m", label: "1M", isDefault: true }],
+          promptInjectedEffortLevels: [],
+        },
+      },
+      {
+        slug: "composer-2",
+        name: "Composer 2",
+        isCustom: false,
+        capabilities: {
+          reasoningEffortLevels: [],
+          supportsFastMode: true,
           supportsThinkingToggle: false,
           contextWindowOptions: [],
           promptInjectedEffortLevels: [],
@@ -684,5 +725,109 @@ describe("TraitsPicker (OpenCode)", () => {
     });
 
     expect(document.querySelector("button")).toBeNull();
+  });
+});
+
+// ── Cursor TraitsPicker tests ─────────────────────────────────────────
+
+async function mountCursorPicker(props: { model?: string; options?: CursorAgentModelOptions }) {
+  const threadId = ThreadId.make("thread-cursor-traits");
+  const model = props.model ?? "gpt-5.5";
+  const draftsByThreadKey: Record<ThreadId, ComposerThreadDraftState> = {
+    [threadId]: {
+      prompt: "",
+      images: [],
+      nonPersistedImageIds: [],
+      persistedAttachments: [],
+      terminalContexts: [],
+      modelSelectionByProvider: {
+        cursorAgent: {
+          provider: "cursorAgent",
+          model,
+          ...(props.options ? { options: props.options } : {}),
+        },
+      },
+      activeProvider: "cursorAgent",
+      runtimeMode: null,
+      interactionMode: null,
+    },
+  };
+
+  useComposerDraftStore.setState({
+    draftsByThreadKey,
+    draftThreadsByThreadKey: {},
+    logicalProjectDraftThreadKeyByLogicalProjectKey: {},
+  });
+  const host = document.createElement("div");
+  document.body.append(host);
+  const screen = await render(
+    <TraitsPicker
+      provider="cursorAgent"
+      models={TEST_PROVIDERS[3]!.models}
+      model={model}
+      prompt=""
+      modelOptions={props.options}
+      onPromptChange={() => {}}
+    />,
+    { container: host },
+  );
+
+  const cleanup = async () => {
+    await screen.unmount();
+    host.remove();
+  };
+
+  return {
+    [Symbol.asyncDispose]: cleanup,
+    cleanup,
+  };
+}
+
+describe("TraitsPicker (Cursor)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    localStorage.removeItem(COMPOSER_DRAFT_STORAGE_KEY);
+    useComposerDraftStore.setState({
+      draftsByThreadKey: {},
+      draftThreadsByThreadKey: {},
+      logicalProjectDraftThreadKeyByLogicalProjectKey: {},
+      stickyModelSelectionByProvider: {},
+    });
+  });
+
+  it("shows parsed Cursor context in the trigger and menu even when it is the only known option", async () => {
+    await using _ = await mountCursorPicker({
+      options: { reasoningEffort: "medium", contextWindow: "1m" },
+    });
+
+    await vi.waitFor(() => {
+      expect(document.body.textContent ?? "").toContain("Medium · 1M");
+    });
+    await page.getByRole("button").click();
+
+    await vi.waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("Context");
+      expect(text).toContain("1M (default)");
+    });
+  });
+
+  it("shows traits controls for fast-only Cursor models", async () => {
+    await using _ = await mountCursorPicker({
+      model: "composer-2",
+      options: { fastMode: true },
+    });
+
+    await vi.waitFor(() => {
+      expect(document.body.textContent ?? "").toContain("Fast");
+    });
+    await page.getByRole("button").click();
+
+    await vi.waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("Fast Mode");
+      expect(text).toContain("off");
+      expect(text).toContain("on");
+    });
   });
 });

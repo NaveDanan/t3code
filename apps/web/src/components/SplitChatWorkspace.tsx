@@ -11,7 +11,12 @@
  * to create or replace split panes.
  */
 
-import { parseScopedThreadKey, scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime";
+import {
+  parseScopedThreadKey,
+  scopedThreadKey,
+  scopeProjectRef,
+  scopeThreadRef,
+} from "@t3tools/client-runtime";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { XIcon } from "lucide-react";
@@ -19,10 +24,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode
 import { useShallow } from "zustand/react/shallow";
 
 import ChatView from "./ChatView";
+import { DesktopTitleBar } from "./DesktopTitleBar";
 import ThreadTerminalHost from "./ThreadTerminalHost";
 import { useSplitViewStore } from "../chatSplitViewStore";
 import { useComposerDraftStore } from "../composerDraftStore";
+import { isElectron } from "../env";
 import { selectThreadsAcrossEnvironments, useStore } from "../store";
+import { createProjectSelectorByRef, createThreadSelectorByRef } from "../storeSelectors";
 import { useTerminalStateStore } from "../terminalStateStore";
 import { buildThreadRouteParams } from "../threadRoutes";
 import type { TerminalContextSelection } from "../lib/terminalContext";
@@ -33,23 +41,46 @@ import type { TerminalContextSelection } from "../lib/terminalContext";
 
 export const THREAD_DRAG_MIME = "application/x-t3-thread-ref";
 const MIN_PANE_WIDTH_PX = 360;
+const SPLIT_EDGE_ZONE_MIN_PX = 96;
+const SPLIT_EDGE_ZONE_MAX_PX = 180;
+const SPLIT_EDGE_ZONE_RATIO = 0.2;
+
+type DropPosition = "left" | "right" | "full";
+
+function resolveWorkspaceDropPosition(rect: DOMRect, clientX: number): DropPosition {
+  const edgeZoneWidth = Math.min(
+    SPLIT_EDGE_ZONE_MAX_PX,
+    Math.max(SPLIT_EDGE_ZONE_MIN_PX, rect.width * SPLIT_EDGE_ZONE_RATIO),
+  );
+  const relativeX = clientX - rect.left;
+
+  if (relativeX <= edgeZoneWidth) {
+    return "left";
+  }
+  if (relativeX >= rect.width - edgeZoneWidth) {
+    return "right";
+  }
+  return "full";
+}
 
 // ---------------------------------------------------------------------------
 // Drop overlay
 // ---------------------------------------------------------------------------
 
 interface DropOverlayProps {
-  position: "left" | "right" | "full";
+  position: DropPosition;
+  offsetDesktopTitleBar: boolean;
   visible: boolean;
 }
 
-function DropOverlay({ position, visible }: DropOverlayProps) {
+function DropOverlay({ position, offsetDesktopTitleBar, visible }: DropOverlayProps) {
   if (!visible) return null;
   const positionClasses =
     position === "left" ? "left-0 w-1/2" : position === "right" ? "right-0 w-1/2" : "inset-0";
+  const topClass = offsetDesktopTitleBar ? "top-[44px]" : "top-0";
   return (
     <div
-      className={`pointer-events-none absolute top-0 bottom-0 z-40 border-2 border-dashed border-primary/50 bg-primary/5 ${positionClasses}`}
+      className={`pointer-events-none absolute bottom-0 z-40 border-2 border-dashed border-muted-foreground/105 bg-muted/35 ${topClass} ${positionClasses}`}
     />
   );
 }
@@ -108,9 +139,27 @@ function SplitChatWorkspace({ environmentId, threadId, rightPanel }: SplitChatWo
   const storeSelectPane = useSplitViewStore((s) => s.selectPane);
   const storeClosePane = useSplitViewStore((s) => s.closePane);
   const storeOpenSplitWith = useSplitViewStore((s) => s.openSplitWith);
+  const storeReplaceSelectedPane = useSplitViewStore((s) => s.replaceSelectedPane);
   const storeSanitizeMissingThreads = useSplitViewStore((s) => s.sanitizeMissingThreads);
 
   const isSplitActive = paneThreadKeys.length >= 2;
+  const selectedTitleThreadRef = useMemo(
+    () => (selectedPaneThreadKey ? parseScopedThreadKey(selectedPaneThreadKey) : routeThreadRef),
+    [routeThreadRef, selectedPaneThreadKey],
+  );
+  const selectedTitleThread = useStore(
+    useMemo(() => createThreadSelectorByRef(selectedTitleThreadRef), [selectedTitleThreadRef]),
+  );
+  const selectedTitleProjectRef = useMemo(
+    () =>
+      selectedTitleThread
+        ? scopeProjectRef(selectedTitleThread.environmentId, selectedTitleThread.projectId)
+        : null,
+    [selectedTitleThread],
+  );
+  const selectedTitleProject = useStore(
+    useMemo(() => createProjectSelectorByRef(selectedTitleProjectRef), [selectedTitleProjectRef]),
+  );
 
   // Thread existence checks
   const serverThreadKeys = useStore(
@@ -203,27 +252,19 @@ function SplitChatWorkspace({ environmentId, threadId, rightPanel }: SplitChatWo
   // Drag/drop state
   // -----------------------------------------------------------------------
 
-  const [dropPosition, setDropPosition] = useState<"left" | "right" | "full" | null>(null);
+  const [dropPosition, setDropPosition] = useState<DropPosition | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
 
-  const handleDragOver = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
-      if (!event.dataTransfer.types.includes(THREAD_DRAG_MIME)) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes(THREAD_DRAG_MIME)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
 
-      const rect = workspaceRef.current?.getBoundingClientRect();
-      if (!rect) return;
+    const rect = workspaceRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-      if (isSplitActive) {
-        const relativeX = event.clientX - rect.left;
-        setDropPosition(relativeX < rect.width / 2 ? "left" : "right");
-      } else {
-        setDropPosition("full");
-      }
-    },
-    [isSplitActive],
-  );
+    setDropPosition(resolveWorkspaceDropPosition(rect, event.clientX));
+  }, []);
 
   const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     // Only clear if we actually left the workspace element.
@@ -247,29 +288,45 @@ function SplitChatWorkspace({ environmentId, threadId, rightPanel }: SplitChatWo
       if (!droppedRef) return;
 
       const droppedThreadKey = scopedThreadKey(droppedRef);
+      const rect = workspaceRef.current?.getBoundingClientRect();
+      const resolvedDropPosition = rect
+        ? resolveWorkspaceDropPosition(rect, event.clientX)
+        : dropPosition;
+      const shouldOpenSplit = resolvedDropPosition === "left" || resolvedDropPosition === "right";
 
       // Check container width before adding a pane.
       const containerWidth = workspaceRef.current?.clientWidth ?? 0;
-      if (!isSplitActive && containerWidth < MIN_PANE_WIDTH_PX * 2) {
+      if (shouldOpenSplit && !isSplitActive && containerWidth < MIN_PANE_WIDTH_PX * 2) {
         // Not enough room — could show a toast here in the future.
         return;
       }
 
-      // Drop the currently-selected thread = no-op.
+      // Drop the currently-selected thread in single-pane mode = no-op.
       if (droppedThreadKey === routeThreadKey && !isSplitActive) {
         return;
       }
 
-      // openSplitWith handles both creating and adding to split
-      storeOpenSplitWith(routeThreadKey, droppedThreadKey);
+      if (shouldOpenSplit) {
+        // openSplitWith handles both creating and adding to split.
+        storeOpenSplitWith(selectedPaneThreadKey ?? routeThreadKey, droppedThreadKey);
+      } else if (isSplitActive) {
+        storeReplaceSelectedPane(droppedThreadKey);
+      }
 
-      // Navigate to the dropped thread since openSplitWith selects it.
       void navigate({
         to: "/$environmentId/$threadId",
         params: buildThreadRouteParams(droppedRef),
       });
     },
-    [isSplitActive, navigate, routeThreadKey, storeOpenSplitWith],
+    [
+      dropPosition,
+      isSplitActive,
+      navigate,
+      routeThreadKey,
+      selectedPaneThreadKey,
+      storeOpenSplitWith,
+      storeReplaceSelectedPane,
+    ],
   );
 
   // -----------------------------------------------------------------------
@@ -299,7 +356,9 @@ function SplitChatWorkspace({ environmentId, threadId, rightPanel }: SplitChatWo
           routeKind="server"
           rightPanel={rightPanel}
         />
-        {dropPosition && <DropOverlay position={dropPosition} visible />}
+        {dropPosition && (
+          <DropOverlay position={dropPosition} offsetDesktopTitleBar={isElectron} visible />
+        )}
       </div>
     );
   }
@@ -316,6 +375,16 @@ function SplitChatWorkspace({ environmentId, threadId, rightPanel }: SplitChatWo
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {isElectron ? (
+        <DesktopTitleBar
+          title={selectedTitleThread?.title ?? "NJ Code"}
+          contextLabel="Project"
+          contextValue={selectedTitleProject?.name ?? "None"}
+          showContextChip={false}
+          {...(selectedTitleProject?.name ? { subtitle: selectedTitleProject.name } : {})}
+        />
+      ) : null}
+
       {/* Pane strip + right panel in horizontal layout */}
       <div className="flex min-h-0 min-w-0 flex-1">
         {/* Pane strip */}
@@ -364,7 +433,9 @@ function SplitChatWorkspace({ environmentId, threadId, rightPanel }: SplitChatWo
       />
 
       {/* Drop overlay */}
-      {dropPosition && <DropOverlay position={dropPosition} visible />}
+      {dropPosition && (
+        <DropOverlay position={dropPosition} offsetDesktopTitleBar={isElectron} visible />
+      )}
     </div>
   );
 }

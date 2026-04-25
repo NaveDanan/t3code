@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { delimiter as PATH_DELIMITER, join } from "node:path";
 
 import rootPackageJson from "../package.json" with { type: "json" };
@@ -13,7 +13,19 @@ import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { Config, Data, Effect, FileSystem, Layer, Logger, Option, Path, Schema } from "effect";
+import {
+  Config,
+  Data,
+  Effect,
+  FileSystem,
+  Layer,
+  Logger,
+  Option,
+  Path,
+  Predicate,
+  Schema,
+} from "effect";
+import * as PlatformError from "effect/PlatformError";
 import { Command, Flag } from "effect/unstable/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
@@ -32,6 +44,11 @@ const ProductionLinuxIconSource = Effect.zipWith(
   RepoRoot,
   Effect.service(Path.Path),
   (repoRoot, path) => path.join(repoRoot, BRAND_ASSET_PATHS.productionLinuxIconPng),
+);
+const ProductionWindowsIconPngSource = Effect.zipWith(
+  RepoRoot,
+  Effect.service(Path.Path),
+  (repoRoot, path) => path.join(repoRoot, BRAND_ASSET_PATHS.productionWindowsIconPng),
 );
 const ProductionWindowsIconSource = Effect.zipWith(
   RepoRoot,
@@ -105,6 +122,48 @@ class BuildScriptError extends Data.TaggedError("BuildScriptError")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
+
+const isPlatformError = (cause: unknown): cause is PlatformError.PlatformError =>
+  Predicate.isTagged(cause, "PlatformError");
+
+export const ensureDirectory = Effect.fn("ensureDirectory")(function* (directory: string) {
+  const fs = yield* FileSystem.FileSystem;
+
+  const existingType = yield* fs.stat(directory).pipe(
+    Effect.map((stat) => stat.type),
+    Effect.catch((cause) =>
+      cause.reason._tag === "NotFound" ? Effect.succeed(null) : Effect.fail(cause),
+    ),
+  );
+
+  if (existingType === "Directory") {
+    return;
+  }
+
+  if (existingType !== null) {
+    return yield* new BuildScriptError({
+      message: `Build output path exists but is not a directory: ${directory}`,
+    });
+  }
+
+  yield* fs.makeDirectory(directory, { recursive: true }).pipe(
+    Effect.catch((cause) =>
+      isPlatformError(cause) && cause.reason._tag === "AlreadyExists"
+        ? fs.stat(directory).pipe(
+            Effect.flatMap((stat) =>
+              stat.type === "Directory"
+                ? Effect.void
+                : Effect.fail(
+                    new BuildScriptError({
+                      message: `Build output path exists but is not a directory: ${directory}`,
+                    }),
+                  ),
+            ),
+          )
+        : Effect.fail(cause),
+    ),
+  );
+});
 
 // Resolve the on-disk directory of a package in the workspace using bun's
 // module resolution. node-pty is a server dependency, so we resolve from
@@ -232,6 +291,7 @@ interface StagePackageJson {
   readonly name: string;
   readonly version: string;
   readonly buildVersion: string;
+  readonly t3CodeBaseVersion: string;
   readonly t3codeCommitHash: string;
   readonly packageManager: string;
   readonly private: true;
@@ -342,6 +402,122 @@ const commandOutputOptions = (verbose: boolean) =>
     stderr: "inherit",
   }) as const;
 
+const REQUIRED_WINDOWS_ICON_SIZE = 256;
+
+export function listIcoImageSizes(buffer: Uint8Array): number[] {
+  if (buffer.byteLength < 6) {
+    return [];
+  }
+
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  if (view.getUint16(0, true) !== 0 || view.getUint16(2, true) !== 1) {
+    return [];
+  }
+
+  const imageCount = view.getUint16(4, true);
+  const sizes: number[] = [];
+  for (let index = 0; index < imageCount; index += 1) {
+    const entryOffset = 6 + index * 16;
+    if (entryOffset + 16 > buffer.byteLength) {
+      break;
+    }
+
+    const widthByte = view.getUint8(entryOffset);
+    const heightByte = view.getUint8(entryOffset + 1);
+    const width = widthByte === 0 ? 256 : widthByte;
+    const height = heightByte === 0 ? 256 : heightByte;
+    if (width === height) {
+      sizes.push(width);
+    }
+  }
+
+  return sizes;
+}
+
+function hasIcoImageSize(buffer: Uint8Array, expectedSize: number): boolean {
+  return listIcoImageSizes(buffer).includes(expectedSize);
+}
+
+function toPowerShellLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function encodePowerShellCommand(command: string): string {
+  return Buffer.from(command, "utf16le").toString("base64");
+}
+
+function generateWindowsIcoFromPng(sourcePng: string, targetIco: string, verbose: boolean): void {
+  if (process.platform !== "win32") {
+    throw new Error("Windows ICO generation is only available on Windows hosts.");
+  }
+
+  const tempPngPath = `${targetIco}.256.png`;
+  const powerShellScript = [
+    "$ErrorActionPreference = 'Stop'",
+    "Add-Type -AssemblyName System.Drawing",
+    `$sourcePath = ${toPowerShellLiteral(sourcePng)}`,
+    `$targetPath = ${toPowerShellLiteral(targetIco)}`,
+    `$tempPngPath = ${toPowerShellLiteral(tempPngPath)}`,
+    "$image = [System.Drawing.Image]::FromFile($sourcePath)",
+    "try {",
+    "  $bitmap = New-Object System.Drawing.Bitmap 256, 256",
+    "  try {",
+    "    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)",
+    "    try {",
+    "      $graphics.Clear([System.Drawing.Color]::Transparent)",
+    "      $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic",
+    "      $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality",
+    "      $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality",
+    "      $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality",
+    "      $graphics.DrawImage($image, 0, 0, 256, 256)",
+    "    } finally {",
+    "      $graphics.Dispose()",
+    "    }",
+    "    $bitmap.Save($tempPngPath, [System.Drawing.Imaging.ImageFormat]::Png)",
+    "  } finally {",
+    "    $bitmap.Dispose()",
+    "  }",
+    "} finally {",
+    "  $image.Dispose()",
+    "}",
+    "$pngBytes = [System.IO.File]::ReadAllBytes($tempPngPath)",
+    "$stream = [System.IO.File]::Open($targetPath, [System.IO.FileMode]::Create)",
+    "$writer = New-Object System.IO.BinaryWriter($stream)",
+    "try {",
+    "  $writer.Write([UInt16]0)",
+    "  $writer.Write([UInt16]1)",
+    "  $writer.Write([UInt16]1)",
+    "  $writer.Write([Byte]0)",
+    "  $writer.Write([Byte]0)",
+    "  $writer.Write([Byte]0)",
+    "  $writer.Write([Byte]0)",
+    "  $writer.Write([UInt16]1)",
+    "  $writer.Write([UInt16]32)",
+    "  $writer.Write([UInt32]$pngBytes.Length)",
+    "  $writer.Write([UInt32]22)",
+    "  $writer.Write($pngBytes)",
+    "} finally {",
+    "  $writer.Dispose()",
+    "  $stream.Dispose()",
+    "}",
+    "Remove-Item $tempPngPath -ErrorAction SilentlyContinue",
+  ].join("\n");
+
+  const result = spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShellCommand(powerShellScript)],
+    {
+      stdio: verbose ? "inherit" : "pipe",
+      encoding: "utf8",
+    },
+  );
+
+  if (result.status !== 0) {
+    const stderr = `${result.stderr ?? ""}`.trim();
+    throw new Error(stderr.length > 0 ? stderr : "PowerShell failed to generate icon.ico.");
+  }
+}
+
 const runCommand = Effect.fn("runCommand")(function* (command: ChildProcess.Command) {
   const commandSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const child = yield* commandSpawner.spawn(command);
@@ -434,19 +610,48 @@ function stageLinuxIcons(stageResourcesDir: string) {
   });
 }
 
-function stageWindowsIcons(stageResourcesDir: string) {
+function stageWindowsIcons(stageResourcesDir: string, verbose: boolean) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const iconSource = yield* ProductionWindowsIconSource;
-    if (!(yield* fs.exists(iconSource))) {
+    const iconSourceIco = yield* ProductionWindowsIconSource;
+    if (!(yield* fs.exists(iconSourceIco))) {
       return yield* new BuildScriptError({
-        message: `Production Windows icon source is missing at ${iconSource}`,
+        message: `Production Windows icon source is missing at ${iconSourceIco}`,
       });
     }
 
     const iconPath = path.join(stageResourcesDir, "icon.ico");
-    yield* fs.copyFile(iconSource, iconPath);
+    const iconBytes = readFileSync(iconSourceIco);
+    if (hasIcoImageSize(iconBytes, REQUIRED_WINDOWS_ICON_SIZE)) {
+      yield* fs.copyFile(iconSourceIco, iconPath);
+      return;
+    }
+
+    const iconSourcePng = yield* ProductionWindowsIconPngSource;
+    if (!(yield* fs.exists(iconSourcePng))) {
+      return yield* new BuildScriptError({
+        message: `Production Windows icon fallback source is missing at ${iconSourcePng}`,
+      });
+    }
+
+    yield* Effect.logWarning(
+      `[desktop-artifact] Production Windows icon is missing a ${REQUIRED_WINDOWS_ICON_SIZE}x${REQUIRED_WINDOWS_ICON_SIZE} entry. Regenerating icon.ico from ${iconSourcePng}.`,
+    );
+    yield* Effect.try({
+      try: () => generateWindowsIcoFromPng(iconSourcePng, iconPath, verbose),
+      catch: (cause) =>
+        new BuildScriptError({
+          message: `Failed to generate a valid Windows icon from ${iconSourcePng}.`,
+          cause,
+        }),
+    });
+
+    if (!hasIcoImageSize(readFileSync(iconPath), REQUIRED_WINDOWS_ICON_SIZE)) {
+      return yield* new BuildScriptError({
+        message: `Generated Windows icon at ${iconPath} is still missing a ${REQUIRED_WINDOWS_ICON_SIZE}x${REQUIRED_WINDOWS_ICON_SIZE} entry.`,
+      });
+    }
   });
 }
 
@@ -623,7 +828,7 @@ const assertPlatformBuildResources = Effect.fn("assertPlatformBuildResources")(f
   }
 
   if (platform === "win") {
-    yield* stageWindowsIcons(stageResourcesDir);
+    yield* stageWindowsIcons(stageResourcesDir, verbose);
   }
 });
 
@@ -676,7 +881,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       }),
   });
 
-  const appVersion = options.version ?? serverPackageJson.version;
+  const appVersion = options.version ?? rootPackageJson.version;
+  const t3CodeBaseVersion = rootPackageJson.t3CodeBaseVersion;
   const commitHash = resolveGitCommitHash(repoRoot);
   const mkdir = options.keepStage ? fs.makeTempDirectory : fs.makeTempDirectoryScoped;
   const stageRoot = yield* mkdir({
@@ -737,6 +943,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     name: "t3code",
     version: appVersion,
     buildVersion: appVersion,
+    t3CodeBaseVersion,
     t3codeCommitHash: commitHash,
     packageManager: rootPackageJson.packageManager,
     private: true,
@@ -844,7 +1051,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   }
 
   const stageEntries = yield* fs.readDirectory(stageDistDir);
-  yield* fs.makeDirectory(options.outputDir, { recursive: true });
+  yield* ensureDirectory(options.outputDir);
 
   const copiedArtifacts: string[] = [];
   for (const entry of stageEntries) {

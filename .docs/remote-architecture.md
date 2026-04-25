@@ -8,7 +8,7 @@ It is intentionally architecture-first. It does not define a complete implementa
 
 - Treat remote environments as first-class product primitives, not special cases.
 - Support multiple ways to reach the same environment.
-- Keep the T3 server as the execution boundary.
+- Keep the NJ server as the execution boundary.
 - Let desktop, mobile, and web all share the same conceptual model.
 - Avoid introducing a local control plane unless product pressure proves it is necessary.
 
@@ -21,7 +21,7 @@ It is intentionally architecture-first. It does not define a complete implementa
 
 ## High-level architecture
 
-T3 already has a clean runtime boundary: the client talks to a T3 server over HTTP/WebSocket, and the server owns orchestration, providers, terminals, git, and filesystem operations.
+T3 already has a clean runtime boundary: the client talks to a NJ server over HTTP/WebSocket, and the server owns orchestration, providers, terminals, git, and filesystem operations.
 
 Remote support should preserve that boundary.
 
@@ -44,10 +44,10 @@ Remote support should preserve that boundary.
 │ - desktop-managed ssh bootstrap + forward   │
 └───────────────┬──────────────────────────────┘
                 │
-                │ connects to one T3 server
+                │ connects to one NJ server
                 │
 ┌───────────────▼──────────────────────────────┐
-│ Execution environment = one T3 server       │
+│ Execution environment = one NJ server       │
 │                                              │
 │ - environment identity                       │
 │ - provider state                             │
@@ -62,7 +62,7 @@ The important decision is that remoteness is expressed at the environment connec
 
 ### ExecutionEnvironment
 
-An `ExecutionEnvironment` is one running T3 server instance.
+An `ExecutionEnvironment` is one running NJ server instance.
 
 It is the unit that owns:
 
@@ -128,7 +128,7 @@ That means:
 
 Access methods answer one question:
 
-How does the client speak WebSocket to a T3 server?
+How does the client speak WebSocket to a NJ server?
 
 They do not answer:
 
@@ -178,7 +178,7 @@ The desktop main process can use SSH to:
 
 - reach a machine
 - probe it
-- launch or reuse a remote T3 server
+- launch or reuse a remote NJ server
 - establish a local port forward
 
 After that, the renderer should still connect using an ordinary WebSocket URL against the forwarded local port.
@@ -189,7 +189,7 @@ This keeps the renderer transport model consistent with every other access metho
 
 Launch methods answer a different question:
 
-How does a T3 server come to exist on the target machine?
+How does a NJ server come to exist on the target machine?
 
 Launch and access should stay separate in the design.
 
@@ -223,13 +223,13 @@ The recommended T3 flow is:
 
 1. Desktop connects over SSH.
 2. Desktop probes the remote machine and verifies T3 availability.
-3. Desktop launches or reuses a remote T3 server.
+3. Desktop launches or reuses a remote NJ server.
 4. Desktop establishes local port forwarding.
 5. Renderer connects to the forwarded WebSocket endpoint as a normal environment.
 
 ### 3. Client-managed local publish
 
-This is the inverse of remote launch: a local T3 server is already running, and the client publishes it through a tunnel.
+This is the inverse of remote launch: a local NJ server is already running, and the client publishes it through a tunnel.
 
 This is useful for:
 
@@ -244,7 +244,7 @@ These concerns are easy to conflate, but separating them prevents architectural 
 
 Examples:
 
-- A manually hosted T3 server might be reached through direct `wss`.
+- A manually hosted NJ server might be reached through direct `wss`.
 - The same server might also be reachable through a tunnel.
 - An SSH-managed server might be launched over SSH but then reached through forwarded WebSocket.
 - A local desktop server might be published through a tunnel for mobile.
@@ -286,7 +286,7 @@ T3 should not copy that part.
 
 T3 already has the right runtime boundary:
 
-- one T3 server per environment
+- one NJ server per environment
 - ordinary HTTP/WebSocket between client and environment
 
 So T3 should borrow Zed's launch discipline, not its transport protocol.

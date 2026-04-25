@@ -10,6 +10,7 @@ import {
   isClaudeUltrathinkPrompt,
   normalizeClaudeModelOptionsWithCapabilities,
   normalizeCodexModelOptionsWithCapabilities,
+  normalizeCursorAgentModelOptionsWithCapabilities,
   normalizeOpencodeModelOptionsWithCapabilities,
   normalizeModelSlug,
   resolveApiModelId,
@@ -61,11 +62,28 @@ const opencodeCaps: ModelCapabilities = {
   promptInjectedEffortLevels: [],
 };
 
+const cursorCaps: ModelCapabilities = {
+  reasoningEffortLevels: [
+    { value: "low", label: "Low" },
+    { value: "medium", label: "Medium", isDefault: true },
+    { value: "high", label: "High" },
+    { value: "xhigh", label: "Extra High" },
+  ],
+  supportsFastMode: true,
+  supportsThinkingToggle: true,
+  contextWindowOptions: [
+    { value: "200k", label: "200K" },
+    { value: "1m", label: "1M", isDefault: true },
+  ],
+  promptInjectedEffortLevels: [],
+};
+
 describe("normalizeModelSlug", () => {
   it("maps known aliases to canonical slugs", () => {
     expect(normalizeModelSlug("gpt-5-codex")).toBe("gpt-5.4");
     expect(normalizeModelSlug("5.3")).toBe("gpt-5.3-codex");
     expect(normalizeModelSlug("sonnet", "claudeAgent")).toBe("claude-sonnet-4-6");
+    expect(normalizeModelSlug("gpt-5.4-xhigh-fast", "cursorAgent")).toBe("gpt-5.4");
   });
 
   it("returns null for empty or missing values", () => {
@@ -82,6 +100,9 @@ describe("resolveModelSlug", () => {
 
     expect(resolveModelSlugForProvider("claudeAgent", undefined)).toBe(
       DEFAULT_MODEL_BY_PROVIDER.claudeAgent,
+    );
+    expect(resolveModelSlugForProvider("cursorAgent", undefined)).toBe(
+      DEFAULT_MODEL_BY_PROVIDER.cursorAgent,
     );
   });
 
@@ -257,6 +278,10 @@ describe("resolveApiModelId", () => {
   it("returns the model as-is for Codex selections", () => {
     expect(resolveApiModelId({ provider: "codex", model: "gpt-5.4" })).toBe("gpt-5.4");
   });
+
+  it("returns the model as-is for Cursor selections", () => {
+    expect(resolveApiModelId({ provider: "cursorAgent", model: "auto" })).toBe("auto");
+  });
 });
 
 describe("normalize*ModelOptionsWithCapabilities", () => {
@@ -327,6 +352,32 @@ describe("normalize*ModelOptionsWithCapabilities", () => {
       }),
     ).toEqual({
       effort: "medium",
+    });
+  });
+
+  it("normalizes Cursor options against capabilities", () => {
+    expect(
+      normalizeCursorAgentModelOptionsWithCapabilities(cursorCaps, {
+        reasoningEffort: "high",
+        fastMode: false,
+        thinking: true,
+        contextWindow: "200k",
+      }),
+    ).toEqual({
+      reasoningEffort: "high",
+      fastMode: false,
+      thinking: true,
+      contextWindow: "200k",
+    });
+
+    expect(
+      normalizeCursorAgentModelOptionsWithCapabilities(cursorCaps, {
+        reasoningEffort: "bogus" as never,
+        contextWindow: "bogus",
+      }),
+    ).toEqual({
+      reasoningEffort: "medium",
+      contextWindow: "1m",
     });
   });
 });

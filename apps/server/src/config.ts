@@ -7,6 +7,7 @@
  * @module ServerConfig
  */
 import { Effect, FileSystem, Layer, LogLevel, Path, Schema, Context } from "effect";
+import type { PlatformError } from "effect/PlatformError";
 
 export const DEFAULT_PORT = 3773;
 
@@ -96,25 +97,47 @@ export const deriveServerPaths = Effect.fn(function* (
   };
 });
 
-export const ensureServerDirectories = Effect.fn(function* (derivedPaths: ServerDerivedPaths) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
+function isAlreadyExistsError(error: PlatformError): boolean {
+  return error.reason._tag === "AlreadyExists";
+}
 
-  yield* Effect.all(
-    [
-      fs.makeDirectory(derivedPaths.stateDir, { recursive: true }),
-      fs.makeDirectory(derivedPaths.logsDir, { recursive: true }),
-      fs.makeDirectory(derivedPaths.providerLogsDir, { recursive: true }),
-      fs.makeDirectory(derivedPaths.terminalLogsDir, { recursive: true }),
-      fs.makeDirectory(derivedPaths.attachmentsDir, { recursive: true }),
-      fs.makeDirectory(derivedPaths.worktreesDir, { recursive: true }),
-      fs.makeDirectory(path.dirname(derivedPaths.keybindingsConfigPath), { recursive: true }),
-      fs.makeDirectory(path.dirname(derivedPaths.settingsPath), { recursive: true }),
-      fs.makeDirectory(path.dirname(derivedPaths.anonymousIdPath), { recursive: true }),
-      fs.makeDirectory(path.dirname(derivedPaths.serverRuntimeStatePath), { recursive: true }),
-    ],
-    { concurrency: "unbounded" },
-  );
+export const ensureDirectory = Effect.fn(function* (directory: string) {
+  const fs = yield* FileSystem.FileSystem;
+
+  const assertDirectory = Effect.gen(function* () {
+    const stat = yield* fs.stat(directory);
+    if (stat.type !== "Directory") {
+      return yield* Effect.fail(new Error(`Expected '${directory}' to be a directory.`));
+    }
+  });
+
+  const exists = yield* fs.exists(directory).pipe(Effect.orElseSucceed(() => false));
+  if (exists) {
+    return yield* assertDirectory;
+  }
+
+  return yield* fs
+    .makeDirectory(directory, { recursive: true })
+    .pipe(Effect.catchIf(isAlreadyExistsError, () => assertDirectory));
+});
+
+export const ensureServerDirectories = Effect.fn(function* (derivedPaths: ServerDerivedPaths) {
+  const path = yield* Path.Path;
+  const directories = new Set([
+    derivedPaths.stateDir,
+    derivedPaths.logsDir,
+    derivedPaths.providerLogsDir,
+    derivedPaths.terminalLogsDir,
+    derivedPaths.attachmentsDir,
+    derivedPaths.worktreesDir,
+    derivedPaths.secretsDir,
+    path.dirname(derivedPaths.keybindingsConfigPath),
+    path.dirname(derivedPaths.settingsPath),
+    path.dirname(derivedPaths.anonymousIdPath),
+    path.dirname(derivedPaths.serverRuntimeStatePath),
+  ]);
+
+  yield* Effect.forEach(directories, ensureDirectory, { discard: true, concurrency: 4 });
 });
 
 /**

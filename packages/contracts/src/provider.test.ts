@@ -68,6 +68,25 @@ describe("ProviderSessionStartInput", () => {
     expect(parsed.modelSelection.options?.fastMode).toBe(true);
     expect(parsed.runtimeMode).toBe("full-access");
   });
+
+  it("accepts cursorAgent model selections", () => {
+    const parsed = decodeProviderSessionStartInput({
+      threadId: "thread-1",
+      provider: "cursorAgent",
+      cwd: "/tmp/workspace",
+      modelSelection: {
+        provider: "cursorAgent",
+        model: "auto",
+      },
+      runtimeMode: "full-access",
+    });
+
+    expect(parsed.provider).toBe("cursorAgent");
+    expect(parsed.modelSelection).toEqual({
+      provider: "cursorAgent",
+      model: "auto",
+    });
+  });
 });
 
 describe("ProviderSendTurnInput", () => {
@@ -112,5 +131,20 @@ describe("ProviderSendTurnInput", () => {
     }
     expect(parsed.modelSelection.options?.effort).toBe("ultrathink");
     expect(parsed.modelSelection.options?.fastMode).toBe(true);
+  });
+
+  it("accepts cursorAgent modelSelection", () => {
+    const parsed = decodeProviderSendTurnInput({
+      threadId: "thread-1",
+      modelSelection: {
+        provider: "cursorAgent",
+        model: "auto",
+      },
+    });
+
+    expect(parsed.modelSelection).toEqual({
+      provider: "cursorAgent",
+      model: "auto",
+    });
   });
 });

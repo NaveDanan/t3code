@@ -1,6 +1,6 @@
 {
   "name": "t3",
-  "version": "0.0.17",
+  "version": "0.0.2",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "bun run src/bin.ts",
+    "dev": "node --import tsx src/bin.ts",
     "dev:bundle": "bun tsdown --watch",
     "build": "bun run scripts/cli.ts build",
     "start": "node dist/bin.mjs",
@@ -44,6 +44,7 @@
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
+    "tsx": "^4.21.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

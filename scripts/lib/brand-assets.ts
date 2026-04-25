@@ -1,11 +1,13 @@
 export const BRAND_ASSET_PATHS = {
   productionMacIconPng: "assets/prod/black-macos-1024.png",
   productionLinuxIconPng: "assets/prod/black-universal-1024.png",
+  productionWindowsIconPng: "assets/prod/black-universal-1024.png",
   productionWindowsIconIco: "assets/prod/t3-black-windows.ico",
   productionWebFaviconIco: "assets/prod/t3-black-web-favicon.ico",
   productionWebFavicon16Png: "assets/prod/t3-black-web-favicon-16x16.png",
   productionWebFavicon32Png: "assets/prod/t3-black-web-favicon-32x32.png",
   productionWebAppleTouchIconPng: "assets/prod/t3-black-web-apple-touch-180.png",
+  developmentDesktopIconPng: "assets/dev/blueprint-universal-1024.png",
   developmentWindowsIconIco: "assets/dev/blueprint-windows.ico",
   developmentWebFaviconIco: "assets/dev/blueprint-web-favicon.ico",
   developmentWebFavicon16Png: "assets/dev/blueprint-web-favicon-16x16.png",
@@ -17,6 +19,41 @@ export interface IconOverride {
   readonly sourceRelativePath: string;
   readonly targetRelativePath: string;
 }
+
+export const DEVELOPMENT_WEB_PUBLIC_ICON_OVERRIDES: ReadonlyArray<IconOverride> = [
+  {
+    sourceRelativePath: BRAND_ASSET_PATHS.developmentWebFaviconIco,
+    targetRelativePath: "apps/web/public/favicon.ico",
+  },
+  {
+    sourceRelativePath: BRAND_ASSET_PATHS.developmentWebFavicon16Png,
+    targetRelativePath: "apps/web/public/favicon-16x16.png",
+  },
+  {
+    sourceRelativePath: BRAND_ASSET_PATHS.developmentWebFavicon32Png,
+    targetRelativePath: "apps/web/public/favicon-32x32.png",
+  },
+  {
+    sourceRelativePath: BRAND_ASSET_PATHS.developmentWebAppleTouchIconPng,
+    targetRelativePath: "apps/web/public/apple-touch-icon.png",
+  },
+];
+
+export const DEVELOPMENT_DESKTOP_RESOURCE_ICON_OVERRIDES: ReadonlyArray<IconOverride> = [
+  {
+    sourceRelativePath: BRAND_ASSET_PATHS.developmentWindowsIconIco,
+    targetRelativePath: "apps/desktop/resources/icon.ico",
+  },
+  {
+    sourceRelativePath: BRAND_ASSET_PATHS.developmentDesktopIconPng,
+    targetRelativePath: "apps/desktop/resources/icon.png",
+  },
+];
+
+export const DEVELOPMENT_DESKTOP_DEV_ICON_OVERRIDES: ReadonlyArray<IconOverride> = [
+  ...DEVELOPMENT_WEB_PUBLIC_ICON_OVERRIDES,
+  ...DEVELOPMENT_DESKTOP_RESOURCE_ICON_OVERRIDES,
+];
 
 export const DEVELOPMENT_ICON_OVERRIDES: ReadonlyArray<IconOverride> = [
   {

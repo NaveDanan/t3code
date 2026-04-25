@@ -1,6 +1,7 @@
 import {
   type ClaudeModelOptions,
   type CodexModelOptions,
+  type CursorAgentModelOptions,
   type GitHubCopilotModelOptions,
   type OpencodeModelOptions,
   type ProviderKind,
@@ -61,6 +62,9 @@ function getRawEffort(
   if (provider === "opencode") {
     return trimOrNull((modelOptions as OpencodeModelOptions | undefined)?.effort);
   }
+  if (provider === "cursorAgent") {
+    return trimOrNull((modelOptions as CursorAgentModelOptions | undefined)?.reasoningEffort);
+  }
   if (provider === "githubCopilot") {
     return trimOrNull((modelOptions as GitHubCopilotModelOptions | undefined)?.reasoningEffort);
   }
@@ -73,6 +77,9 @@ function getRawContextWindow(
 ): string | null {
   if (provider === "claudeAgent") {
     return trimOrNull((modelOptions as ClaudeModelOptions | undefined)?.contextWindow);
+  }
+  if (provider === "cursorAgent") {
+    return trimOrNull((modelOptions as CursorAgentModelOptions | undefined)?.contextWindow);
   }
   return null;
 }
@@ -217,6 +224,8 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
     ultrathinkInBodyText,
   } = getSelectedTraits(provider, models, model, prompt, modelOptions, allowPromptInjectedEffort);
   const defaultEffort = getDefaultEffort(caps);
+  const showContextSelector =
+    provider === "cursorAgent" ? contextWindowOptions.length > 0 : contextWindowOptions.length > 1;
 
   const handleEffortChange = useCallback(
     (value: string) => {
@@ -239,9 +248,11 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
       const effortKey =
         provider === "codex"
           ? "reasoningEffort"
-          : provider === "claudeAgent" || provider === "opencode"
-            ? "effort"
-            : null;
+          : provider === "cursorAgent"
+            ? "reasoningEffort"
+            : provider === "claudeAgent" || provider === "opencode"
+              ? "effort"
+              : null;
       if (!effortKey) {
         return;
       }
@@ -262,7 +273,12 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
     ],
   );
 
-  if (effort === null && thinkingEnabled === null && contextWindowOptions.length <= 1) {
+  if (
+    effort === null &&
+    thinkingEnabled === null &&
+    !caps.supportsFastMode &&
+    !showContextSelector
+  ) {
     return null;
   }
 
@@ -329,12 +345,12 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
           </MenuGroup>
         </>
       ) : null}
-      {contextWindowOptions.length > 1 ? (
+      {showContextSelector ? (
         <>
           <MenuDivider />
           <MenuGroup>
             <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
-              Context Window
+              {provider === "cursorAgent" ? "Context" : "Context Window"}
             </div>
             <MenuRadioGroup
               value={contextWindow ?? defaultContextWindow ?? ""}
@@ -384,14 +400,26 @@ export const TraitsPicker = memo(function TraitsPicker({
     defaultContextWindow,
     ultrathinkPromptControlled,
   } = getSelectedTraits(provider, models, model, prompt, modelOptions, allowPromptInjectedEffort);
+  const showContextInTrigger =
+    provider === "cursorAgent" ? contextWindowOptions.length > 0 : contextWindowOptions.length > 1;
 
   const effortLabel = effort
     ? (effortLevels.find((l) => l.value === effort)?.label ?? effort)
     : null;
   const contextWindowLabel =
-    contextWindowOptions.length > 1 && contextWindow !== defaultContextWindow
+    showContextInTrigger && (provider === "cursorAgent" || contextWindow !== defaultContextWindow)
       ? (contextWindowOptions.find((o) => o.value === contextWindow)?.label ?? null)
       : null;
+
+  if (
+    effort === null &&
+    thinkingEnabled === null &&
+    !caps.supportsFastMode &&
+    !showContextInTrigger
+  ) {
+    return null;
+  }
+
   const triggerLabel = [
     ultrathinkPromptControlled
       ? "Ultrathink"

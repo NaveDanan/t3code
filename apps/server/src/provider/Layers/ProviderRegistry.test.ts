@@ -1885,6 +1885,42 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsService.layerTest()))(
         }).pipe(Effect.ensuring(resetGitHubCopilotProviderTestDoubles)),
       );
 
+      it.effect("does not fail the provider when the Copilot version check times out", () =>
+        Effect.gen(function* () {
+          setGitHubCopilotProviderProcessRunnerForTests(
+            async () =>
+              new Promise<{
+                stdout: string;
+                stderr: string;
+                code: number | null;
+              }>(() => undefined),
+          );
+          setGitHubCopilotProviderRuntimeProbeForTests(async () => ({
+            auth: {
+              isAuthenticated: true,
+              authType: "user",
+              login: "NAVED_aicahub",
+              statusMessage: "NAVED_aicahub",
+            },
+            models: [],
+          }));
+
+          const fiber = yield* Effect.forkScoped(checkGitHubCopilotProviderStatus);
+          yield* TestClock.adjust("17 seconds");
+          const status = yield* Fiber.join(fiber);
+
+          assert.strictEqual(status.provider, "githubCopilot");
+          assert.strictEqual(status.status, "ready");
+          assert.strictEqual(status.installed, true);
+          assert.strictEqual(status.version, null);
+          assert.strictEqual(status.auth.status, "authenticated");
+          assert.match(status.message ?? "", /version check timed out/);
+        }).pipe(
+          Effect.ensuring(resetGitHubCopilotProviderTestDoubles),
+          Effect.provide(TestClock.layer()),
+        ),
+      );
+
       it.effect("treats environment-token auth as authenticated", () =>
         Effect.gen(function* () {
           setGitHubCopilotProviderProcessRunnerForTests(async (_command, args) => {

@@ -10,6 +10,7 @@ import { Effect, Layer, Context } from "effect";
 import { TextGeneration, type TextGenerationShape } from "../Services/TextGeneration.ts";
 import { CodexTextGenerationLive } from "./CodexTextGeneration.ts";
 import { ClaudeTextGenerationLive } from "./ClaudeTextGeneration.ts";
+import { CursorTextGenerationLive } from "./CursorTextGeneration.ts";
 import { ForgeTextGenerationLive } from "./ForgeTextGeneration.ts";
 import { GitHubCopilotTextGenerationLive } from "./GitHubCopilotTextGeneration.ts";
 import { OpencodeTextGenerationLive } from "./OpencodeTextGeneration.ts";
@@ -38,6 +39,10 @@ class GitHubCopilotTextGen extends Context.Service<GitHubCopilotTextGen, TextGen
   "t3/git/Layers/RoutingTextGeneration/GitHubCopilotTextGen",
 ) {}
 
+class CursorTextGen extends Context.Service<CursorTextGen, TextGenerationShape>()(
+  "t3/git/Layers/RoutingTextGeneration/CursorTextGen",
+) {}
+
 // ---------------------------------------------------------------------------
 // Routing implementation
 // ---------------------------------------------------------------------------
@@ -45,6 +50,7 @@ class GitHubCopilotTextGen extends Context.Service<GitHubCopilotTextGen, TextGen
 const makeRoutingTextGeneration = Effect.gen(function* () {
   const codex = yield* CodexTextGen;
   const claude = yield* ClaudeTextGen;
+  const cursor = yield* CursorTextGen;
   const forge = yield* ForgeTextGen;
   const opencode = yield* OpencodeTextGen;
   const githubCopilot = yield* GitHubCopilotTextGen;
@@ -56,6 +62,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generateCommitMessage(input);
         case "claudeAgent":
           return claude.generateCommitMessage(input);
+        case "cursorAgent":
+          return cursor.generateCommitMessage(input);
         case "forgecode":
           return forge.generateCommitMessage(input);
         case "opencode":
@@ -70,6 +78,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generatePrContent(input);
         case "claudeAgent":
           return claude.generatePrContent(input);
+        case "cursorAgent":
+          return cursor.generatePrContent(input);
         case "forgecode":
           return forge.generatePrContent(input);
         case "opencode":
@@ -84,6 +94,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generateBranchName(input);
         case "claudeAgent":
           return claude.generateBranchName(input);
+        case "cursorAgent":
+          return cursor.generateBranchName(input);
         case "forgecode":
           return forge.generateBranchName(input);
         case "opencode":
@@ -98,6 +110,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generateThreadTitle(input);
         case "claudeAgent":
           return claude.generateThreadTitle(input);
+        case "cursorAgent":
+          return cursor.generateThreadTitle(input);
         case "forgecode":
           return forge.generateThreadTitle(input);
         case "opencode":
@@ -112,6 +126,8 @@ const makeRoutingTextGeneration = Effect.gen(function* () {
           return codex.generateActivityGroupTitle(input);
         case "claudeAgent":
           return claude.generateActivityGroupTitle(input);
+        case "cursorAgent":
+          return cursor.generateActivityGroupTitle(input);
         case "forgecode":
           return forge.generateActivityGroupTitle(input);
         case "opencode":
@@ -163,12 +179,21 @@ const InternalGitHubCopilotLayer = Layer.effect(
   }),
 ).pipe(Layer.provide(GitHubCopilotTextGenerationLive));
 
+const InternalCursorLayer = Layer.effect(
+  CursorTextGen,
+  Effect.gen(function* () {
+    const svc = yield* TextGeneration;
+    return svc;
+  }),
+).pipe(Layer.provide(CursorTextGenerationLive));
+
 export const RoutingTextGenerationLive = Layer.effect(
   TextGeneration,
   makeRoutingTextGeneration,
 ).pipe(
   Layer.provide(InternalCodexLayer),
   Layer.provide(InternalClaudeLayer),
+  Layer.provide(InternalCursorLayer),
   Layer.provide(InternalForgeLayer),
   Layer.provide(InternalOpencodeLayer),
   Layer.provide(InternalGitHubCopilotLayer),

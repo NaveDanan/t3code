@@ -18,9 +18,10 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 
 import { type BenchmarkLaneConfig, type BenchmarkLaneRun } from "../../benchmarks/benchmarkRun";
+import { useBenchmarkHistoryStore } from "../../benchmarks/benchmarkHistoryStore";
 import {
   applyBenchmarkDispatchResults,
   buildBenchmarkRun,
@@ -155,7 +156,7 @@ function resolveBenchmarkProviderChoices(
     (
       option,
     ): option is (typeof PROVIDER_OPTIONS)[number] & { available: true; value: ProviderKind } =>
-      option.available && option.value !== "cursor",
+      option.available,
   ).flatMap((option) => {
     const provider = providerByKind.get(option.value);
     if (!provider) {
@@ -425,12 +426,27 @@ function BenchmarkLaneShell({ project, lane }: BenchmarkLaneShellProps) {
 }
 
 export const BenchmarksSettings = memo(function BenchmarksSettings() {
+  const navigate = useNavigate();
+  const benchmarkRunId = useLocation({
+    select: (location) => {
+      const runId = (location.search as { runId?: unknown }).runId;
+      return typeof runId === "string" && runId.length > 0 ? runId : null;
+    },
+  });
   const settings = useSettings();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const primaryServerConfig = useServerConfig();
   const runtimeStateById = useSavedEnvironmentRuntimeStore((state) => state.byId);
   const savedEnvironmentRegistry = useSavedEnvironmentRegistryStore((state) => state.byId);
   const projects = useStore(useShallow(selectProjectsAcrossEnvironments));
+  const activeHistoryRun = useBenchmarkHistoryStore(
+    useCallback(
+      (state) => state.runs.find((run) => run.id === benchmarkRunId) ?? null,
+      [benchmarkRunId],
+    ),
+  );
+  const addBenchmarkHistoryRun = useBenchmarkHistoryStore((state) => state.addRun);
+  const updateBenchmarkHistoryRun = useBenchmarkHistoryStore((state) => state.updateRun);
 
   const projectOptions = useMemo<BenchmarkProjectOption[]>(() => {
     return projects
@@ -580,7 +596,27 @@ export const BenchmarksSettings = memo(function BenchmarksSettings() {
       pickNextBenchmarkProvider(lanes, providerChoices) !== null,
     [lanes, providerChoices],
   );
-  const activeRunProject = runProject ?? selectedProject;
+  const historyRunProject = useMemo<BenchmarkProjectOption | null>(() => {
+    if (!activeHistoryRun) {
+      return null;
+    }
+
+    return {
+      id: activeHistoryRun.projectId,
+      environmentId: activeHistoryRun.environmentId,
+      cwd: activeHistoryRun.projectCwd,
+      name: activeHistoryRun.projectName,
+      environmentLabel: activeHistoryRun.environmentLabel,
+      defaultModelSelection: null,
+    };
+  }, [activeHistoryRun]);
+  const activeRunProject = historyRunProject ?? runProject ?? selectedProject;
+  const visibleRunLanes = activeHistoryRun?.lanes ?? runLanes;
+  const visibleRunTitle = activeHistoryRun
+    ? activeHistoryRun.title
+    : runLanes.length > 0
+      ? "Current benchmark run"
+      : null;
 
   const updateLane = useCallback((laneId: string, patch: Partial<BenchmarkLaneConfig>) => {
     setLanes((current) =>
@@ -641,31 +677,54 @@ export const BenchmarksSettings = memo(function BenchmarksSettings() {
         providers,
         settings,
       });
+      const pendingLanes = applyBenchmarkDispatchResults({
+        lanes: run.lanes,
+        results: [],
+      });
+      const savedRun = addBenchmarkHistoryRun({
+        title: `Benchmark · ${project.name}`,
+        environmentId: project.environmentId,
+        projectId: project.id,
+        projectName: project.name,
+        projectCwd: project.cwd,
+        environmentLabel: project.environmentLabel,
+        baseBranch: run.baseBranch,
+        prompt: run.prompt,
+        lanes: pendingLanes,
+      });
       setRunProject(project);
-      setRunLanes(
-        applyBenchmarkDispatchResults({
-          lanes: run.lanes,
-          results: [],
-        }),
-      );
+      setRunLanes(pendingLanes);
+      void navigate({
+        to: "/settings/benchmarks",
+        search: { runId: savedRun.id },
+        replace: true,
+      });
       const results = await dispatchBenchmarkCommands({
         run,
         dispatch: async (command) => {
           await api.orchestration.dispatchCommand(command);
         },
       });
-      setRunLanes(
-        applyBenchmarkDispatchResults({
-          lanes: run.lanes,
-          results,
-        }),
-      );
+      const dispatchedLanes = applyBenchmarkDispatchResults({
+        lanes: run.lanes,
+        results,
+      });
+      setRunLanes(dispatchedLanes);
+      updateBenchmarkHistoryRun(savedRun.id, { lanes: dispatchedLanes });
     } catch (error) {
       setRunError(error instanceof Error ? error.message : "Failed to start benchmark run.");
     } finally {
       setIsLaunching(false);
     }
-  }, [draft, providers, selectedProject, settings]);
+  }, [
+    addBenchmarkHistoryRun,
+    draft,
+    navigate,
+    providers,
+    selectedProject,
+    settings,
+    updateBenchmarkHistoryRun,
+  ]);
 
   const handleProjectPickerOpenChange = useCallback((open: boolean) => {
     setProjectPickerOpen(open);
@@ -919,7 +978,7 @@ export const BenchmarksSettings = memo(function BenchmarksSettings() {
           </div>
 
           <div className="min-w-0">
-            {runLanes.length === 0 || !activeRunProject ? (
+            {visibleRunLanes.length === 0 || !activeRunProject ? (
               <Empty className="min-h-[42rem] rounded-2xl border border-dashed bg-muted/15">
                 <EmptyMedia variant="icon">
                   <GaugeIcon />
@@ -932,17 +991,34 @@ export const BenchmarksSettings = memo(function BenchmarksSettings() {
                 </EmptyHeader>
               </Empty>
             ) : (
-              <div
-                className={cn(
-                  "grid gap-4",
-                  runLanes.length === 2
-                    ? "lg:grid-cols-2"
-                    : "grid-cols-1 overflow-x-auto md:auto-cols-[minmax(360px,1fr)] md:grid-flow-col",
-                )}
-              >
-                {runLanes.map((lane) => (
-                  <BenchmarkLaneShell key={lane.laneId} project={activeRunProject} lane={lane} />
-                ))}
+              <div className="space-y-3">
+                {visibleRunTitle ? (
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-sm font-semibold text-foreground">
+                        {visibleRunTitle}
+                      </h2>
+                      {activeHistoryRun ? (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {activeHistoryRun.environmentLabel} · {activeHistoryRun.projectName} ·{" "}
+                          {activeHistoryRun.baseBranch}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+                <div
+                  className={cn(
+                    "grid gap-4",
+                    visibleRunLanes.length === 2
+                      ? "lg:grid-cols-2"
+                      : "grid-cols-1 overflow-x-auto md:auto-cols-[minmax(360px,1fr)] md:grid-flow-col",
+                  )}
+                >
+                  {visibleRunLanes.map((lane) => (
+                    <BenchmarkLaneShell key={lane.laneId} project={activeRunProject} lane={lane} />
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./appMetadata": {
+      "types": "./src/appMetadata.ts",
+      "import": "./src/appMetadata.ts"
+    },
     "./diff": {
       "types": "./src/diff.ts",
       "import": "./src/diff.ts"

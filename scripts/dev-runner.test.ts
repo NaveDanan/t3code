@@ -2,13 +2,14 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { assert, describe, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, FileSystem, Path } from "effect";
 
 import {
   createDevRunnerEnv,
   findFirstAvailableOffset,
   resolveModePortOffsets,
   resolveOffset,
+  syncDesktopDevelopmentBrandAssets,
 } from "./dev-runner.ts";
 
 it.layer(NodeServices.layer)("dev-runner", (it) => {
@@ -309,6 +310,100 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
         assert.deepStrictEqual(offsets, { serverOffset: 0, webOffset: 0 });
       }),
+    );
+  });
+
+  describe("syncDesktopDevelopmentBrandAssets", () => {
+    it.effect("copies current desktop dev brand assets into the served locations", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const tempRoot = yield* fs.makeTempDirectoryScoped({
+            prefix: "t3-dev-runner-assets-",
+          });
+
+          yield* fs.makeDirectory(path.join(tempRoot, "assets/dev"), { recursive: true });
+          yield* fs.makeDirectory(path.join(tempRoot, "apps/web/public"), { recursive: true });
+          yield* fs.makeDirectory(path.join(tempRoot, "apps/desktop/resources"), {
+            recursive: true,
+          });
+
+          yield* fs.writeFileString(
+            path.join(tempRoot, "assets/dev/blueprint-web-favicon.ico"),
+            "favicon-ico-next",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "assets/dev/blueprint-web-favicon-16x16.png"),
+            "favicon-16-next",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "assets/dev/blueprint-web-favicon-32x32.png"),
+            "favicon-32-next",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "assets/dev/blueprint-web-apple-touch-180.png"),
+            "apple-touch-next",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "assets/dev/blueprint-windows.ico"),
+            "desktop-icon-next",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "assets/dev/blueprint-universal-1024.png"),
+            "desktop-png-next",
+          );
+
+          yield* fs.writeFileString(path.join(tempRoot, "apps/web/public/favicon.ico"), "stale");
+          yield* fs.writeFileString(
+            path.join(tempRoot, "apps/web/public/favicon-16x16.png"),
+            "stale",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "apps/web/public/favicon-32x32.png"),
+            "stale",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "apps/web/public/apple-touch-icon.png"),
+            "stale",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "apps/desktop/resources/icon.ico"),
+            "stale",
+          );
+          yield* fs.writeFileString(
+            path.join(tempRoot, "apps/desktop/resources/icon.png"),
+            "stale",
+          );
+
+          yield* syncDesktopDevelopmentBrandAssets(tempRoot);
+
+          assert.equal(
+            yield* fs.readFileString(path.join(tempRoot, "apps/web/public/favicon.ico")),
+            "favicon-ico-next",
+          );
+          assert.equal(
+            yield* fs.readFileString(path.join(tempRoot, "apps/web/public/favicon-16x16.png")),
+            "favicon-16-next",
+          );
+          assert.equal(
+            yield* fs.readFileString(path.join(tempRoot, "apps/web/public/favicon-32x32.png")),
+            "favicon-32-next",
+          );
+          assert.equal(
+            yield* fs.readFileString(path.join(tempRoot, "apps/web/public/apple-touch-icon.png")),
+            "apple-touch-next",
+          );
+          assert.equal(
+            yield* fs.readFileString(path.join(tempRoot, "apps/desktop/resources/icon.ico")),
+            "desktop-icon-next",
+          );
+          assert.equal(
+            yield* fs.readFileString(path.join(tempRoot, "apps/desktop/resources/icon.png")),
+            "desktop-png-next",
+          );
+        }),
+      ),
     );
   });
 });

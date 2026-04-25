@@ -5,9 +5,22 @@ import { homedir } from "node:os";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { NetService } from "@t3tools/shared/Net";
-import { Config, Data, Effect, Hash, Layer, Logger, Option, Path, Schema } from "effect";
+import {
+  Config,
+  Data,
+  Effect,
+  FileSystem,
+  Hash,
+  Layer,
+  Logger,
+  Option,
+  Path,
+  Schema,
+} from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ChildProcess } from "effect/unstable/process";
+
+import { DEVELOPMENT_DESKTOP_DEV_ICON_OVERRIDES } from "./lib/brand-assets.ts";
 
 const BASE_SERVER_PORT = 3773;
 const BASE_WEB_PORT = 5733;
@@ -17,6 +30,10 @@ const DESKTOP_DEV_LOOPBACK_HOST = "127.0.0.1";
 
 export const DEFAULT_T3_HOME = Effect.map(Effect.service(Path.Path), (path) =>
   path.join(homedir(), ".t3"),
+);
+
+const RepoRoot = Effect.service(Path.Path).pipe(
+  Effect.flatMap((path) => path.fromFileUrl(new URL("..", import.meta.url))),
 );
 
 const MODE_ARGS = {
@@ -411,6 +428,11 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
       return;
     }
 
+    if (input.mode === "dev:desktop") {
+      const repoRoot = yield* RepoRoot;
+      yield* syncDesktopDevelopmentBrandAssets(repoRoot);
+    }
+
     const child = yield* ChildProcess.make(
       "turbo",
       [...MODE_ARGS[input.mode], ...input.turboArgs],
@@ -447,6 +469,33 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
     ),
   );
 }
+
+export const syncDesktopDevelopmentBrandAssets = (repoRoot: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+
+    for (const override of DEVELOPMENT_DESKTOP_DEV_ICON_OVERRIDES) {
+      const sourcePath = path.join(repoRoot, override.sourceRelativePath);
+      const targetPath = path.join(repoRoot, override.targetRelativePath);
+
+      if (!(yield* fs.exists(sourcePath))) {
+        return yield* new DevRunnerError({
+          message: `Missing desktop dev asset source: ${sourcePath}`,
+        });
+      }
+
+      if (!(yield* fs.exists(targetPath))) {
+        return yield* new DevRunnerError({
+          message: `Missing desktop dev asset target: ${targetPath}`,
+        });
+      }
+
+      yield* fs.copyFile(sourcePath, targetPath);
+    }
+
+    yield* Effect.logInfo("[dev-runner] synced desktop development brand assets");
+  });
 
 const devRunnerCli = Command.make("dev-runner", {
   mode: Argument.choice("mode", DEV_RUNNER_MODES).pipe(

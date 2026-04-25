@@ -1,6 +1,7 @@
 import type {
   ClaudeModelOptions,
   CodexModelOptions,
+  CursorAgentModelOptions,
   ForgeCodeModelOptions,
   GitHubCopilotModelOptions,
   ModelSelection,
@@ -29,6 +30,11 @@ export function buildModelSelection(
   options?: ForgeCodeModelOptions,
 ): ModelSelection;
 export function buildModelSelection(
+  provider: "cursorAgent",
+  model: string,
+  options?: CursorAgentModelOptions,
+): ModelSelection;
+export function buildModelSelection(
   provider: "githubCopilot",
   model: string,
   options?: GitHubCopilotModelOptions,
@@ -39,6 +45,7 @@ export function buildModelSelection(
   options?:
     | CodexModelOptions
     | ClaudeModelOptions
+    | CursorAgentModelOptions
     | OpencodeModelOptions
     | ForgeCodeModelOptions
     | GitHubCopilotModelOptions,
@@ -49,6 +56,7 @@ export function buildModelSelection(
   options?:
     | CodexModelOptions
     | ClaudeModelOptions
+    | CursorAgentModelOptions
     | OpencodeModelOptions
     | ForgeCodeModelOptions
     | GitHubCopilotModelOptions,
@@ -69,6 +77,10 @@ export function buildModelSelection(
     case "forgecode":
       return options
         ? { provider, model, options: options as ForgeCodeModelOptions }
+        : { provider, model };
+    case "cursorAgent":
+      return options
+        ? { provider, model, options: options as CursorAgentModelOptions }
         : { provider, model };
     case "githubCopilot":
       return options

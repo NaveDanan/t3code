@@ -34,6 +34,7 @@ import {
 import {
   DEFAULT_PORT,
   deriveServerPaths,
+  ensureDirectory,
   ensureServerDirectories,
   resolveStaticDir,
   ServerConfig,
@@ -219,7 +220,6 @@ export const resolveServerConfig = (
   Effect.gen(function* () {
     const { findAvailablePort } = yield* NetService;
     const path = yield* Path.Path;
-    const fs = yield* FileSystem.FileSystem;
     const env = yield* EnvServerConfig;
     const normalizedFlags = {
       mode: flags.mode ?? Option.none(),
@@ -284,14 +284,14 @@ export const resolveServerConfig = (
     );
     const rawCwd = Option.getOrElse(normalizedFlags.cwd, () => process.cwd());
     const cwd = path.resolve(yield* expandHomePath(rawCwd.trim()));
-    yield* fs.makeDirectory(cwd, { recursive: true });
+    yield* ensureDirectory(cwd);
     const derivedPaths = yield* deriveServerPaths(baseDir, devUrl);
     yield* ensureServerDirectories(derivedPaths);
     const persistedObservabilitySettings = yield* loadPersistedObservabilitySettings(
       derivedPaths.settingsPath,
     );
     const serverTracePath = env.traceFile ?? derivedPaths.serverTracePath;
-    yield* fs.makeDirectory(path.dirname(serverTracePath), { recursive: true });
+    yield* ensureDirectory(path.dirname(serverTracePath));
     const startupPresentation = options?.startupPresentation ?? "browser";
     const isHeadlessStartup = startupPresentation === "headless";
     const noBrowser = Option.getOrElse(
