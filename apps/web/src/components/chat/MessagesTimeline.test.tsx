@@ -146,7 +146,7 @@ describe("MessagesTimeline", () => {
     );
 
     expect(markup).toContain("Context compacted");
-    expect(markup).toContain("Work log");
+    expect(markup).toContain("Context compacted (1)");
   });
 
   it("renders the file review card for file-change work entries", async () => {
@@ -202,7 +202,7 @@ describe("MessagesTimeline", () => {
       />,
     );
 
-    expect(markup).toContain("File review");
+    expect(markup).toContain("Apply patch (1)");
     expect(markup).toContain("ChatView.tsx");
     expect(markup).toContain("apps/web/src/components");
     expect(markup).toContain("+1");
